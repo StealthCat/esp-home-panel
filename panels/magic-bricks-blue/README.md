@@ -1,19 +1,27 @@
-# Home Panel Magic
+# Home Panel Magic Bricks
 
-Blue magical-school/building-brick theme: original castle/stars/building-block artwork with blue and gold accents; no franchise logos or character art.
+Deep-blue magical-school/building-brick theme closely matching the mockup: moonlit castle skyline, stars, gold ornamental card borders, gothic window details, owl artwork, blue brick accents, and warm lantern-style lighting cues.
 
-![800x480 screen preview](preview.svg)
+![800x480 live panel artwork](assets/screen.svg)
+
+The visual language is an original generic enchanted-school/building-brick aesthetic; it does not use third-party franchise logos or character artwork.
 
 ## Files
 
-- `panel.yaml` — theme colors, entity IDs, shared LVGL package and image assets
-- `assets/header-art.svg` — header artwork used by the live panel
-- `assets/fan.svg` — themed ceiling-fan graphic used by the live panel
-- `assets/echo.svg` — themed Echo/media graphic used by the live panel
-- `preview.svg` — vector preview of the deployed screen geometry
+- `panel.yaml` — ESPHome entry point and Home Assistant entity substitutions
+- `assets/screen.svg` — complete 800×480 deployed artwork
+- `../../shared/ui-dashboard.yaml` — transparent interaction layer aligned to the artwork
+- `../../shared/home-assistant-controls.yaml` — Home Assistant state bridge
+
+The full-screen artwork supplies the ornate gold trim, stars, castle, owl, windows and brick graphics. Transparent LVGL controls preserve touch interaction without flattening the visual design.
 
 ## Setup
 
-Edit the four Home Assistant entity substitutions in `panel.yaml`, then validate/install with `esphome config panels/magic-bricks-blue/panel.yaml` and `esphome run panels/magic-bricks-blue/panel.yaml`.
+Edit the four Home Assistant entity IDs in `panel.yaml`, then run:
 
-The **Announce** button fires `esphome.panel_echo_announce` with `entity_id` and `panel` event data. Use a Home Assistant automation to route that event to the Alexa/Echo notify mechanism you prefer.
+```bash
+esphome config panels/magic-bricks-blue/panel.yaml
+esphome run panels/magic-bricks-blue/panel.yaml
+```
+
+The **Announce** control fires the `esphome.panel_echo_announce` Home Assistant event.
