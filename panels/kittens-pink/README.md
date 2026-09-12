@@ -1,19 +1,25 @@
 # Home Panel Kittens
 
-Rose/pink kitten theme: cat/paw/heart artwork, warm dark-plum cards and pink controls.
+Pink kitten-themed version of the dashboard, rebuilt to closely match the mockup with rosy glass bevels, paw-print details, peeking and sleeping kitten artwork, hearts, handwritten decorative phrases, and the same four-card control layout.
 
-![800x480 screen preview](preview.svg)
+![800x480 live panel artwork](assets/screen.svg)
 
 ## Files
 
-- `panel.yaml` — theme colors, entity IDs, shared LVGL package and image assets
-- `assets/header-art.svg` — header artwork used by the live panel
-- `assets/fan.svg` — themed ceiling-fan graphic used by the live panel
-- `assets/echo.svg` — themed Echo/media graphic used by the live panel
-- `preview.svg` — vector preview of the deployed screen geometry
+- `panel.yaml` — ESPHome entry point and Home Assistant entity substitutions
+- `assets/screen.svg` — complete 800×480 deployed artwork
+- `../../shared/ui-dashboard.yaml` — transparent interaction layer aligned to the artwork
+- `../../shared/home-assistant-controls.yaml` — Home Assistant state bridge
+
+The kitten illustrations and decorative effects are part of the live screen artwork rather than separate decorative widgets, so they retain their intended placement and appearance on the 800×480 panel.
 
 ## Setup
 
-Edit these four substitutions in `panel.yaml` before compiling, then run `esphome config panels/kittens-pink/panel.yaml` and `esphome run panels/kittens-pink/panel.yaml` from the repository root.
+Edit the four Home Assistant entity IDs in `panel.yaml`, then run:
 
-The **Announce** button fires `esphome.panel_echo_announce` with `entity_id` and `panel` event data. Use a Home Assistant automation to route that event to the Alexa/Echo notify mechanism you prefer.
+```bash
+esphome config panels/kittens-pink/panel.yaml
+esphome run panels/kittens-pink/panel.yaml
+```
+
+The **Announce** control fires the `esphome.panel_echo_announce` Home Assistant event.
