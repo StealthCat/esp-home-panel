@@ -1,38 +1,12 @@
-# Shared Home Assistant bridge. All four visual themes use these IDs and actions.
+# Shared Home Assistant bridge for the artwork-first dashboards.
+# The visible status text, icons and chrome are part of the full-screen theme
+# artwork. Only state needed by interactive controls is mirrored into LVGL.
 
 binary_sensor:
-  - platform: homeassistant
-    id: tapo_led_on
-    entity_id: ${tapo_led_entity}
-    on_state:
-      - lvgl.label.update:
-          id: tapo_status_label
-          text: !lambda 'return x ? "ON" : "OFF";'
-
-  - platform: homeassistant
-    id: overhead_light_on
-    entity_id: ${overhead_light_entity}
-    on_state:
-      - lvgl.label.update:
-          id: overhead_status_label
-          text: !lambda 'return x ? "ON" : "OFF";'
-
-  - platform: homeassistant
-    id: ceiling_fan_on
-    entity_id: ${ceiling_fan_entity}
-    on_state:
-      - lvgl.label.update:
-          id: fan_status_label
-          text: !lambda 'return x ? "ON" : "OFF";'
-
   - platform: homeassistant
     id: echo_muted
     entity_id: ${echo_dot_entity}
     attribute: is_volume_muted
-    on_state:
-      - lvgl.label.update:
-          id: echo_mute_label
-          text: !lambda 'return x ? "UNMUTE" : "MUTE";'
 
 sensor:
   - platform: homeassistant
@@ -40,58 +14,33 @@ sensor:
     entity_id: ${tapo_led_entity}
     attribute: brightness
     on_value:
-      - lvgl.slider.update:
-          id: tapo_brightness_slider
-          value: !lambda 'return (int) x;'
+      then:
+        - lvgl.slider.update:
+            id: tapo_brightness_slider
+            value: !lambda |-
+              if (isnan(x)) return 0;
+              return (int) x;
 
   - platform: homeassistant
     id: overhead_brightness_state
     entity_id: ${overhead_light_entity}
     attribute: brightness
     on_value:
-      - lvgl.slider.update:
-          id: overhead_brightness_slider
-          value: !lambda 'return (int) x;'
+      then:
+        - lvgl.slider.update:
+            id: overhead_brightness_slider
+            value: !lambda |-
+              if (isnan(x)) return 0;
+              return (int) x;
 
   - platform: homeassistant
     id: echo_volume_state
     entity_id: ${echo_dot_entity}
     attribute: volume_level
     on_value:
-      - lvgl.slider.update:
-          id: echo_volume_slider
-          value: !lambda 'return (int) roundf(x * 100.0f);'
-
-text_sensor:
-  - platform: homeassistant
-    id: echo_player_state
-    entity_id: ${echo_dot_entity}
-    on_value:
-      - lvgl.label.update:
-          id: echo_status_label
-          text: !lambda |-
-            std::string s = x;
-            for (auto &c : s) c = toupper(c);
-            return s;
-
-interval:
-  - interval: 30s
-    then:
-      - lvgl.label.update:
-          id: clock_label
-          text: !lambda |-
-            auto now = id(panel_time).now();
-            if (!now.is_valid()) return std::string("--:--");
-            int h = now.hour % 12;
-            if (h == 0) h = 12;
-            char buf[8];
-            snprintf(buf, sizeof(buf), "%d:%02d", h, now.minute);
-            return std::string(buf);
-      - lvgl.label.update:
-          id: date_label
-          text: !lambda |-
-            auto now = id(panel_time).now();
-            if (!now.is_valid()) return std::string("--- --");
-            char buf[16];
-            strftime(buf, sizeof(buf), "%a, %b %d", &now.to_c_tm());
-            return std::string(buf);
+      then:
+        - lvgl.slider.update:
+            id: echo_volume_slider
+            value: !lambda |-
+              if (isnan(x)) return 0;
+              return (int) roundf(x * 100.0f);
