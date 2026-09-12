@@ -45,6 +45,10 @@ esphome run panels/classic-dark/panel.yaml
 
 Repeat with whichever theme you want to flash.
 
+## Automated validation
+
+`.github/workflows/validate.yml` runs `esphome config` against **all four panels** using ESPHome 2026.8.2 on every push to `main` and on pull requests. CI-only dummy secrets are created inside each panel directory during the workflow and are never committed.
+
 ## Entity substitutions
 
 Every panel uses the same substitutions:
@@ -65,6 +69,8 @@ The **Announce** touch region fires the Home Assistant event `esphome.panel_echo
 ## Repository structure
 
 ```text
+.github/workflows/
+  validate.yml
 shared/
   waveshare-7c-hardware.yaml
   home-assistant-controls.yaml
