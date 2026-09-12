@@ -1,33 +1,25 @@
 # Home Panel Soccer
 
-Emerald soccer theme: field-line motifs, ball/goal artwork and green controls while retaining the same functional layout.
+Green soccer-themed version of the original dashboard, rebuilt to match the mockup with illuminated green bevels, field markings, goal/net art, a soccer-ball header accent, and an audio equalizer treatment for the Echo card.
 
-![800x480 screen preview](preview.svg)
+![800x480 live panel artwork](assets/screen.svg)
 
 ## Files
 
-- `panel.yaml` — theme colors, entity IDs, shared LVGL package and image assets
-- `assets/header-art.svg` — header artwork used by the live panel
-- `assets/fan.svg` — themed ceiling-fan graphic used by the live panel
-- `assets/echo.svg` — themed Echo/media graphic used by the live panel
-- `preview.svg` — vector preview of the deployed screen geometry
+- `panel.yaml` — ESPHome entry point and Home Assistant entity substitutions
+- `assets/screen.svg` — complete 800×480 deployed artwork
+- `../../shared/ui-dashboard.yaml` — transparent interaction layer aligned to the visible controls
+- `../../shared/home-assistant-controls.yaml` — Home Assistant state bridge
+
+The visible interface is one full-resolution RGB565 image at runtime. LVGL buttons and sliders are transparent and sit directly over the toggles, color presets, brightness controls, fan switch, and Echo controls shown in the artwork.
 
 ## Setup
 
-Edit these four substitutions in `panel.yaml` before compiling:
-
-```yaml
-tapo_led_entity: light.tapo_led_strip
-overhead_light_entity: light.overhead_light
-ceiling_fan_entity: switch.ceiling_fan
-echo_dot_entity: media_player.echo_dot
-```
-
-Then validate/install from the repository root:
+Edit the four Home Assistant entity IDs in `panel.yaml`, then run:
 
 ```bash
 esphome config panels/soccer-green/panel.yaml
 esphome run panels/soccer-green/panel.yaml
 ```
 
-The **Announce** button fires `esphome.panel_echo_announce` with `entity_id` and `panel` event data. Use a Home Assistant automation to route that event to the Alexa/Echo notify mechanism you prefer.
+The **Announce** control fires the `esphome.panel_echo_announce` Home Assistant event.
