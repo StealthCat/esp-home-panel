@@ -38,16 +38,12 @@ lvgl:
       bg_color: 0x000000
       bg_opa: COVER
       widgets:
-        # Pixel-aligned visual surface. All bevels, artwork, card textures,
-        # icons and decorative graphics live in this 800x480 image.
         - image:
             x: 0
             y: 0
             src: theme_screen
 
-        # ------------------------------------------------------------------
-        # Tapo LED strip
-        # ------------------------------------------------------------------
+        # Tapo LED strip power
         - button:
             x: 292
             y: 76
@@ -59,6 +55,7 @@ lvgl:
                   data:
                     entity_id: ${tapo_led_entity}
 
+        # Tapo color presets
         - button:
             x: 166
             y: 145
@@ -135,7 +132,6 @@ lvgl:
             min_value: 0
             max_value: 255
             value: 180
-            adv_hittest: true
             on_release:
               - homeassistant.action:
                   action: light.turn_on
@@ -143,9 +139,7 @@ lvgl:
                     entity_id: ${tapo_led_entity}
                     brightness: !lambda 'return (int) x;'
 
-        # ------------------------------------------------------------------
-        # Overhead light
-        # ------------------------------------------------------------------
+        # Overhead light power
         - button:
             x: 690
             y: 76
@@ -166,7 +160,6 @@ lvgl:
             min_value: 0
             max_value: 255
             value: 160
-            adv_hittest: true
             on_release:
               - homeassistant.action:
                   action: light.turn_on
@@ -219,9 +212,7 @@ lvgl:
                     entity_id: ${overhead_light_entity}
                     brightness_pct: 100
 
-        # ------------------------------------------------------------------
-        # Ceiling fan smart switch. The fan emblem and toggle are both active.
-        # ------------------------------------------------------------------
+        # Ceiling fan smart switch: emblem and toggle are both active.
         - button:
             x: 24
             y: 320
@@ -243,9 +234,7 @@ lvgl:
                   data:
                     entity_id: ${ceiling_fan_entity}
 
-        # ------------------------------------------------------------------
-        # Echo Dot
-        # ------------------------------------------------------------------
+        # Echo Dot volume
         - slider:
             id: echo_volume_slider
             x: 463
@@ -255,7 +244,6 @@ lvgl:
             min_value: 0
             max_value: 100
             value: 50
-            adv_hittest: true
             on_release:
               - homeassistant.action:
                   action: media_player.volume_set
