@@ -1,6 +1,6 @@
 # ESP Home Panel — Waveshare 7C BOX
 
-Four themed ESPHome/LVGL dashboards for the Waveshare **ESP32-S3-Touch-LCD-7C-BOX** (800×480):
+Four themed ESPHome/LVGL dashboards for the Waveshare **ESP32-S3-Touch-LCD-7C-BOX** (800×480).
 
 | Folder | Theme |
 |---|---|
@@ -9,37 +9,35 @@ Four themed ESPHome/LVGL dashboards for the Waveshare **ESP32-S3-Touch-LCD-7C-BO
 | `panels/kittens-pink/` | Kittens + pink |
 | `panels/magic-bricks-blue/` | Magical-school + building-bricks + blue |
 
-Each panel controls the same four Home Assistant entities through the ESPHome native API:
+Each theme includes a complete `panel.yaml`, live SVG artwork, and a vector screen preview. The shared 800×480 LVGL control surface keeps behavior identical while each folder supplies its own colors and artwork.
 
-- Tapo LED strip — on/off, brightness, and color presets
-- Overhead light — on/off and dimming
-- Ceiling fan smart switch — on/off
-- Amazon Echo Dot — volume, mute, play/pause and an optional announcement event
+## Controls
+
+- **Tapo LED strip** — power, brightness, six color presets (red/orange/yellow/green/blue/purple)
+- **Overhead light smart dimmer** — power, brightness slider, 25/50/75/100% presets
+- **Ceiling fan smart switch** — state display and toggle
+- **Amazon Echo Dot** — live state, volume, mute/unmute, play/pause and announcement event
 
 ## Hardware target
 
-The shared hardware package is configured specifically for the **7C BOX**, not the older Waveshare 7-inch board. It uses the 7C's official 800×480 ST7262 RGB timings and GPIO map, GT911 touch on I²C GPIO47/GPIO48 with IRQ GPIO4, and the Waveshare CH32V003 I/O expander for panel power/backlight control.
+The shared hardware package is configured specifically for the **7C BOX**, not the older Waveshare 7-inch board. It uses the 7C's official 800×480 ST7262 RGB timings and GPIO map, GT911 touch on I²C GPIO47/GPIO48 with IRQ GPIO4, and the Waveshare CH32V003 I/O expander for display reset/power/backlight.
 
-Use **ESPHome 2026.7.0 or newer** because the native `waveshare_io_ch32v003` component was added in the 2026.7 line.
+Use **ESPHome 2026.7.0 or newer** because the native `waveshare_io_ch32v003` component is required.
 
 ## Configure a panel
 
-1. Pick one folder under `panels/`.
-2. Copy `secrets.example.yaml` to your ESPHome secrets file or provide the same keys globally.
-3. Edit the four entity substitutions near the top of that panel's `panel.yaml` to match your Home Assistant entity IDs.
-4. In Home Assistant, allow this ESPHome device to perform Home Assistant actions.
-5. Validate and install:
+1. Copy the values from `shared/secrets.example.yaml` into your ESPHome `secrets.yaml` and replace every placeholder.
+2. Pick one theme under `panels/`.
+3. Edit the four entity substitutions near the top of that theme's `panel.yaml`.
+4. In Home Assistant, open the ESPHome integration for the panel and enable **Allow the device to perform Home Assistant actions**.
+5. Validate/install from the repository root:
 
 ```bash
 esphome config panels/classic-dark/panel.yaml
 esphome run panels/classic-dark/panel.yaml
 ```
 
-Repeat with the desired theme folder.
-
 ## Entity substitutions
-
-Every panel exposes the same substitutions so themes can be swapped without rewriting automations:
 
 ```yaml
 tapo_led_entity: light.tapo_led_strip
@@ -48,28 +46,30 @@ ceiling_fan_entity: switch.ceiling_fan
 echo_dot_entity: media_player.echo_dot
 ```
 
-These values are placeholders; change them to the actual entity IDs in your Home Assistant instance.
+These are placeholders. Replace them with the actual entity IDs in your Home Assistant instance.
 
 ## Echo announcements
 
-The panel fires the Home Assistant event `esphome_panel_echo_announce` when the **Announce** button is pressed. This keeps the panel independent of whichever Alexa integration/notify service you use. Create one Home Assistant automation that listens for that event and sends the announcement through your preferred Alexa/Echo integration.
+The **Announce** button fires `esphome.panel_echo_announce` with `entity_id` and `panel` event data. Create a Home Assistant automation that listens for the event and routes it to the Alexa/Echo integration or notify action you use. Keeping this as an event avoids hard-coding a third-party Alexa integration into the panel firmware.
 
-## Structure
+## Repository layout
 
 ```text
 shared/
   waveshare-7c-hardware.yaml
   home-assistant-controls.yaml
+  ui-dashboard.yaml
   secrets.example.yaml
 panels/
   classic-dark/
+    panel.yaml
+    preview.svg
+    assets/
   soccer-green/
   kittens-pink/
   magic-bricks-blue/
 ```
 
-Every theme folder contains its own `panel.yaml`, LVGL UI, SVG artwork, vector preview, and theme notes. The hardware and Home Assistant bridge are shared so behavior remains consistent across all four designs.
+## Artwork
 
-## Notes
-
-The artwork in this repository is original. The blue magical theme is intentionally a generic enchanted boarding-school/building-brick aesthetic and does not include third-party franchise logos or copyrighted character art.
+All embedded SVG artwork is original and theme-specific. The blue theme uses a generic enchanted boarding-school/building-brick aesthetic and intentionally contains no franchise logos or character artwork.
