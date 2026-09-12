@@ -1,0 +1,46 @@
+substitutions:
+  name: "home-panel-classic"
+  friendly_name: "Home Panel Classic"
+
+  # Replace these four placeholders with the entity IDs from your Home Assistant instance.
+  tapo_led_entity: "light.tapo_led_strip"
+  overhead_light_entity: "light.overhead_light"
+  ceiling_fan_entity: "switch.ceiling_fan"
+  echo_dot_entity: "media_player.echo_dot"
+
+  # Theme tokens
+  tagline: "Smart Home  •  ESPHome + Home Assistant"
+  screen_bg: "0x0B1118"
+  card_bg: "0x131E29"
+  button_bg: "0x1C2A38"
+  slider_bg: "0x344455"
+  border_color: "0x31485E"
+  accent_color: "0x269BFF"
+  text_color: "0xF5F9FF"
+  muted_color: "0x9FB3C8"
+  status_color: "0x35D47A"
+
+packages:
+  hardware: !include ../../shared/waveshare-7c-hardware.yaml
+  controls: !include ../../shared/home-assistant-controls.yaml
+  interface: !include ../../shared/ui-dashboard.yaml
+
+image:
+  - platform: file
+    file: "assets/header-art.svg"
+    id: theme_header_art
+    type: RGB565
+    transparency: alpha_channel
+    resize: 160x54
+  - platform: file
+    file: "assets/fan.svg"
+    id: theme_fan_art
+    type: RGB565
+    transparency: alpha_channel
+    resize: 96x96
+  - platform: file
+    file: "assets/echo.svg"
+    id: theme_echo_art
+    type: RGB565
+    transparency: alpha_channel
+    resize: 54x54
