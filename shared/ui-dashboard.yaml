@@ -34,7 +34,7 @@ lvgl:
         pad_all: 3
   gradients:
     - id: color_wheel_gradient
-      direction: conical
+      direction: hor
       stops:
         - color: 0xFF0000
           position: 0
