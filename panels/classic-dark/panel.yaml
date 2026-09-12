@@ -8,7 +8,7 @@ substitutions:
   ceiling_fan_entity: "switch.ceiling_fan"
   echo_dot_entity: "media_player.echo_dot"
 
-  # Theme tokens
+  # Theme tokens retained for compatibility with shared packages/customization.
   tagline: "Smart Home  •  ESPHome + Home Assistant"
   screen_bg: "0x0B1118"
   card_bg: "0x131E29"
@@ -25,22 +25,12 @@ packages:
   controls: !include ../../shared/home-assistant-controls.yaml
   interface: !include ../../shared/ui-dashboard.yaml
 
+# The complete 800x480 visible surface is a single artwork asset. ESPHome
+# rasterizes the SVG to RGB565 at compile time; LVGL places transparent touch
+# targets over the controls in shared/ui-dashboard.yaml.
 image:
   - platform: file
-    file: "assets/header-art.svg"
-    id: theme_header_art
+    file: "assets/screen.svg"
+    id: theme_screen
     type: RGB565
-    transparency: alpha_channel
-    resize: 160x54
-  - platform: file
-    file: "assets/fan.svg"
-    id: theme_fan_art
-    type: RGB565
-    transparency: alpha_channel
-    resize: 96x96
-  - platform: file
-    file: "assets/echo.svg"
-    id: theme_echo_art
-    type: RGB565
-    transparency: alpha_channel
-    resize: 54x54
+    resize: 800x480
