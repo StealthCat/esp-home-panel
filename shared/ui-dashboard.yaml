@@ -1,4 +1,6 @@
-# 800x480 LVGL dashboard. Entity IDs and colors are supplied by panel.yaml substitutions.
+# Full-screen mockup artwork with transparent LVGL interaction regions.
+# The visible dashboard is supplied by each theme's assets/screen.svg.
+# Controls below line up with the controls drawn into that artwork.
 
 lvgl:
   displays:
@@ -6,497 +8,290 @@ lvgl:
   touchscreens:
     - touchscreen_id: panel_touch
   buffer_size: 25%
-  default_font: ui_body
-  bg_color: ${screen_bg}
-  text_color: ${text_color}
+  bg_color: 0x000000
+
   theme:
     button:
-      bg_color: ${button_bg}
-      bg_opa: COVER
-      border_color: ${border_color}
-      border_width: 1
-      radius: 12
-      text_color: ${text_color}
+      bg_opa: TRANSP
+      border_width: 0
+      shadow_width: 0
       pressed:
-        bg_color: ${accent_color}
+        bg_opa: TRANSP
     slider:
-      bg_color: ${slider_bg}
-      bg_opa: COVER
-      radius: 8
+      bg_opa: TRANSP
+      border_width: 0
       indicator:
-        bg_color: ${accent_color}
-        bg_opa: COVER
-        radius: 8
+        bg_opa: TRANSP
       knob:
-        bg_color: 0xFFFFFF
-        bg_opa: COVER
-        radius: 12
-        pad_all: 3
-  gradients:
-    - id: color_wheel_gradient
-      direction: hor
-      stops:
-        - color: 0xFF0000
-          position: 0
-        - color: 0xFFFF00
-          position: 42
-        - color: 0x00FF00
-          position: 84
-        - color: 0x00FFFF
-          position: 127
-        - color: 0x0000FF
-          position: 169
-        - color: 0xFF00FF
-          position: 212
-        - color: 0xFF0000
-          position: 255
+        bg_opa: TRANSP
+        border_width: 0
+        shadow_width: 0
+
   on_idle:
     - timeout: 10min
       then:
         - light.turn_off: panel_backlight
         - lvgl.pause:
+
   pages:
     - id: main_page
-      bg_color: ${screen_bg}
+      bg_color: 0x000000
       bg_opa: COVER
       widgets:
-        - label:
-            x: 24
-            y: 12
-            text: "HOME CONTROL"
-            text_font: ui_title
-            text_color: ${text_color}
-        - label:
-            x: 26
-            y: 46
-            text: "${tagline}"
-            text_font: ui_small
-            text_color: ${muted_color}
+        # Pixel-aligned visual surface. All bevels, artwork, card textures,
+        # icons and decorative graphics live in this 800x480 image.
         - image:
-            x: 500
-            y: 8
-            src: theme_header_art
-        - label:
-            id: clock_label
-            x: 704
-            y: 11
-            width: 72
-            text_align: RIGHT
-            text: "--:--"
-            text_font: ui_heading
-            text_color: ${text_color}
-        - label:
-            id: date_label
-            x: 674
-            y: 40
-            width: 102
-            text_align: RIGHT
-            text: "--- --"
-            text_font: ui_small
-            text_color: ${muted_color}
-        - obj:
-            x: 18
+            x: 0
+            y: 0
+            src: theme_screen
+
+        # ------------------------------------------------------------------
+        # Tapo LED strip
+        # ------------------------------------------------------------------
+        - button:
+            x: 292
             y: 76
-            width: 374
-            height: 184
-            radius: 18
-            bg_color: ${card_bg}
-            bg_opa: COVER
-            border_color: ${border_color}
-            border_width: 1
-            pad_all: 0
-            widgets:
-              - label:
-                  x: 18
-                  y: 12
-                  text: "TAPO LED STRIP"
-                  text_font: ui_heading
-              - label:
-                  id: tapo_status_label
-                  x: 302
-                  y: 16
-                  width: 52
-                  text_align: RIGHT
-                  text: "..."
-                  text_font: ui_small
-                  text_color: ${status_color}
-              - obj:
-                  x: 18
-                  y: 50
-                  width: 82
-                  height: 82
-                  radius: 41
-                  border_width: 0
-                  pad_all: 0
-                  bg_grad: color_wheel_gradient
-              - label:
-                  x: 20
-                  y: 139
-                  width: 80
-                  text_align: CENTER
-                  text: "COLOR"
-                  text_font: ui_small
-                  text_color: ${muted_color}
-              - button:
-                  x: 120
-                  y: 54
-                  width: 32
-                  height: 32
-                  radius: 16
-                  bg_color: 0xFF3B30
-                  border_width: 0
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${tapo_led_entity}
-                          color_name: red
-              - button:
-                  x: 159
-                  y: 54
-                  width: 32
-                  height: 32
-                  radius: 16
-                  bg_color: 0xFF9500
-                  border_width: 0
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${tapo_led_entity}
-                          color_name: orange
-              - button:
-                  x: 198
-                  y: 54
-                  width: 32
-                  height: 32
-                  radius: 16
-                  bg_color: 0xFFD60A
-                  border_width: 0
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${tapo_led_entity}
-                          color_name: yellow
-              - button:
-                  x: 237
-                  y: 54
-                  width: 32
-                  height: 32
-                  radius: 16
-                  bg_color: 0x30D158
-                  border_width: 0
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${tapo_led_entity}
-                          color_name: green
-              - button:
-                  x: 276
-                  y: 54
-                  width: 32
-                  height: 32
-                  radius: 16
-                  bg_color: 0x0A84FF
-                  border_width: 0
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${tapo_led_entity}
-                          color_name: blue
-              - button:
-                  x: 315
-                  y: 54
-                  width: 32
-                  height: 32
-                  radius: 16
-                  bg_color: 0xBF5AF2
-                  border_width: 0
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${tapo_led_entity}
-                          color_name: purple
-              - label:
-                  x: 120
-                  y: 98
-                  text: "BRIGHTNESS"
-                  text_font: ui_small
-                  text_color: ${muted_color}
-              - slider:
-                  id: tapo_brightness_slider
-                  x: 120
-                  y: 122
-                  width: 155
-                  height: 18
-                  min_value: 0
-                  max_value: 255
-                  value: 180
-                  adv_hittest: true
-                  on_release:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${tapo_led_entity}
-                          brightness: !lambda 'return (int) x;'
-              - button:
-                  x: 286
-                  y: 111
-                  width: 67
-                  height: 42
-                  text: "POWER"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.toggle
-                        data:
-                          entity_id: ${tapo_led_entity}
-        - obj:
-            x: 408
+            width: 96
+            height: 64
+            on_short_click:
+              - homeassistant.action:
+                  action: light.toggle
+                  data:
+                    entity_id: ${tapo_led_entity}
+
+        - button:
+            x: 166
+            y: 145
+            width: 43
+            height: 48
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${tapo_led_entity}
+                    color_name: red
+        - button:
+            x: 205
+            y: 145
+            width: 43
+            height: 48
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${tapo_led_entity}
+                    color_name: orange
+        - button:
+            x: 244
+            y: 145
+            width: 43
+            height: 48
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${tapo_led_entity}
+                    color_name: yellow
+        - button:
+            x: 283
+            y: 145
+            width: 43
+            height: 48
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${tapo_led_entity}
+                    color_name: green
+        - button:
+            x: 322
+            y: 145
+            width: 43
+            height: 48
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${tapo_led_entity}
+                    color_name: blue
+        - button:
+            x: 361
+            y: 145
+            width: 39
+            height: 48
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${tapo_led_entity}
+                    color_name: purple
+
+        - slider:
+            id: tapo_brightness_slider
+            x: 190
+            y: 216
+            width: 180
+            height: 49
+            min_value: 0
+            max_value: 255
+            value: 180
+            adv_hittest: true
+            on_release:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${tapo_led_entity}
+                    brightness: !lambda 'return (int) x;'
+
+        # ------------------------------------------------------------------
+        # Overhead light
+        # ------------------------------------------------------------------
+        - button:
+            x: 690
             y: 76
-            width: 374
-            height: 184
-            radius: 18
-            bg_color: ${card_bg}
-            bg_opa: COVER
-            border_color: ${border_color}
-            border_width: 1
-            pad_all: 0
-            widgets:
-              - label:
-                  x: 18
-                  y: 12
-                  text: "OVERHEAD LIGHT"
-                  text_font: ui_heading
-              - label:
-                  id: overhead_status_label
-                  x: 302
-                  y: 16
-                  width: 52
-                  text_align: RIGHT
-                  text: "..."
-                  text_font: ui_small
-                  text_color: ${status_color}
-              - button:
-                  x: 248
-                  y: 48
-                  width: 105
-                  height: 42
-                  text: "POWER"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.toggle
-                        data:
-                          entity_id: ${overhead_light_entity}
-              - label:
-                  x: 24
-                  y: 60
-                  text: "BRIGHTNESS"
-                  text_font: ui_small
-                  text_color: ${muted_color}
-              - slider:
-                  id: overhead_brightness_slider
-                  x: 24
-                  y: 89
-                  width: 329
-                  height: 20
-                  min_value: 0
-                  max_value: 255
-                  value: 160
-                  adv_hittest: true
-                  on_release:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${overhead_light_entity}
-                          brightness: !lambda 'return (int) x;'
-              - button:
-                  x: 24
-                  y: 127
-                  width: 72
-                  height: 40
-                  text: "25%"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${overhead_light_entity}
-                          brightness_pct: 25
-              - button:
-                  x: 109
-                  y: 127
-                  width: 72
-                  height: 40
-                  text: "50%"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${overhead_light_entity}
-                          brightness_pct: 50
-              - button:
-                  x: 194
-                  y: 127
-                  width: 72
-                  height: 40
-                  text: "75%"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${overhead_light_entity}
-                          brightness_pct: 75
-              - button:
-                  x: 279
-                  y: 127
-                  width: 74
-                  height: 40
-                  text: "100%"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: light.turn_on
-                        data:
-                          entity_id: ${overhead_light_entity}
-                          brightness_pct: 100
-        - obj:
-            x: 18
-            y: 274
-            width: 374
-            height: 188
-            radius: 18
-            bg_color: ${card_bg}
-            bg_opa: COVER
-            border_color: ${border_color}
-            border_width: 1
-            pad_all: 0
-            widgets:
-              - label:
-                  x: 18
-                  y: 12
-                  text: "CEILING FAN"
-                  text_font: ui_heading
-              - label:
-                  id: fan_status_label
-                  x: 302
-                  y: 16
-                  width: 52
-                  text_align: RIGHT
-                  text: "..."
-                  text_font: ui_small
-                  text_color: ${status_color}
-              - image:
-                  x: 28
-                  y: 55
-                  src: theme_fan_art
-              - label:
-                  x: 145
-                  y: 65
-                  text: "SMART SWITCH"
-                  text_font: ui_small
-                  text_color: ${muted_color}
-              - button:
-                  x: 145
-                  y: 94
-                  width: 195
-                  height: 60
-                  text: "FAN ON / OFF"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: switch.toggle
-                        data:
-                          entity_id: ${ceiling_fan_entity}
-        - obj:
-            x: 408
-            y: 274
-            width: 374
-            height: 188
-            radius: 18
-            bg_color: ${card_bg}
-            bg_opa: COVER
-            border_color: ${border_color}
-            border_width: 1
-            pad_all: 0
-            widgets:
-              - label:
-                  x: 18
-                  y: 12
-                  text: "ECHO DOT"
-                  text_font: ui_heading
-              - label:
-                  id: echo_status_label
-                  x: 260
-                  y: 16
-                  width: 94
-                  text_align: RIGHT
-                  text: "..."
-                  text_font: ui_small
-                  text_color: ${status_color}
-              - image:
-                  x: 23
-                  y: 55
-                  src: theme_echo_art
-              - label:
-                  x: 92
-                  y: 62
-                  text: "VOLUME"
-                  text_font: ui_small
-                  text_color: ${muted_color}
-              - slider:
-                  id: echo_volume_slider
-                  x: 92
-                  y: 88
-                  width: 248
-                  height: 18
-                  min_value: 0
-                  max_value: 100
-                  value: 50
-                  adv_hittest: true
-                  on_release:
-                    - homeassistant.action:
-                        action: media_player.volume_set
-                        data:
-                          entity_id: ${echo_dot_entity}
-                          volume_level: !lambda 'return x / 100.0f;'
-              - button:
-                  x: 20
-                  y: 127
-                  width: 100
-                  height: 42
-                  widgets:
-                    - label:
-                        id: echo_mute_label
-                        align: CENTER
-                        text: "MUTE"
-                        text_font: ui_small
-                  on_short_click:
-                    - homeassistant.action:
-                        action: media_player.volume_mute
-                        data:
-                          entity_id: ${echo_dot_entity}
-                          is_volume_muted: !lambda 'return !id(echo_muted).state;'
-              - button:
-                  x: 132
-                  y: 127
-                  width: 102
-                  height: 42
-                  text: "PLAY/PAUSE"
-                  on_short_click:
-                    - homeassistant.action:
-                        action: media_player.media_play_pause
-                        data:
-                          entity_id: ${echo_dot_entity}
-              - button:
-                  x: 246
-                  y: 127
-                  width: 108
-                  height: 42
-                  text: "ANNOUNCE"
-                  on_short_click:
-                    - homeassistant.event:
-                        event: esphome.panel_echo_announce
-                        data:
-                          entity_id: ${echo_dot_entity}
-                          panel: ${name}
+            width: 92
+            height: 64
+            on_short_click:
+              - homeassistant.action:
+                  action: light.toggle
+                  data:
+                    entity_id: ${overhead_light_entity}
+
+        - slider:
+            id: overhead_brightness_slider
+            x: 463
+            y: 181
+            width: 292
+            height: 48
+            min_value: 0
+            max_value: 255
+            value: 160
+            adv_hittest: true
+            on_release:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${overhead_light_entity}
+                    brightness: !lambda 'return (int) x;'
+
+        - button:
+            x: 422
+            y: 216
+            width: 88
+            height: 52
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${overhead_light_entity}
+                    brightness_pct: 25
+        - button:
+            x: 510
+            y: 216
+            width: 88
+            height: 52
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${overhead_light_entity}
+                    brightness_pct: 50
+        - button:
+            x: 598
+            y: 216
+            width: 88
+            height: 52
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${overhead_light_entity}
+                    brightness_pct: 75
+        - button:
+            x: 686
+            y: 216
+            width: 94
+            height: 52
+            on_short_click:
+              - homeassistant.action:
+                  action: light.turn_on
+                  data:
+                    entity_id: ${overhead_light_entity}
+                    brightness_pct: 100
+
+        # ------------------------------------------------------------------
+        # Ceiling fan smart switch. The fan emblem and toggle are both active.
+        # ------------------------------------------------------------------
+        - button:
+            x: 24
+            y: 320
+            width: 130
+            height: 137
+            on_short_click:
+              - homeassistant.action:
+                  action: switch.toggle
+                  data:
+                    entity_id: ${ceiling_fan_entity}
+        - button:
+            x: 222
+            y: 328
+            width: 116
+            height: 76
+            on_short_click:
+              - homeassistant.action:
+                  action: switch.toggle
+                  data:
+                    entity_id: ${ceiling_fan_entity}
+
+        # ------------------------------------------------------------------
+        # Echo Dot
+        # ------------------------------------------------------------------
+        - slider:
+            id: echo_volume_slider
+            x: 463
+            y: 363
+            width: 292
+            height: 50
+            min_value: 0
+            max_value: 100
+            value: 50
+            adv_hittest: true
+            on_release:
+              - homeassistant.action:
+                  action: media_player.volume_set
+                  data:
+                    entity_id: ${echo_dot_entity}
+                    volume_level: !lambda 'return x / 100.0f;'
+
+        - button:
+            x: 420
+            y: 404
+            width: 112
+            height: 70
+            on_short_click:
+              - homeassistant.action:
+                  action: media_player.volume_mute
+                  data:
+                    entity_id: ${echo_dot_entity}
+                    is_volume_muted: !lambda 'return !id(echo_muted).state;'
+        - button:
+            x: 526
+            y: 404
+            width: 116
+            height: 70
+            on_short_click:
+              - homeassistant.action:
+                  action: media_player.media_play_pause
+                  data:
+                    entity_id: ${echo_dot_entity}
+        - button:
+            x: 638
+            y: 404
+            width: 156
+            height: 70
+            on_short_click:
+              - homeassistant.event:
+                  event: esphome.panel_echo_announce
+                  data:
+                    entity_id: ${echo_dot_entity}
+                    panel: ${name}
