@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Generate main/artwork.c from the canonical SVG assets.
+"""Generate main/artwork.c from the canonical SVG theme assets.
 
-Uses only the Python standard library so it works in ESP-IDF and PlatformIO
-build environments without extra packages.
+This script uses only the Python standard library. PlatformIO executes it as a
+pre-build script, and it can also be run directly.
 """
 
 from pathlib import Path
@@ -10,10 +10,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MAIN = ROOT / "main"
 THEMES = [
-    ("CLASSIC_SVG", ROOT / "assets" / "classic-dark" / "screen.svg", "CONFIG_PANEL_THEME_CLASSIC"),
-    ("SOCCER_SVG", ROOT / "assets" / "soccer-green" / "screen.svg", "CONFIG_PANEL_THEME_SOCCER"),
-    ("KITTENS_SVG", ROOT / "assets" / "kittens-pink" / "screen.svg", "CONFIG_PANEL_THEME_KITTENS"),
-    ("MAGIC_SVG", ROOT / "assets" / "magic-bricks-blue" / "screen.svg", "CONFIG_PANEL_THEME_MAGIC"),
+    ("CLASSIC_SVG", ROOT / "assets" / "classic-dark" / "screen.svg"),
+    ("SOCCER_SVG", ROOT / "assets" / "soccer-green" / "screen.svg"),
+    ("KITTENS_SVG", ROOT / "assets" / "kittens-pink" / "screen.svg"),
+    ("MAGIC_SVG", ROOT / "assets" / "magic-bricks-blue" / "screen.svg"),
 ]
 
 
@@ -22,19 +22,17 @@ def c_literal(text: str) -> str:
     for line in text.splitlines(keepends=True):
         escaped = (
             line.replace("\\", "\\\\")
-                .replace('"', '\\"')
-                .replace("\r", "\\r")
-                .replace("\n", "\\n")
+            .replace('"', '\\"')
+            .replace("\r", "\\r")
+            .replace("\n", "\\n")
         )
         lines.append(f'"{escaped}"')
-    if not lines:
-        lines.append('""')
-    return "\n".join(lines)
+    return "\n".join(lines) if lines else '""'
 
 
-def main() -> None:
+def generate() -> None:
     blocks = []
-    for symbol, path, _ in THEMES:
+    for symbol, path in THEMES:
         text = path.read_text(encoding="utf-8")
         blocks.append(f"static const char {symbol}[] =\n{c_literal(text)};\n")
 
@@ -57,9 +55,9 @@ artwork_svg_t artwork_get_active_svg(void)
 }
 """
 
-    (MAIN / "artwork.c").write_text(output, encoding="utf-8")
-    print(f"Wrote {MAIN / 'artwork.c'}")
+    output_path = MAIN / "artwork.c"
+    output_path.write_text(output, encoding="utf-8")
+    print(f"[artwork] generated {output_path}")
 
 
-if __name__ == "__main__":
-    main()
+generate()
