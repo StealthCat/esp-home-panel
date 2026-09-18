@@ -5,19 +5,21 @@ on:
     branches: [main]
   pull_request:
 
+concurrency:
+  group: esp-idf-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: espressif/idf:v5.5.3
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
       - name: Build Waveshare 7C BOX firmware
-        shell: bash
-        run: |
-          cd idf
-          idf.py set-target esp32s3
-          idf.py build
+        uses: espressif/esp-idf-ci-action@v1
+        with:
+          esp_idf_version: v5.5.3
+          target: esp32s3
+          path: idf
