@@ -10,6 +10,7 @@
 #include "esp_heap_caps.h"
 #include "esp_lvgl_port.h"
 #include "board_7c.h"
+#include "artwork.h"
 #include "lvgl.h"
 #include "mqtt_bridge.h"
 #include "ui_theme.h"
@@ -19,6 +20,9 @@ static const char *TAG = "ui";
 static const panel_theme_t *T;
 
 static lv_display_t *s_disp;
+static bool s_artwork_mode = true;
+static lv_image_dsc_t s_artwork_dsc;
+static lv_obj_t *s_artwork_image;
 
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_mqtt_dot;
@@ -65,6 +69,31 @@ static inline lv_color_t c(uint32_t hex)
     return lv_color_hex(hex);
 }
 
+static void create_artwork_background(lv_obj_t *root)
+{
+    artwork_svg_t art = artwork_get_active_svg();
+    if (!art.data || art.size == 0) {
+        ESP_LOGW(TAG, "No artwork data available; using native LVGL fallback");
+        s_artwork_mode = false;
+        return;
+    }
+
+    memset(&s_artwork_dsc, 0, sizeof(s_artwork_dsc));
+    s_artwork_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
+    s_artwork_dsc.header.w = PANEL_H_RES;
+    s_artwork_dsc.header.h = PANEL_V_RES;
+    s_artwork_dsc.data_size = art.size;
+    s_artwork_dsc.data = art.data;
+
+    s_artwork_image = lv_image_create(root);
+    lv_image_set_src(s_artwork_image, &s_artwork_dsc);
+    lv_obj_set_pos(s_artwork_image, 0, 0);
+    lv_obj_set_size(s_artwork_image, PANEL_H_RES, PANEL_V_RES);
+    lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_SCROLLABLE);
+    ESP_LOGI(TAG, "Loaded %u-byte SVG artwork background", (unsigned)art.size);
+}
+
 static void style_screen(lv_obj_t *screen)
 {
     lv_obj_set_style_bg_color(screen, c(T->screen_bg), 0);
@@ -81,27 +110,27 @@ static void init_styles(void)
     lv_style_set_bg_color(&s_card_style, c(T->card_bg));
     lv_style_set_bg_grad_color(&s_card_style, c(T->card_bg_2));
     lv_style_set_bg_grad_dir(&s_card_style, LV_GRAD_DIR_VER);
-    lv_style_set_bg_opa(&s_card_style, 242);
+    lv_style_set_bg_opa(&s_card_style, s_artwork_mode ? LV_OPA_TRANSP : 242);
     lv_style_set_border_width(&s_card_style, T->magic ? 2 : 1);
     lv_style_set_border_color(&s_card_style, c(T->card_border));
-    lv_style_set_border_opa(&s_card_style, T->magic ? 220 : 150);
+    lv_style_set_border_opa(&s_card_style, s_artwork_mode ? LV_OPA_TRANSP : (T->magic ? 220 : 150));
     lv_style_set_shadow_width(&s_card_style, 14);
     lv_style_set_shadow_spread(&s_card_style, 1);
     lv_style_set_shadow_color(&s_card_style, c(T->accent));
-    lv_style_set_shadow_opa(&s_card_style, T->kittens ? 45 : 30);
+    lv_style_set_shadow_opa(&s_card_style, s_artwork_mode ? LV_OPA_TRANSP : (T->kittens ? 45 : 30));
     lv_style_set_pad_all(&s_card_style, 0);
 
     lv_style_init(&s_button_style);
     lv_style_set_radius(&s_button_style, 11);
     lv_style_set_bg_color(&s_button_style, c(T->card_bg_2));
-    lv_style_set_bg_opa(&s_button_style, 220);
+    lv_style_set_bg_opa(&s_button_style, s_artwork_mode ? LV_OPA_TRANSP : 220);
     lv_style_set_border_width(&s_button_style, 1);
     lv_style_set_border_color(&s_button_style, c(T->card_border));
-    lv_style_set_border_opa(&s_button_style, 160);
+    lv_style_set_border_opa(&s_button_style, s_artwork_mode ? LV_OPA_TRANSP : 160);
     lv_style_set_text_color(&s_button_style, c(T->text));
     lv_style_set_shadow_width(&s_button_style, 5);
     lv_style_set_shadow_color(&s_button_style, c(T->accent));
-    lv_style_set_shadow_opa(&s_button_style, 30);
+    lv_style_set_shadow_opa(&s_button_style, s_artwork_mode ? LV_OPA_TRANSP : 30);
 
     lv_style_init(&s_button_pressed_style);
     lv_style_set_bg_color(&s_button_pressed_style, c(T->accent));
@@ -118,6 +147,9 @@ static lv_obj_t *make_label(lv_obj_t *parent, const char *text, int x, int y,
     lv_obj_set_pos(label, x, y);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, c(color), 0);
+    if (s_artwork_mode) {
+        lv_obj_set_style_text_opa(label, LV_OPA_TRANSP, 0);
+    }
     return label;
 }
 
@@ -182,6 +214,9 @@ static lv_obj_t *make_button(lv_obj_t *parent, const char *text, int x, int y, i
     lv_label_set_text(label, text);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(label, c(T->text), 0);
+    if (s_artwork_mode) {
+        lv_obj_set_style_text_opa(label, LV_OPA_TRANSP, 0);
+    }
     lv_obj_center(label);
     return btn;
 }
@@ -454,6 +489,9 @@ static lv_obj_t *create_colorwheel(lv_obj_t *parent)
     lv_obj_set_style_pad_all(s_color_knob, 0, 0);
     lv_obj_remove_flag(s_color_knob, LV_OBJ_FLAG_CLICKABLE);
     colorwheel_position_knob(210, 80);
+    if (s_artwork_mode) {
+        lv_obj_set_style_opa(canvas, LV_OPA_TRANSP, 0);
+    }
 
     return canvas;
 }
@@ -626,6 +664,9 @@ static lv_obj_t *create_fan_graphic(lv_obj_t *card, int x, int y)
 
     lv_obj_set_style_transform_width(fan, 18, 0);
     lv_obj_set_style_transform_height(fan, 18, 0);
+    if (s_artwork_mode) {
+        lv_obj_set_style_opa(fan, LV_OPA_TRANSP, 0);
+    }
     return fan;
 }
 
@@ -669,7 +710,7 @@ static void create_echo_wave(lv_obj_t *card)
         lv_obj_set_pos(bar, 145 + i * 10, 71);
         lv_obj_set_size(bar, 5, 10 + ((i * 7) % 26));
         lv_obj_set_style_bg_color(bar, c(T->accent), 0);
-        lv_obj_set_style_bg_opa(bar, 100, 0);
+        lv_obj_set_style_bg_opa(bar, s_artwork_mode ? LV_OPA_TRANSP : 100, 0);
         lv_obj_set_style_border_width(bar, 0, 0);
         lv_obj_set_style_radius(bar, 3, 0);
         lv_obj_set_style_pad_all(bar, 0, 0);
@@ -728,7 +769,7 @@ static void create_header(lv_obj_t *root)
     lv_obj_set_size(s_mqtt_dot, 8, 8);
     lv_obj_set_style_radius(s_mqtt_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(s_mqtt_dot, c(T->muted), 0);
-    lv_obj_set_style_bg_opa(s_mqtt_dot, LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_opa(s_mqtt_dot, s_artwork_mode ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(s_mqtt_dot, 0, 0);
 }
 
@@ -762,6 +803,10 @@ static void animation_timer_cb(lv_timer_t *timer)
         s_fan_angle += 80;
         if (s_fan_angle >= 3600) s_fan_angle -= 3600;
         lv_obj_set_style_transform_rotation(s_fan_icon, s_fan_angle, 0);
+    }
+
+    if (s_artwork_mode) {
+        return;
     }
 
     if (s_echo_playing) {
@@ -839,7 +884,10 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
 
     lv_obj_t *root = lv_screen_active();
     style_screen(root);
-    add_theme_decor(root);
+    create_artwork_background(root);
+    if (!s_artwork_mode) {
+        add_theme_decor(root);
+    }
     create_header(root);
     create_tapo_card(root);
     create_overhead_card(root);
