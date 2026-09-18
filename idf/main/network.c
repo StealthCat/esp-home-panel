@@ -9,7 +9,7 @@
 #include "esp_netif.h"
 #include "esp_sntp.h"
 #include "esp_wifi.h"
-#include "freertos/EventGroups.h"
+#include "freertos/event_groups.h"
 
 static const char *TAG = "network";
 
