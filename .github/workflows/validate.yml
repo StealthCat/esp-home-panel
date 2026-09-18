@@ -1,4 +1,4 @@
-name: Validate ESPHome panels
+name: Build ESP-IDF firmware
 
 on:
   push:
@@ -6,40 +6,18 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        panel:
-          - panels/classic-dark/panel.yaml
-          - panels/soccer-green/panel.yaml
-          - panels/kittens-pink/panel.yaml
-          - panels/magic-bricks-blue/panel.yaml
+    container:
+      image: espressif/idf:v5.5.3
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install ESPHome
-        run: pip install 'esphome==2026.8.2'
-
-      - name: Create CI-only secrets
+      - name: Build Waveshare 7C BOX firmware
         shell: bash
         run: |
-          panel_dir="$(dirname '${{ matrix.panel }}')"
-          cat > "${panel_dir}/secrets.yaml" <<'EOF'
-          wifi_ssid: "CI_WIFI"
-          wifi_password: "ci-password"
-          fallback_ap_password: "ci-fallback-password"
-          api_encryption_key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-          ota_password: "ci-ota-password"
-          EOF
-
-      - name: Validate configuration
-        run: esphome config '${{ matrix.panel }}'
+          cd idf
+          idf.py set-target esp32s3
+          idf.py build
