@@ -81,10 +81,30 @@ The default topic root is:
 home/7c-panel
 ```
 
+## Artwork
+
+The native ESP-IDF project now has its own canonical artwork under:
+
+```text
+idf/assets/
+  classic-dark/screen.svg
+  soccer-green/screen.svg
+  kittens-pink/screen.svg
+  magic-bricks-blue/screen.svg
+```
+
+Those 800×480 SVGs are the visual source-of-truth for the mockup chrome, themed art,
+bevels, gradients, decorative graphics, and spacing. The live stateful controls are
+still LVGL objects so their positions and values can track Home Assistant rather than
+being frozen in a screenshot.
+
 ## Build
+
 
 Waveshare currently recommends ESP-IDF **5.5.3** for the 7C examples, and this
 project is built around that release.
+
+### ESP-IDF CLI
 
 ```bash
 git clone https://github.com/StealthCat/esp-home-panel.git
@@ -95,6 +115,22 @@ idf.py menuconfig
 idf.py build
 idf.py -p COM_PORT flash monitor
 ```
+
+### PlatformIO
+
+PlatformIO is also supported. The project pins `espressif32 @ 6.13.0`, which
+packages ESP-IDF 5.5.3, and includes a custom `waveshare-7c-box` board manifest
+for the 32 MB flash configuration.
+
+```bash
+cd esp-home-panel/idf
+pio run
+pio run -t upload
+pio device monitor -b 115200
+```
+
+In VS Code, open the `idf` directory as the PlatformIO project and use the normal
+Build / Upload / Monitor tasks.
 
 Under **Home Panel** in `menuconfig`, configure:
 
