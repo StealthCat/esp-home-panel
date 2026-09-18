@@ -1,94 +1,136 @@
 # ESP Home Panel — Waveshare 7C BOX
 
-Four high-fidelity ESPHome/LVGL dashboards for the Waveshare **ESP32-S3-Touch-LCD-7C-BOX** (800×480), rebuilt so the live display closely follows the original visual mockups instead of approximating them with flat LVGL cards.
+This repository now contains a **native ESP-IDF + LVGL implementation** for the
+Waveshare **ESP32-S3-Touch-LCD-7C-BOX**. The custom firmware is the primary
+implementation because it gives much tighter control over the visual design,
+animation, touch behavior, and state synchronization than the earlier ESPHome
+prototype.
 
-| Folder | Theme |
-|---|---|
-| `panels/classic-dark/` | Original dark/navy smart-home dashboard |
-| `panels/soccer-green/` | Soccer + green |
-| `panels/kittens-pink/` | Kittens + pink |
-| `panels/magic-bricks-blue/` | Magical-school + building-bricks + blue |
+The target hardware is the 800×480 Waveshare 7C BOX with ESP32-S3, 16 MB PSRAM,
+RGB LCD, GT911 capacitive touch, and Waveshare's I2C I/O-expander/backlight
+controller.
 
-Each theme controls the same four Home Assistant entities through the ESPHome native API:
+## Primary implementation
 
-- Tapo LED strip — on/off, brightness and six color presets
-- Overhead light — on/off, continuous dimming and 25/50/75/100% presets
-- Ceiling fan smart switch — on/off from the fan graphic or toggle area
-- Amazon Echo Dot — volume, mute, play/pause and an optional announcement event
-
-## Mockup-faithful rendering
-
-Each panel now uses a complete **800×480 `assets/screen.svg`** as the visible UI. ESPHome converts that artwork to RGB565 at compile time, preserving the mockup's beveled cards, inner highlights, shadows, gradients, artwork, field textures, kittens, castle/brick graphics and decorative icons.
-
-`shared/ui-dashboard.yaml` then places **transparent LVGL hit targets and sliders** over the visible buttons, toggles and slider tracks. The result keeps the rich mockup appearance while retaining real touchscreen control.
-
-This also means the individual old `header-art.svg`, `fan.svg`, `echo.svg` and simplified `preview.svg` assets are no longer used; the complete screen artwork is the single visual source of truth for each theme.
-
-## Hardware target
-
-The shared hardware package is configured specifically for the **7C BOX**, not the older Waveshare 7-inch board. It uses the 7C's 800×480 RGB panel configuration, GT911 touch controller and Waveshare CH32V003 I/O expander for panel/backlight control.
-
-Use **ESPHome 2026.7.0 or newer** because the native `waveshare_io_ch32v003` component is required.
-
-## Configure a panel
-
-1. Pick one folder under `panels/`.
-2. Copy `shared/secrets.example.yaml` values into your ESPHome secrets file or supply the same keys globally.
-3. Edit the four entity substitutions near the top of that panel's `panel.yaml` to match your Home Assistant entity IDs.
-4. In Home Assistant, allow this ESPHome device to perform Home Assistant actions.
-5. Validate and install, for example:
-
-```bash
-esphome config panels/classic-dark/panel.yaml
-esphome run panels/classic-dark/panel.yaml
-```
-
-Repeat with whichever theme you want to flash.
-
-## Automated validation
-
-`.github/workflows/validate.yml` runs `esphome config` against **all four panels** using ESPHome 2026.8.2 on every push to `main` and on pull requests. CI-only dummy secrets are created inside each panel directory during the workflow and are never committed.
-
-## Entity substitutions
-
-Every panel uses the same substitutions:
-
-```yaml
-tapo_led_entity: light.tapo_led_strip
-overhead_light_entity: light.overhead_light
-ceiling_fan_entity: switch.ceiling_fan
-echo_dot_entity: media_player.echo_dot
-```
-
-Change these placeholders to the actual entity IDs in your Home Assistant instance.
-
-## Echo announcements
-
-The **Announce** touch region fires the Home Assistant event `esphome.panel_echo_announce` with `entity_id` and `panel` event data. Create a Home Assistant automation that listens for that event and routes it through whichever Alexa/Echo notify integration you use.
-
-## Repository structure
+The native firmware lives in:
 
 ```text
-.github/workflows/
-  validate.yml
-shared/
-  waveshare-7c-hardware.yaml
-  home-assistant-controls.yaml
-  ui-dashboard.yaml
-  secrets.example.yaml
-panels/
-  classic-dark/
-    panel.yaml
-    assets/screen.svg
-  soccer-green/
-    panel.yaml
-    assets/screen.svg
-  kittens-pink/
-    panel.yaml
-    assets/screen.svg
-  magic-bricks-blue/
-    panel.yaml
-    assets/screen.svg
+idf/
+  CMakeLists.txt
+  sdkconfig.defaults
+  partitions.csv
+  main/
+    app_main.c
+    board_7c.c
+    network.c
+    mqtt_bridge.c
+    ui.c
+    ui_theme.c
+    Kconfig.projbuild
+    idf_component.yml
 ```
 
-The blue magical theme is intentionally an original generic enchanted boarding-school/building-brick aesthetic and does not contain third-party franchise logos or copyrighted character art.
+It implements:
+
+- 800×480 RGB565 display initialization for the 7C BOX
+- GT911 capacitive touch
+- Waveshare I/O-expander reset and backlight control
+- ESP-IDF Wi-Fi + SNTP
+- MQTT state/command bridge
+- native LVGL 9 interface with gradients, bevels, shadows, glows and animation
+- Tapo LED strip power, brightness, RGB color wheel and presets
+- overhead-light power, dimmer and 25/50/75/100% presets
+- ceiling-fan smart-switch control with animated fan graphic
+- Echo Dot volume, mute, play/pause and announcement button
+- four compile-time themes:
+  - Classic dark
+  - Soccer green
+  - Kittens pink
+  - Magic / bricks blue
+
+The decorative graphics are drawn as native LVGL objects rather than a static
+full-screen screenshot. That allows the switches, slider positions, fan,
+waveform, status indicators and color selector to reflect live device state.
+
+## Home Assistant integration
+
+The custom firmware uses MQTT as the clean boundary between the display and
+Home Assistant.
+
+A ready-to-edit Home Assistant package is included at:
+
+```text
+home-assistant/esp-home-panel-package.yaml
+```
+
+It translates MQTT commands from the panel into Home Assistant service calls
+and publishes retained state for:
+
+```text
+light.tapo_led_strip
+light.overhead_light
+switch.ceiling_fan
+media_player.echo_dot
+```
+
+Change those four entity IDs if your installation uses different names.
+
+The default topic root is:
+
+```text
+home/7c-panel
+```
+
+## Build
+
+Waveshare currently recommends ESP-IDF **5.5.3** for the 7C examples, and this
+project is built around that release.
+
+```bash
+git clone https://github.com/StealthCat/esp-home-panel.git
+cd esp-home-panel/idf
+
+idf.py set-target esp32s3
+idf.py menuconfig
+idf.py build
+idf.py -p COM_PORT flash monitor
+```
+
+Under **Home Panel** in `menuconfig`, configure:
+
+- Wi-Fi SSID/password
+- MQTT broker URI and credentials
+- MQTT base topic
+- timezone
+- preferred visual theme
+- display backlight brightness
+
+Managed components pull LVGL, Espressif's LVGL port, and the GT911 touch driver
+automatically.
+
+## Theme design
+
+### Classic dark
+Dark navy/graphite cards, blue glow, restrained smart-home graphics.
+
+### Soccer green
+Green stadium/pitch treatment, field markings, brighter green controls and
+soccer decorative elements.
+
+### Kittens pink
+Mauve/pink glass cards, paws, cat graphics and soft pink highlights.
+
+### Magic / bricks blue
+Deep blue background, gold trim, stars, castle silhouettes and original
+building-brick-inspired graphics. It intentionally does not use third-party
+franchise logos or character artwork.
+
+## Legacy ESPHome prototype
+
+The original ESPHome/LVGL implementation remains under `panels/` and
+`shared/` as a reference/prototype. New development should target `idf/`.
+
+## CI
+
+`.github/workflows/validate.yml` builds the native ESP-IDF firmware for the
+ESP32-S3 on pushes and pull requests.
