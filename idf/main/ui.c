@@ -6,6 +6,7 @@
 #include <time.h>
 
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "esp_lvgl_port.h"
 #include "lvgl.h"
 #include "mqtt_bridge.h"
@@ -27,6 +28,8 @@ static lv_obj_t *s_tapo_slider;
 static lv_obj_t *s_tapo_pct;
 static lv_obj_t *s_tapo_status;
 static lv_obj_t *s_colorwheel;
+static lv_obj_t *s_color_knob;
+static void *s_colorwheel_buf;
 
 static lv_obj_t *s_overhead_switch;
 static lv_obj_t *s_overhead_slider;
@@ -384,13 +387,100 @@ static void hsv_to_rgb(uint16_t hue, uint8_t sat, uint8_t val, uint8_t *r, uint8
     *b = (uint8_t)lroundf(bf * 255.0f);
 }
 
+static void colorwheel_position_knob(uint16_t hue, uint8_t sat)
+{
+    if (!s_color_knob) return;
+
+    const float angle = ((float)hue) * ((float)M_PI / 180.0f);
+    const float radius = 45.0f * ((float)sat / 100.0f);
+    int x = 17 + 52 + (int)lroundf(cosf(angle) * radius) - 7;
+    int y = 70 + 52 + (int)lroundf(sinf(angle) * radius) - 7;
+    lv_obj_set_pos(s_color_knob, x, y);
+}
+
+static lv_obj_t *create_colorwheel(lv_obj_t *parent)
+{
+    const int w = 104;
+    const int h = 104;
+    const int cx = w / 2;
+    const int cy = h / 2;
+    const float radius = 49.0f;
+
+    s_colorwheel_buf = heap_caps_malloc(w * h * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_colorwheel_buf) {
+        ESP_LOGE(TAG, "Failed to allocate color wheel canvas");
+        return NULL;
+    }
+
+    lv_obj_t *canvas = lv_canvas_create(parent);
+    lv_obj_set_pos(canvas, 17, 70);
+    lv_canvas_set_buffer(canvas, s_colorwheel_buf, w, h, LV_COLOR_FORMAT_RGB565);
+    lv_canvas_fill_bg(canvas, lv_color_hex(T->card_bg), LV_OPA_TRANSP);
+    lv_obj_add_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(canvas, LV_OBJ_FLAG_SCROLLABLE);
+
+    lv_display_t *disp = lv_obj_get_display(canvas);
+    lv_display_enable_invalidation(disp, false);
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            float dx = (float)(x - cx);
+            float dy = (float)(y - cy);
+            float dist = sqrtf(dx * dx + dy * dy);
+            if (dist <= radius) {
+                float deg = atan2f(dy, dx) * 180.0f / (float)M_PI;
+                if (deg < 0) deg += 360.0f;
+                uint8_t sat = (uint8_t)lroundf((dist / radius) * 100.0f);
+                lv_canvas_set_px(canvas, x, y, lv_color_hsv_to_rgb((uint16_t)deg, sat, 100), LV_OPA_COVER);
+            } else {
+                lv_canvas_set_px(canvas, x, y, lv_color_hex(T->card_bg), LV_OPA_TRANSP);
+            }
+        }
+    }
+    lv_display_enable_invalidation(disp, true);
+    lv_obj_invalidate(canvas);
+
+    s_color_knob = lv_obj_create(parent);
+    lv_obj_set_size(s_color_knob, 14, 14);
+    lv_obj_set_style_radius(s_color_knob, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(s_color_knob, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(s_color_knob, 3, 0);
+    lv_obj_set_style_border_color(s_color_knob, lv_color_white(), 0);
+    lv_obj_set_style_shadow_width(s_color_knob, 5, 0);
+    lv_obj_set_style_shadow_color(s_color_knob, lv_color_black(), 0);
+    lv_obj_set_style_shadow_opa(s_color_knob, 100, 0);
+    lv_obj_set_style_pad_all(s_color_knob, 0, 0);
+    lv_obj_remove_flag(s_color_knob, LV_OBJ_FLAG_CLICKABLE);
+    colorwheel_position_knob(210, 80);
+
+    return canvas;
+}
+
 static void colorwheel_cb(lv_event_t *e)
 {
     if (s_syncing) return;
-    lv_color_hsv_t hsv = lv_colorwheel_get_hsv(lv_event_get_target(e));
-    uint8_t r, g, b;
-    hsv_to_rgb(hsv.h, hsv.s, hsv.v, &r, &g, &b);
-    mqtt_bridge_tapo_rgb(r, g, b);
+
+    lv_obj_t *canvas = lv_event_get_target(e);
+    lv_indev_t *indev = lv_indev_active();
+    if (!indev) return;
+
+    lv_point_t p;
+    lv_area_t a;
+    lv_indev_get_point(indev, &p);
+    lv_obj_get_coords(canvas, &a);
+
+    float dx = (float)(p.x - a.x1 - 52);
+    float dy = (float)(p.y - a.y1 - 52);
+    float dist = sqrtf(dx * dx + dy * dy);
+    if (dist > 49.0f) return;
+
+    float deg = atan2f(dy, dx) * 180.0f / (float)M_PI;
+    if (deg < 0) deg += 360.0f;
+    uint8_t sat = (uint8_t)lroundf((dist / 49.0f) * 100.0f);
+    uint8_t rr, gg, bb;
+    hsv_to_rgb((uint16_t)deg, sat, 100, &rr, &gg, &bb);
+
+    colorwheel_position_knob((uint16_t)deg, sat);
+    mqtt_bridge_tapo_rgb(rr, gg, bb);
 }
 
 static void echo_mute_cb(lv_event_t *e)
@@ -424,13 +514,12 @@ static void create_tapo_card(lv_obj_t *root)
     s_tapo_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_tapo_switch, switch_tapo_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    s_colorwheel = lv_colorwheel_create(card, true);
-    lv_obj_set_pos(s_colorwheel, 17, 70);
-    lv_obj_set_size(s_colorwheel, 104, 104);
-    lv_colorwheel_set_mode_fixed(s_colorwheel, true);
-    lv_obj_set_style_arc_width(s_colorwheel, 16, LV_PART_MAIN);
-    lv_obj_set_style_border_width(s_colorwheel, 0, LV_PART_MAIN);
-    lv_obj_add_event_cb(s_colorwheel, colorwheel_cb, LV_EVENT_RELEASED, NULL);
+    s_colorwheel = create_colorwheel(card);
+    if (s_colorwheel) {
+        lv_obj_add_event_cb(s_colorwheel, colorwheel_cb, LV_EVENT_PRESSED, NULL);
+        lv_obj_add_event_cb(s_colorwheel, colorwheel_cb, LV_EVENT_PRESSING, NULL);
+        lv_obj_add_event_cb(s_colorwheel, colorwheel_cb, LV_EVENT_RELEASED, NULL);
+    }
 
     const uint32_t colors[6] = {0xFF3B30, 0xFF9500, 0xFFD60A, 0x30D158, 0x0A84FF, 0xBF5AF2};
     const uint32_t payloads[6] = {0xFF0000, 0xFF8000, 0xFFFF00, 0x00FF00, 0x0066FF, 0xA020F0};
@@ -786,7 +875,8 @@ void ui_apply_tapo_state(bool on, uint8_t brightness, uint8_t r, uint8_t g, uint
     lv_slider_set_value(s_tapo_slider, brightness, LV_ANIM_ON);
     lv_label_set_text_fmt(s_tapo_pct, "%u%%", brightness);
     lv_label_set_text(s_tapo_status, on ? "Online • On" : "Online • Off");
-    lv_colorwheel_set_rgb(s_colorwheel, lv_color_make(r, g, b));
+    lv_color_hsv_t hsv = lv_color_rgb_to_hsv(r, g, b);
+    colorwheel_position_knob(hsv.h, hsv.s);
     s_syncing = false;
 
     lvgl_port_unlock();
