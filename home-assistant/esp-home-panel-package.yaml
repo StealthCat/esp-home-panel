@@ -232,3 +232,53 @@ automation:
               'muted': state_attr('media_player.echo_dot', 'is_volume_muted') | bool(false),
               'playing': is_state('media_player.echo_dot', 'playing')
             } | to_json }}
+
+  - id: esp_home_panel_state_request
+    alias: "7C Panel - Publish complete state on request"
+    mode: restart
+    trigger:
+      - platform: mqtt
+        topic: "home/7c-panel/request_state"
+    action:
+      - service: mqtt.publish
+        data:
+          topic: "home/7c-panel/state/tapo"
+          qos: 1
+          retain: true
+          payload: >-
+            {% set rgb = state_attr('light.tapo_led_strip', 'rgb_color') or [255, 255, 255] %}
+            {{ {
+              'on': is_state('light.tapo_led_strip', 'on'),
+              'brightness': (((state_attr('light.tapo_led_strip', 'brightness') | int(0)) * 100 / 255) | round | int),
+              'r': rgb[0] | int,
+              'g': rgb[1] | int,
+              'b': rgb[2] | int
+            } | to_json }}
+      - service: mqtt.publish
+        data:
+          topic: "home/7c-panel/state/overhead"
+          qos: 1
+          retain: true
+          payload: >-
+            {{ {
+              'on': is_state('light.overhead_light', 'on'),
+              'brightness': (((state_attr('light.overhead_light', 'brightness') | int(0)) * 100 / 255) | round | int)
+            } | to_json }}
+      - service: mqtt.publish
+        data:
+          topic: "home/7c-panel/state/fan"
+          qos: 1
+          retain: true
+          payload: >-
+            {{ {'on': is_state('switch.ceiling_fan', 'on')} | to_json }}
+      - service: mqtt.publish
+        data:
+          topic: "home/7c-panel/state/echo"
+          qos: 1
+          retain: true
+          payload: >-
+            {{ {
+              'volume': ((state_attr('media_player.echo_dot', 'volume_level') | float(0)) * 100) | round | int,
+              'muted': state_attr('media_player.echo_dot', 'is_volume_muted') | bool(false),
+              'playing': is_state('media_player.echo_dot', 'playing')
+            } | to_json }}
