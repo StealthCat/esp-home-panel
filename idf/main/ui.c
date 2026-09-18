@@ -39,6 +39,7 @@ static lv_obj_t *s_overhead_status;
 static lv_obj_t *s_fan_switch;
 static lv_obj_t *s_fan_icon;
 static lv_obj_t *s_fan_status;
+static lv_obj_t *s_fan_state_label;
 
 static lv_obj_t *s_echo_slider;
 static lv_obj_t *s_echo_pct;
@@ -638,7 +639,7 @@ static void create_fan_card(lv_obj_t *root)
     s_fan_switch = make_switch(card, 248, 72);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    make_label(card, "Fan is Off", 237, 116, &lv_font_montserrat_18, T->text);
+    s_fan_state_label = make_label(card, "Fan is Off", 237, 116, &lv_font_montserrat_18, T->text);
     make_label(card, "Smart Switch", 237, 143, &lv_font_montserrat_14, T->muted);
 
     if (T->soccer) {
@@ -904,6 +905,7 @@ void ui_apply_fan_state(bool on)
     s_fan_on = on;
     set_switch(s_fan_switch, on);
     lv_label_set_text(s_fan_status, on ? "Online • On" : "Online • Off");
+    lv_label_set_text(s_fan_state_label, on ? "Fan is On" : "Fan is Off");
     lv_obj_set_style_shadow_opa(s_fan_icon, on ? 100 : 20, 0);
     s_syncing = false;
 
