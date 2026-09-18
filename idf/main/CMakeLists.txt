@@ -18,4 +18,9 @@ idf_component_register(
         esp_lcd
         esp_driver_gpio
         esp_driver_i2c
+    EMBED_TXTFILES
+        "../assets/classic-dark/screen.svg"
+        "../assets/soccer-green/screen.svg"
+        "../assets/kittens-pink/screen.svg"
+        "../assets/magic-bricks-blue/screen.svg"
 )
