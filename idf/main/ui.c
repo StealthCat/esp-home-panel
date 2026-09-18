@@ -6,8 +6,10 @@
 #include <time.h>
 
 #include "esp_log.h"
+#include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_lvgl_port.h"
+#include "board_7c.h"
 #include "lvgl.h"
 #include "mqtt_bridge.h"
 #include "ui_theme.h"
