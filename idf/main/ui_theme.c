@@ -1,6 +1,6 @@
 #include "ui_theme.h"
 
-static const panel_theme_t THEME_CLASSIC = {
+static const panel_theme_t __attribute__((unused)) THEME_CLASSIC = {
     .id = PANEL_THEME_CLASSIC_DARK,
     .name = "Home Control",
     .tagline = "Smart Home  •  Powered by ESP-IDF + LVGL",
@@ -17,7 +17,7 @@ static const panel_theme_t THEME_CLASSIC = {
     .warm = 0xFFD447,
 };
 
-static const panel_theme_t THEME_SOCCER = {
+static const panel_theme_t __attribute__((unused)) THEME_SOCCER = {
     .id = PANEL_THEME_SOCCER_GREEN,
     .name = "Home Control",
     .tagline = "Home Field  •  Fast Local Control",
@@ -35,7 +35,7 @@ static const panel_theme_t THEME_SOCCER = {
     .soccer = true,
 };
 
-static const panel_theme_t THEME_KITTENS = {
+static const panel_theme_t __attribute__((unused)) THEME_KITTENS = {
     .id = PANEL_THEME_KITTENS_PINK,
     .name = "Home Control",
     .tagline = "Cozy Controls  •  Purrfectly Connected",
@@ -53,7 +53,7 @@ static const panel_theme_t THEME_KITTENS = {
     .kittens = true,
 };
 
-static const panel_theme_t THEME_MAGIC = {
+static const panel_theme_t __attribute__((unused)) THEME_MAGIC = {
     .id = PANEL_THEME_MAGIC_BLUE,
     .name = "Home Control",
     .tagline = "A Smarter Home  •  More Magical Living",
