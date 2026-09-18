@@ -254,7 +254,7 @@ static void add_kittens_decor(lv_obj_t *screen)
     lv_obj_t *cat = make_label(screen, "=^.^=", 690, 8, &lv_font_montserrat_20, T->accent_2);
     lv_obj_set_style_text_opa(cat, 220, 0);
 
-    lv_obj_t *heart = make_label(screen, LV_SYMBOL_HEART, 760, 42, &lv_font_montserrat_18, T->accent);
+    lv_obj_t *heart = make_label(screen, "<3", 760, 42, &lv_font_montserrat_18, T->accent);
     lv_obj_set_style_text_opa(heart, 180, 0);
 }
 
@@ -448,7 +448,7 @@ static void create_tapo_card(lv_obj_t *root)
     }
 
     make_label(card, "Brightness", 145, 113, &lv_font_montserrat_16, T->muted);
-    make_label(card, LV_SYMBOL_SUN, 145, 140, &lv_font_montserrat_18, T->accent);
+    make_label(card, "*", 145, 140, &lv_font_montserrat_18, T->accent);
 
     s_tapo_slider = make_slider(card, 174, 143, 150, T->accent);
     lv_obj_add_event_cb(s_tapo_slider, tapo_brightness_cb, LV_EVENT_RELEASED, NULL);
@@ -467,7 +467,7 @@ static void create_overhead_card(lv_obj_t *root)
     lv_obj_add_event_cb(s_overhead_switch, switch_overhead_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
     make_label(card, "Brightness", 20, 78, &lv_font_montserrat_16, T->muted);
-    make_label(card, LV_SYMBOL_SUN, 20, 107, &lv_font_montserrat_18, T->warm);
+    make_label(card, "*", 20, 107, &lv_font_montserrat_18, T->warm);
 
     s_overhead_slider = make_slider(card, 50, 110, 250, T->warm);
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_RELEASED, NULL);
