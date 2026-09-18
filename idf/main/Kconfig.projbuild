@@ -1,0 +1,54 @@
+menu "Home Panel"
+
+config PANEL_WIFI_SSID
+    string "Wi-Fi SSID"
+    default ""
+
+config PANEL_WIFI_PASSWORD
+    string "Wi-Fi password"
+    default ""
+
+config PANEL_MQTT_URI
+    string "MQTT broker URI"
+    default "mqtt://192.168.1.2"
+
+config PANEL_MQTT_USERNAME
+    string "MQTT username"
+    default ""
+
+config PANEL_MQTT_PASSWORD
+    string "MQTT password"
+    default ""
+
+config PANEL_MQTT_BASE_TOPIC
+    string "MQTT base topic"
+    default "home/7c-panel"
+
+config PANEL_TIMEZONE
+    string "POSIX timezone"
+    default "EST5EDT,M3.2.0/2,M11.1.0/2"
+
+choice PANEL_THEME
+    prompt "Panel theme"
+    default PANEL_THEME_CLASSIC
+
+config PANEL_THEME_CLASSIC
+    bool "Classic dark"
+
+config PANEL_THEME_SOCCER
+    bool "Soccer green"
+
+config PANEL_THEME_KITTENS
+    bool "Kittens pink"
+
+config PANEL_THEME_MAGIC
+    bool "Magic / bricks blue"
+
+endchoice
+
+config PANEL_BACKLIGHT
+    int "Backlight brightness percent"
+    range 5 100
+    default 100
+
+endmenu
