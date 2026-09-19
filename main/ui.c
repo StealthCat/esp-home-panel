@@ -14,6 +14,9 @@
 #include "lvgl.h"
 #include "mqtt_bridge.h"
 #include "ui_theme.h"
+#ifdef WOKWI_EMULATOR
+#include "wokwi_panel.h"
+#endif
 
 static const char *TAG = "ui";
 
@@ -839,6 +842,13 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
     };
     ESP_RETURN_ON_ERROR(lvgl_port_init(&lvgl_cfg), TAG, "LVGL port init failed");
 
+#ifdef WOKWI_EMULATOR
+    (void)panel;
+    (void)touch;
+    s_disp = wokwi_panel_create_display();
+    ESP_RETURN_ON_FALSE(s_disp, ESP_FAIL, TAG, "Failed to create Wokwi display");
+    ESP_RETURN_ON_ERROR(wokwi_panel_add_touch(s_disp), TAG, "Failed to create Wokwi touch input");
+#else
     const lvgl_port_display_cfg_t disp_cfg = {
         .panel_handle = panel,
         .buffer_size = PANEL_H_RES * PANEL_V_RES,
@@ -875,6 +885,7 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
         .handle = touch,
     };
     ESP_RETURN_ON_FALSE(lvgl_port_add_touch(&touch_cfg), ESP_FAIL, TAG, "Failed to add touch input");
+#endif
 
     if (!lvgl_port_lock(0)) {
         return ESP_ERR_TIMEOUT;

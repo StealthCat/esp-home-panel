@@ -1,6 +1,34 @@
 #include "board_7c.h"
 
 #include <string.h>
+
+#ifdef WOKWI_EMULATOR
+
+#include "esp_check.h"
+#include "esp_log.h"
+#include "wokwi_panel.h"
+
+static const char *TAG = "board_7c";
+
+esp_err_t board_7c_set_backlight(uint8_t percent)
+{
+    ESP_LOGD(TAG, "Wokwi virtual backlight: %u%%", percent);
+    return ESP_OK;
+}
+
+esp_err_t board_7c_init(board_7c_handles_t *handles)
+{
+    ESP_RETURN_ON_FALSE(handles, ESP_ERR_INVALID_ARG, TAG, "handles is NULL");
+    memset(handles, 0, sizeof(*handles));
+    ESP_LOGI(TAG, "Initializing Wokwi 7C BOX transport");
+    ESP_RETURN_ON_ERROR(wokwi_panel_init(), TAG, "Wokwi panel transport init failed");
+    ESP_LOGI(TAG, "Wokwi 7C BOX ready: 800x480 virtual RGB565 display");
+    return ESP_OK;
+}
+
+#else
+
+
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_check.h"
@@ -237,3 +265,5 @@ esp_err_t board_7c_init(board_7c_handles_t *handles)
     ESP_LOGI(TAG, "7C BOX ready: 800x480 RGB565 + GT911");
     return ESP_OK;
 }
+
+#endif

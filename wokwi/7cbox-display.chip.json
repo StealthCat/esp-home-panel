@@ -1,0 +1,11 @@
+{
+  "name": "Waveshare 7C BOX Virtual Display",
+  "author": "OpenAI",
+  "pins": ["VCC", "GND", "SCK", "MOSI", "CS", "SCL", "SDA"],
+  "controls": [
+    {"id":"touchX","label":"Touch X","type":"range","min":0,"max":799,"step":1},
+    {"id":"touchY","label":"Touch Y","type":"range","min":0,"max":479,"step":1},
+    {"id":"touchPressed","label":"Touch pressed","type":"range","min":0,"max":1,"step":1}
+  ],
+  "display": {"width": 800, "height": 480}
+}

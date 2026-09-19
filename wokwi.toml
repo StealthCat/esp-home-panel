@@ -1,0 +1,8 @@
+[wokwi]
+version = 1
+firmware = '.pio/build/wokwi/flasher_args.json'
+elf = '.pio/build/wokwi/firmware.elf'
+
+[[chip]]
+name = '7cbox-display'
+binary = 'wokwi/7cbox-display.chip.wasm'

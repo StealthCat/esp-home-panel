@@ -7,6 +7,7 @@ idf_component_register(
         "ui.c"
         "ui_theme.c"
         "artwork.c"
+        "wokwi_panel.c"
     INCLUDE_DIRS "."
     REQUIRES
         esp_wifi
@@ -19,4 +20,5 @@ idf_component_register(
         esp_lcd
         esp_driver_gpio
         esp_driver_i2c
+        esp_driver_spi
 )
