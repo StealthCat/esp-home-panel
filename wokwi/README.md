@@ -14,6 +14,11 @@ wokwi-cli .
 You can also open the repository in VS Code with the Wokwi extension, build the
 `wokwi` environment, and choose **Wokwi: Start Simulator**.
 
+The Wokwi PlatformIO environment also creates a merged flash image at
+`.pio/build/wokwi/wokwi.bin`. This includes the bootloader, partition table,
+and application in one image and avoids relative-path problems with PlatformIO
+ESP-IDF `flasher_args.json` files.
+
 The virtual panel is an 800×480 Wokwi custom framebuffer chip. LVGL sends RGB565
 flush regions to it over simulated SPI:
 
