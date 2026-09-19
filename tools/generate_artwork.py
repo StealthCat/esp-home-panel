@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """Generate main/artwork.c from the canonical SVG theme assets.
 
-This script uses only the Python standard library. PlatformIO executes it as a
-pre-build script, and it can also be run directly.
+PlatformIO executes extra scripts through SCons, where Python's __file__ is not
+defined. In that context we use PlatformIO's PROJECT_DIR. The same script can
+still be executed directly with normal Python.
 """
 
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+try:
+    Import("env")  # Provided by PlatformIO/SCons.
+    ROOT = Path(env.subst("$PROJECT_DIR")).resolve()
+except NameError:
+    # Normal direct execution: python tools/generate_artwork.py
+    ROOT = Path(__file__).resolve().parents[1]
+
 MAIN = ROOT / "main"
 THEMES = [
     ("CLASSIC_SVG", ROOT / "assets" / "classic-dark" / "screen.svg"),
@@ -31,6 +38,12 @@ def c_literal(text: str) -> str:
 
 
 def generate() -> None:
+    missing = [str(path) for _, path in THEMES if not path.is_file()]
+    if missing:
+        raise FileNotFoundError(
+            "Missing artwork asset(s):\n  " + "\n  ".join(missing)
+        )
+
     blocks = []
     for symbol, path in THEMES:
         text = path.read_text(encoding="utf-8")
