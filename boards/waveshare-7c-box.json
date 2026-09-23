@@ -26,9 +26,9 @@
   ],
   "name": "Waveshare ESP32-S3 Touch LCD 7C BOX",
   "upload": {
-    "flash_size": "32MB",
+    "flash_size": "16MB",
     "maximum_ram_size": 16777216,
-    "maximum_size": 33554432,
+    "maximum_size": 16777216,
     "require_upload_port": true,
     "speed": 460800
   },
