@@ -915,11 +915,16 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
         return ESP_ERR_TIMEOUT;
     }
 
-    init_styles();
-
     lv_obj_t *root = lv_screen_active();
     style_screen(root);
+
+    /*
+     * Determine whether artwork rendering is usable before initializing
+     * styles, because style opacity depends on s_artwork_mode.
+     */
     create_artwork_background(root);
+    init_styles();
+
     if (!s_artwork_mode) {
         add_theme_decor(root);
     }
