@@ -81,6 +81,23 @@ static void create_artwork_background(lv_obj_t *root)
         return;
     }
 
+    /*
+     * The current artwork assets are SVG containers around base64-encoded
+     * raster images (WebP). LVGL 9.5's bundled ThorVG build can parse SVG, but
+     * it does not include raster image loaders such as WebP. Attempting to use
+     * those assets therefore produces an empty image while artwork mode hides
+     * the native controls, leaving the panel apparently blank.
+     *
+     * Keep support for future pure-vector SVG assets, but fail visibly to the
+     * native LVGL theme for raster-backed SVGs.
+     */
+    const char *svg_text = (const char *)art.data;
+    if (strstr(svg_text, "data:image/") != NULL) {
+        ESP_LOGW(TAG, "Artwork contains embedded raster images unsupported by bundled ThorVG; using native LVGL fallback");
+        s_artwork_mode = false;
+        return;
+    }
+
     memset(&s_artwork_dsc, 0, sizeof(s_artwork_dsc));
     s_artwork_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
     s_artwork_dsc.header.w = PANEL_H_RES;
@@ -88,13 +105,20 @@ static void create_artwork_background(lv_obj_t *root)
     s_artwork_dsc.data_size = art.size;
     s_artwork_dsc.data = art.data;
 
+    lv_image_header_t header;
+    if (lv_image_decoder_get_info(&s_artwork_dsc, &header) != LV_RESULT_OK) {
+        ESP_LOGW(TAG, "SVG artwork decoder rejected asset; using native LVGL fallback");
+        s_artwork_mode = false;
+        return;
+    }
+
     s_artwork_image = lv_image_create(root);
     lv_image_set_src(s_artwork_image, &s_artwork_dsc);
     lv_obj_set_pos(s_artwork_image, 0, 0);
     lv_obj_set_size(s_artwork_image, PANEL_H_RES, PANEL_V_RES);
     lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_SCROLLABLE);
-    ESP_LOGI(TAG, "Loaded %u-byte SVG artwork background", (unsigned)art.size);
+    ESP_LOGI(TAG, "Loaded %u-byte pure-vector SVG artwork background", (unsigned)art.size);
 }
 
 static void style_screen(lv_obj_t *screen)
