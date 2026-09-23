@@ -15,18 +15,22 @@ static const char *TAG = "mqtt_bridge";
 static esp_mqtt_client_handle_t s_client;
 static bool s_connected;
 
-static char s_topic_state_tapo[160];
-static char s_topic_state_overhead[160];
-static char s_topic_state_fan[160];
-static char s_topic_state_echo[160];
+/*
+ * MQTT topics are compile-time strings. Keeping them in read-only storage
+ * avoids reserving ten 160-byte buffers in scarce internal DRAM (.bss).
+ */
+static const char s_topic_state_tapo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/tapo";
+static const char s_topic_state_overhead[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/overhead";
+static const char s_topic_state_fan[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/fan";
+static const char s_topic_state_echo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/echo";
 
-static char s_topic_cmd_tapo[160];
-static char s_topic_cmd_overhead[160];
-static char s_topic_cmd_fan[160];
-static char s_topic_cmd_echo[160];
+static const char s_topic_cmd_tapo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/tapo";
+static const char s_topic_cmd_overhead[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/overhead";
+static const char s_topic_cmd_fan[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/fan";
+static const char s_topic_cmd_echo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/echo";
 
-static char s_topic_availability[160];
-static char s_topic_request_state[160];
+static const char s_topic_availability[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/availability";
+static const char s_topic_request_state[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/request_state";
 
 static uint8_t clamp_pct(int value)
 {
@@ -40,22 +44,6 @@ static uint8_t clamp_u8(int value)
     if (value < 0) return 0;
     if (value > 255) return 255;
     return (uint8_t)value;
-}
-
-static void build_topics(void)
-{
-    snprintf(s_topic_state_tapo, sizeof(s_topic_state_tapo), "%s/state/tapo", CONFIG_PANEL_MQTT_BASE_TOPIC);
-    snprintf(s_topic_state_overhead, sizeof(s_topic_state_overhead), "%s/state/overhead", CONFIG_PANEL_MQTT_BASE_TOPIC);
-    snprintf(s_topic_state_fan, sizeof(s_topic_state_fan), "%s/state/fan", CONFIG_PANEL_MQTT_BASE_TOPIC);
-    snprintf(s_topic_state_echo, sizeof(s_topic_state_echo), "%s/state/echo", CONFIG_PANEL_MQTT_BASE_TOPIC);
-
-    snprintf(s_topic_cmd_tapo, sizeof(s_topic_cmd_tapo), "%s/cmd/tapo", CONFIG_PANEL_MQTT_BASE_TOPIC);
-    snprintf(s_topic_cmd_overhead, sizeof(s_topic_cmd_overhead), "%s/cmd/overhead", CONFIG_PANEL_MQTT_BASE_TOPIC);
-    snprintf(s_topic_cmd_fan, sizeof(s_topic_cmd_fan), "%s/cmd/fan", CONFIG_PANEL_MQTT_BASE_TOPIC);
-    snprintf(s_topic_cmd_echo, sizeof(s_topic_cmd_echo), "%s/cmd/echo", CONFIG_PANEL_MQTT_BASE_TOPIC);
-
-    snprintf(s_topic_availability, sizeof(s_topic_availability), "%s/availability", CONFIG_PANEL_MQTT_BASE_TOPIC);
-    snprintf(s_topic_request_state, sizeof(s_topic_request_state), "%s/request_state", CONFIG_PANEL_MQTT_BASE_TOPIC);
 }
 
 static bool topic_equals(const esp_mqtt_event_handle_t event, const char *expected)
@@ -159,8 +147,6 @@ static void publish_json(const char *topic, const char *json)
 
 esp_err_t mqtt_bridge_start(void)
 {
-    build_topics();
-
     const esp_mqtt_client_config_t cfg = {
         .broker.address.uri = CONFIG_PANEL_MQTT_URI,
         .credentials.username = CONFIG_PANEL_MQTT_USERNAME[0] ? CONFIG_PANEL_MQTT_USERNAME : NULL,
