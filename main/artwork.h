@@ -1,11 +1,13 @@
 #pragma once
 
-#include <stddef.h>
-#include <stdint.h>
+#include "lvgl.h"
 
-typedef struct {
-    const uint8_t *data;
-    size_t size;
-} artwork_svg_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-artwork_svg_t artwork_get_active_svg(void);
+const lv_image_dsc_t *artwork_get_active_image(void);
+
+#ifdef __cplusplus
+}
+#endif
