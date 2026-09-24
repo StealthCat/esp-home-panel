@@ -1,4 +1,4 @@
-#include "board_7c.h"
+#include "board_7c.h"\n#include "settings.h"
 
 #include <string.h>
 
@@ -452,7 +452,7 @@ esp_err_t board_7c_init(board_7c_handles_t *handles)
     ESP_RETURN_ON_ERROR(touch_init(&handles->touch), TAG, "Touch init failed");
     ESP_RETURN_ON_ERROR(lcd_init(&handles->panel), TAG, "LCD init failed");
 
-    ESP_RETURN_ON_ERROR(board_7c_set_backlight(CONFIG_PANEL_BACKLIGHT), TAG, "Backlight on failed");
+    ESP_RETURN_ON_ERROR(board_7c_set_backlight(settings_get()->backlight_percent), TAG, "Backlight on failed");
 
     ESP_LOGI(TAG, "Waveshare panel ready: 800x480 RGB565 + GT911 (%s)",
              s_hw_profile == HW_PROFILE_7C_BOX ? "7C-BOX" : "ESP32-S3-Touch-LCD-7");
