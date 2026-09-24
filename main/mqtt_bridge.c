@@ -222,6 +222,15 @@ static int json_int(cJSON *root, const char *name, int fallback)
     return item->valueint;
 }
 
+static const char *json_string(cJSON *root, const char *name)
+{
+    cJSON *item = cJSON_GetObjectItemCaseSensitive(root, name);
+    if (!cJSON_IsString(item) || !item->valuestring) {
+        return "";
+    }
+    return item->valuestring;
+}
+
 static void handle_state_message(esp_mqtt_event_handle_t event)
 {
     cJSON *root = cJSON_ParseWithLength(event->data, event->data_len);
@@ -254,9 +263,12 @@ static void handle_state_message(esp_mqtt_event_handle_t event)
         uint8_t volume = clamp_pct(json_int(root, "volume", 0));
         bool muted = json_bool(root, "muted", false);
         bool playing = json_bool(root, "playing", false);
-        ESP_LOGI(TAG, "MQTT APPLY echo volume=%u muted=%d playing=%d",
-                 volume, muted, playing);
-        ui_apply_echo_state(volume, muted, playing);
+        const char *title = json_string(root, "title");
+        const char *artist = json_string(root, "artist");
+        ESP_LOGI(TAG,
+                 "MQTT APPLY alexa volume=%u muted=%d playing=%d title=\"%s\" artist=\"%s\"",
+                 volume, muted, playing, title, artist);
+        ui_apply_echo_state(volume, muted, playing, title, artist);
     }
 
     cJSON_Delete(root);
