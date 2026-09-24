@@ -24,7 +24,6 @@ static const panel_theme_t *T;
 
 static lv_display_t *s_disp;
 static bool s_artwork_mode = true;
-static lv_image_dsc_t s_artwork_dsc;
 static lv_obj_t *s_artwork_image;
 
 static lv_obj_t *s_wifi_icon;
@@ -74,51 +73,45 @@ static inline lv_color_t c(uint32_t hex)
 
 static void create_artwork_background(lv_obj_t *root)
 {
-    artwork_svg_t art = artwork_get_active_svg();
-    if (!art.data || art.size == 0) {
-        ESP_LOGW(TAG, "No artwork data available; using native LVGL fallback");
+    const lv_image_dsc_t *art = artwork_get_active_image();
+    if (!art || !art->data || art->data_size == 0) {
+        ESP_LOGW(TAG, "No native artwork image available; using LVGL fallback");
         s_artwork_mode = false;
         return;
     }
 
-    /*
-     * The current artwork assets are SVG containers around base64-encoded
-     * raster images (WebP). LVGL 9.5's bundled ThorVG build can parse SVG, but
-     * it does not include raster image loaders such as WebP. Attempting to use
-     * those assets therefore produces an empty image while artwork mode hides
-     * the native controls, leaving the panel apparently blank.
-     *
-     * Keep support for future pure-vector SVG assets, but fail visibly to the
-     * native LVGL theme for raster-backed SVGs.
-     */
-    const char *svg_text = (const char *)art.data;
-    if (strstr(svg_text, "data:image/") != NULL) {
-        ESP_LOGW(TAG, "Artwork contains embedded raster images unsupported by bundled ThorVG; using native LVGL fallback");
-        s_artwork_mode = false;
-        return;
-    }
-
-    memset(&s_artwork_dsc, 0, sizeof(s_artwork_dsc));
-    s_artwork_dsc.header.magic = LV_IMAGE_HEADER_MAGIC;
-    s_artwork_dsc.header.w = PANEL_H_RES;
-    s_artwork_dsc.header.h = PANEL_V_RES;
-    s_artwork_dsc.data_size = art.size;
-    s_artwork_dsc.data = art.data;
-
-    lv_image_header_t header;
-    if (lv_image_decoder_get_info(&s_artwork_dsc, &header) != LV_RESULT_OK) {
-        ESP_LOGW(TAG, "SVG artwork decoder rejected asset; using native LVGL fallback");
+    if (art->header.magic != LV_IMAGE_HEADER_MAGIC ||
+        art->header.cf != LV_COLOR_FORMAT_RGB565 ||
+        art->header.w != PANEL_H_RES ||
+        art->header.h != PANEL_V_RES ||
+        art->header.stride != PANEL_H_RES * 2) {
+        ESP_LOGE(TAG,
+                 "Artwork descriptor mismatch: magic=0x%02X cf=%u %ux%u stride=%u",
+                 (unsigned)art->header.magic,
+                 (unsigned)art->header.cf,
+                 (unsigned)art->header.w,
+                 (unsigned)art->header.h,
+                 (unsigned)art->header.stride);
         s_artwork_mode = false;
         return;
     }
 
     s_artwork_image = lv_image_create(root);
-    lv_image_set_src(s_artwork_image, &s_artwork_dsc);
+    if (!s_artwork_image) {
+        ESP_LOGE(TAG, "Unable to create artwork image object");
+        s_artwork_mode = false;
+        return;
+    }
+
+    lv_image_set_src(s_artwork_image, art);
     lv_obj_set_pos(s_artwork_image, 0, 0);
     lv_obj_set_size(s_artwork_image, PANEL_H_RES, PANEL_V_RES);
     lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_SCROLLABLE);
-    ESP_LOGI(TAG, "Loaded %u-byte pure-vector SVG artwork background", (unsigned)art.size);
+
+    s_artwork_mode = true;
+    ESP_LOGI(TAG, "Loaded %u-byte native RGB565 artwork background",
+             (unsigned)art->data_size);
 }
 
 static void style_screen(lv_obj_t *screen)
