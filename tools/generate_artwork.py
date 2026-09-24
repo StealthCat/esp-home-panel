@@ -15,9 +15,11 @@ from __future__ import annotations
 
 import base64
 import re
+import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -140,64 +142,77 @@ def data_href(node: ET.Element) -> str | None:
 
 
 def decode_tile(ffmpeg: str, raw: bytes, mime: str, width: int, height: int) -> bytes:
-    """Decode one embedded raster image to exactly width*height RGBA bytes."""
+    """Decode one embedded raster image to exactly width*height RGBA bytes.
 
-    demuxers = {
-        "webp": "webp_pipe",
-        "png": "png_pipe",
-        "jpeg": "jpeg_pipe",
-        "jpg": "jpeg_pipe",
+    Older Windows FFmpeg builds are unreliable at probing WebP from stdin.
+    Write the tile to a short-lived file with the proper extension so FFmpeg
+    can use its normal file probing path.
+    """
+
+    extensions = {
+        "webp": ".webp",
+        "png": ".png",
+        "jpeg": ".jpg",
+        "jpg": ".jpg",
     }
-    demuxer = demuxers.get(mime.lower())
-    if not demuxer:
+    suffix = extensions.get(mime.lower())
+    if not suffix:
         raise ValueError(f"Unsupported embedded artwork MIME type: image/{mime}")
 
-    cmd = [
-        ffmpeg,
-        "-hide_banner",
-        "-loglevel",
-        "error",
-        "-f",
-        demuxer,
-        "-i",
-        "pipe:0",
-        "-frames:v",
-        "1",
-        "-vf",
-        f"scale={width}:{height}:flags=lanczos",
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        "rgba",
-        "pipe:1",
-    ]
+    temp_path = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as temp:
+            temp.write(raw)
+            temp_path = temp.name
 
-    proc = subprocess.run(
-        cmd,
-        input=raw,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
+        cmd = [
+            ffmpeg,
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            temp_path,
+            "-frames:v",
+            "1",
+            "-vf",
+            f"scale={width}:{height}:flags=lanczos",
+            "-f",
+            "rawvideo",
+            "-pix_fmt",
+            "rgba",
+            "pipe:1",
+        ]
 
-    expected = width * height * 4
-    if proc.returncode != 0:
-        detail = proc.stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(
-            "FFmpeg failed to decode an embedded artwork tile"
-            + (f": {detail}" if detail else "")
+        proc = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
         )
 
-    if len(proc.stdout) != expected:
-        detail = proc.stderr.decode("utf-8", errors="replace").strip()
-        raise RuntimeError(
-            f"FFmpeg decoded {len(proc.stdout)} bytes for a {width}x{height} RGBA "
-            f"tile; expected {expected}"
-            + (f". Decoder output: {detail}" if detail else "")
-        )
+        expected = width * height * 4
+        if proc.returncode != 0:
+            detail = proc.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                "FFmpeg failed to decode an embedded artwork tile"
+                + (f": {detail}" if detail else "")
+            )
 
-    return proc.stdout
+        if len(proc.stdout) != expected:
+            detail = proc.stderr.decode("utf-8", errors="replace").strip()
+            raise RuntimeError(
+                f"FFmpeg decoded {len(proc.stdout)} bytes for a {width}x{height} RGBA "
+                f"tile; expected {expected}"
+                + (f". Decoder output: {detail}" if detail else "")
+            )
 
+        return proc.stdout
+    finally:
+        if temp_path:
+            try:
+                os.unlink(temp_path)
+            except OSError:
+                pass
 
 def alpha_composite(canvas: bytearray, tile: bytes, x0: int, y0: int, width: int, height: int) -> None:
     """Composite an RGBA tile onto the RGBA screen canvas."""
