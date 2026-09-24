@@ -7,6 +7,7 @@
 #include "cJSON.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_timer.h"
 #include "mqtt_client.h"
 #include "settings.h"
 #include "ui.h"
@@ -15,6 +16,7 @@ static const char *TAG = "mqtt_bridge";
 
 static esp_mqtt_client_handle_t s_client;
 static bool s_connected;
+static int64_t s_last_state_request_us;
 
 static char *s_topic_state_tapo;
 static char *s_topic_state_overhead;
@@ -134,6 +136,41 @@ static void handle_state_message(esp_mqtt_event_handle_t event)
     cJSON_Delete(root);
 }
 
+static void publish_state_request(void)
+{
+    if (!s_client || !s_connected || !s_topic_request_state) {
+        return;
+    }
+
+    const panel_settings_t *settings = settings_get();
+    if (!settings) {
+        return;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (!root) {
+        ESP_LOGW(TAG, "Unable to allocate Home Assistant state request");
+        return;
+    }
+
+    cJSON_AddNumberToObject(root, "request", 1);
+    cJSON_AddStringToObject(root, "tapo", settings->ha_tapo_entity);
+    cJSON_AddStringToObject(root, "overhead", settings->ha_overhead_entity);
+    cJSON_AddStringToObject(root, "fan", settings->ha_fan_entity);
+    cJSON_AddStringToObject(root, "echo", settings->ha_echo_entity);
+
+    char *payload = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!payload) {
+        ESP_LOGW(TAG, "Unable to encode Home Assistant state request");
+        return;
+    }
+
+    esp_mqtt_client_publish(s_client, s_topic_request_state, payload, 0, 1, 0);
+    cJSON_free(payload);
+    s_last_state_request_us = esp_timer_get_time();
+}
+
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
     esp_mqtt_event_handle_t event = (esp_mqtt_event_handle_t)event_data;
@@ -150,7 +187,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         esp_mqtt_client_subscribe(s_client, s_topic_state_echo, 1);
 
         esp_mqtt_client_publish(s_client, s_topic_availability, "online", 0, 1, 1);
-        esp_mqtt_client_publish(s_client, s_topic_request_state, "1", 0, 1, 0);
+        publish_state_request();
         break;
 
     case MQTT_EVENT_DISCONNECTED:
@@ -180,6 +217,41 @@ static void publish_json(const char *topic, const char *json)
     }
 
     esp_mqtt_client_publish(s_client, topic, json, 0, 1, 0);
+}
+
+static void publish_targeted_json(const char *topic,
+                                  const char *entity_id,
+                                  const char *script_entity_id,
+                                  const char *json)
+{
+    if ((!entity_id || entity_id[0] == '\0') &&
+        (!script_entity_id || script_entity_id[0] == '\0')) {
+        publish_json(topic, json);
+        return;
+    }
+
+    cJSON *root = cJSON_Parse(json);
+    if (!root) {
+        ESP_LOGW(TAG, "Unable to parse command JSON: %s", json);
+        return;
+    }
+
+    if (entity_id && entity_id[0] != '\0') {
+        cJSON_AddStringToObject(root, "entity_id", entity_id);
+    }
+    if (script_entity_id && script_entity_id[0] != '\0') {
+        cJSON_AddStringToObject(root, "script_entity_id", script_entity_id);
+    }
+
+    char *payload = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!payload) {
+        ESP_LOGW(TAG, "Unable to encode targeted MQTT command");
+        return;
+    }
+
+    publish_json(topic, payload);
+    cJSON_free(payload);
 }
 
 esp_err_t mqtt_bridge_start(void)
@@ -220,60 +292,113 @@ esp_err_t mqtt_bridge_start(void)
     return esp_mqtt_client_start(s_client);
 }
 
+void mqtt_bridge_poll(void)
+{
+    if (!s_connected) {
+        return;
+    }
+
+    const int64_t now = esp_timer_get_time();
+    if (s_last_state_request_us == 0 ||
+        now - s_last_state_request_us >= 10LL * 1000LL * 1000LL) {
+        publish_state_request();
+    }
+}
+
 void mqtt_bridge_tapo_power(bool on)
 {
-    publish_json(s_topic_cmd_tapo, on ? "{\"on\":true}" : "{\"on\":false}");
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_tapo,
+                          settings ? settings->ha_tapo_entity : NULL,
+                          NULL,
+                          on ? "{\"on\":true}" : "{\"on\":false}");
 }
 
 void mqtt_bridge_tapo_brightness(uint8_t percent)
 {
     char payload[40];
     snprintf(payload, sizeof(payload), "{\"brightness\":%u}", clamp_pct(percent));
-    publish_json(s_topic_cmd_tapo, payload);
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_tapo,
+                          settings ? settings->ha_tapo_entity : NULL,
+                          NULL,
+                          payload);
 }
 
 void mqtt_bridge_tapo_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
     char payload[80];
     snprintf(payload, sizeof(payload), "{\"r\":%u,\"g\":%u,\"b\":%u}", r, g, b);
-    publish_json(s_topic_cmd_tapo, payload);
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_tapo,
+                          settings ? settings->ha_tapo_entity : NULL,
+                          NULL,
+                          payload);
 }
 
 void mqtt_bridge_overhead_power(bool on)
 {
-    publish_json(s_topic_cmd_overhead, on ? "{\"on\":true}" : "{\"on\":false}");
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_overhead,
+                          settings ? settings->ha_overhead_entity : NULL,
+                          NULL,
+                          on ? "{\"on\":true}" : "{\"on\":false}");
 }
 
 void mqtt_bridge_overhead_brightness(uint8_t percent)
 {
     char payload[40];
     snprintf(payload, sizeof(payload), "{\"brightness\":%u}", clamp_pct(percent));
-    publish_json(s_topic_cmd_overhead, payload);
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_overhead,
+                          settings ? settings->ha_overhead_entity : NULL,
+                          NULL,
+                          payload);
 }
 
 void mqtt_bridge_fan_power(bool on)
 {
-    publish_json(s_topic_cmd_fan, on ? "{\"on\":true}" : "{\"on\":false}");
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_fan,
+                          settings ? settings->ha_fan_entity : NULL,
+                          NULL,
+                          on ? "{\"on\":true}" : "{\"on\":false}");
 }
 
 void mqtt_bridge_echo_volume(uint8_t percent)
 {
     char payload[40];
     snprintf(payload, sizeof(payload), "{\"volume\":%u}", clamp_pct(percent));
-    publish_json(s_topic_cmd_echo, payload);
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_echo,
+                          settings ? settings->ha_echo_entity : NULL,
+                          NULL,
+                          payload);
 }
 
 void mqtt_bridge_echo_mute(bool muted)
 {
-    publish_json(s_topic_cmd_echo, muted ? "{\"muted\":true}" : "{\"muted\":false}");
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_echo,
+                          settings ? settings->ha_echo_entity : NULL,
+                          NULL,
+                          muted ? "{\"muted\":true}" : "{\"muted\":false}");
 }
 
 void mqtt_bridge_echo_play_pause(void)
 {
-    publish_json(s_topic_cmd_echo, "{\"action\":\"play_pause\"}");
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_echo,
+                          settings ? settings->ha_echo_entity : NULL,
+                          NULL,
+                          "{\"action\":\"play_pause\"}");
 }
 
 void mqtt_bridge_echo_announce(void)
 {
-    publish_json(s_topic_cmd_echo, "{\"action\":\"announce\"}");
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(s_topic_cmd_echo,
+                          settings ? settings->ha_echo_entity : NULL,
+                          settings ? settings->ha_echo_announce_script : NULL,
+                          "{\"action\":\"announce\"}");
 }
