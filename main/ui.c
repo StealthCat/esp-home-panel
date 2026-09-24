@@ -54,6 +54,7 @@ static lv_obj_t *s_echo_slider;
 static lv_obj_t *s_echo_pct;
 static lv_obj_t *s_echo_status;
 static lv_obj_t *s_echo_mute;
+static lv_obj_t *s_echo_play;
 static lv_obj_t *s_alexa_now_playing;
 static lv_obj_t *s_alexa_artist;
 static lv_obj_t *s_wave[14];
@@ -62,6 +63,7 @@ static bool s_syncing;
 static bool s_fan_on;
 static bool s_echo_playing;
 static bool s_echo_muted;
+static uint8_t s_echo_unmuted_volume = 50;
 static int s_fan_angle;
 static int s_wave_phase;
 
@@ -100,6 +102,13 @@ typedef struct {
 
 static pending_ui_state_t s_pending_ui;
 static portMUX_TYPE s_pending_ui_mux = portMUX_INITIALIZER_UNLOCKED;
+
+static void discard_pending_ui(uint32_t mask)
+{
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    s_pending_ui.dirty &= ~mask;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
+}
 
 static lv_style_t s_card_style;
 static lv_style_t s_button_style;
@@ -353,15 +362,11 @@ static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
 
 static void add_magic_card_ornaments(lv_obj_t *card, int w, int h)
 {
-    const uint32_t gold = T->accent_2;
-
-    /* Four small gold corner brackets matching the original ornate frames. */
-    const int xs[4] = {7, w - 28, 7, w - 28};
-    const int ys[4] = {7, 7, h - 24, h - 24};
-    for (int i = 0; i < 4; ++i) {
-        add_decor_box(card, xs[i], ys[i], 21, 2, gold, 175, 1);
-        add_decor_box(card, xs[i], ys[i], 2, 17, gold, 175, 1);
-    }
+    const int s = 42;
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TL, 0, 0, false);
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TR, w - s, 0, false);
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_BL, 0, h - s, false);
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_BR, w - s, h - s, false);
 }
 
 static void add_kittens_decor(lv_obj_t *screen)
@@ -398,24 +403,38 @@ static void add_theme_decor(lv_obj_t *screen)
 static void switch_tapo_cb(lv_event_t *e)
 {
     if (s_syncing) return;
-    mqtt_bridge_tapo_power(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+    discard_pending_ui(UI_PENDING_TAPO);
+    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    ESP_LOGI(TAG, "UI CMD tapo power=%d", on);
+    mqtt_bridge_tapo_power(on);
 }
 
 static void switch_overhead_cb(lv_event_t *e)
 {
     if (s_syncing) return;
-    mqtt_bridge_overhead_power(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+    discard_pending_ui(UI_PENDING_OVERHEAD);
+    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    ESP_LOGI(TAG, "UI CMD overhead power=%d", on);
+    mqtt_bridge_overhead_power(on);
 }
 
 static void switch_fan_cb(lv_event_t *e)
 {
     if (s_syncing) return;
-    mqtt_bridge_fan_power(lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED));
+    discard_pending_ui(UI_PENDING_FAN);
+    bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    s_fan_on = on;
+    if (s_fan_state_label) {
+        lv_label_set_text(s_fan_state_label, on ? "Fan is On" : "Fan is Off");
+    }
+    ESP_LOGI(TAG, "UI CMD fan power=%d", on);
+    mqtt_bridge_fan_power(on);
 }
 
 static void tapo_brightness_cb(lv_event_t *e)
 {
     if (s_syncing) return;
+    discard_pending_ui(UI_PENDING_TAPO);
     int value = lv_slider_get_value(lv_event_get_target(e));
     set_percent_label(s_tapo_pct, value);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
@@ -426,6 +445,7 @@ static void tapo_brightness_cb(lv_event_t *e)
 static void overhead_brightness_cb(lv_event_t *e)
 {
     if (s_syncing) return;
+    discard_pending_ui(UI_PENDING_OVERHEAD);
     int value = lv_slider_get_value(lv_event_get_target(e));
     set_percent_label(s_overhead_pct, value);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
@@ -436,7 +456,11 @@ static void overhead_brightness_cb(lv_event_t *e)
 static void echo_volume_cb(lv_event_t *e)
 {
     if (s_syncing) return;
+    discard_pending_ui(UI_PENDING_ALEXA);
     int value = lv_slider_get_value(lv_event_get_target(e));
+    if (value > 0) {
+        s_echo_unmuted_volume = (uint8_t)value;
+    }
     set_percent_label(s_echo_pct, value);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
         mqtt_bridge_echo_volume((uint8_t)value);
@@ -451,6 +475,7 @@ static void preset_color_cb(lv_event_t *e)
 
 static void overhead_preset_cb(lv_event_t *e)
 {
+    discard_pending_ui(UI_PENDING_OVERHEAD);
     uintptr_t pct = (uintptr_t)lv_event_get_user_data(e);
     if (s_overhead_slider) {
         s_syncing = true;
@@ -562,6 +587,7 @@ static lv_obj_t *create_colorwheel(lv_obj_t *parent)
 static void colorwheel_cb(lv_event_t *e)
 {
     if (s_syncing) return;
+    discard_pending_ui(UI_PENDING_TAPO);
 
     lv_obj_t *canvas = lv_event_get_target(e);
     lv_indev_t *indev = lv_indev_active();
@@ -589,16 +615,55 @@ static void colorwheel_cb(lv_event_t *e)
 
 static void echo_mute_cb(lv_event_t *e)
 {
-    mqtt_bridge_echo_mute(!s_echo_muted);
+    (void)e;
+    discard_pending_ui(UI_PENDING_ALEXA);
+
+    bool muted = !s_echo_muted;
+    int current = s_echo_slider ? lv_slider_get_value(s_echo_slider) : 0;
+    if (muted && current > 0) {
+        s_echo_unmuted_volume = (uint8_t)current;
+    }
+
+    uint8_t target_volume = muted ? 0 : s_echo_unmuted_volume;
+    s_echo_muted = muted;
+
+    if (s_echo_slider) {
+        s_syncing = true;
+        lv_slider_set_value(s_echo_slider, target_volume, LV_ANIM_OFF);
+        set_percent_label(s_echo_pct, target_volume);
+        s_syncing = false;
+    }
+    if (s_echo_mute) {
+        lv_obj_set_style_bg_color(
+            s_echo_mute, c(muted ? T->accent : T->card_bg_2), 0);
+    }
+
+    ESP_LOGI(TAG, "UI CMD alexa mute=%d target_volume=%u",
+             muted, target_volume);
+    mqtt_bridge_echo_mute(muted, target_volume);
 }
 
 static void echo_play_cb(lv_event_t *e)
 {
-    mqtt_bridge_echo_play_pause();
+    (void)e;
+    discard_pending_ui(UI_PENDING_ALEXA);
+
+    bool playing = !s_echo_playing;
+    s_echo_playing = playing;
+    if (s_echo_play) {
+        lv_obj_set_style_bg_color(
+            s_echo_play, c(playing ? T->accent : T->card_bg_2), 0);
+    }
+
+    ESP_LOGI(TAG, "UI CMD alexa playing=%d", playing);
+    mqtt_bridge_echo_play_pause(playing);
 }
 
 static void echo_announce_cb(lv_event_t *e)
 {
+    (void)e;
+    discard_pending_ui(UI_PENDING_ALEXA);
+    ESP_LOGI(TAG, "UI CMD alexa announce");
     mqtt_bridge_echo_announce();
 }
 
@@ -848,9 +913,9 @@ static void create_echo_card(lv_obj_t *root)
     s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 146, 94, 38);
     lv_obj_add_event_cb(s_echo_mute, echo_mute_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *play = make_button(card, LV_SYMBOL_PLAY " " LV_SYMBOL_PAUSE,
-                                 126, 146, 96, 38);
-    lv_obj_add_event_cb(play, echo_play_cb, LV_EVENT_CLICKED, NULL);
+    s_echo_play = make_button(card, LV_SYMBOL_PLAY " " LV_SYMBOL_PAUSE,
+                              126, 146, 96, 38);
+    lv_obj_add_event_cb(s_echo_play, echo_play_cb, LV_EVENT_CLICKED, NULL);
 
     lv_obj_t *announce = make_button(card, "Announce", 236, 146, 128, 38);
     lv_obj_add_event_cb(announce, echo_announce_cb, LV_EVENT_CLICKED, NULL);
@@ -964,6 +1029,9 @@ static void pending_state_timer_cb(lv_timer_t *timer)
         s_syncing = true;
         s_echo_muted = pending.alexa_muted;
         s_echo_playing = pending.alexa_playing;
+        if (pending.alexa_volume > 0) {
+            s_echo_unmuted_volume = pending.alexa_volume;
+        }
         lv_slider_set_value(
             s_echo_slider, pending.alexa_volume, LV_ANIM_OFF);
         set_percent_label(s_echo_pct, pending.alexa_volume);
@@ -971,6 +1039,12 @@ static void pending_state_timer_cb(lv_timer_t *timer)
             s_echo_mute,
             c(pending.alexa_muted ? T->accent : T->card_bg_2),
             0);
+        if (s_echo_play) {
+            lv_obj_set_style_bg_color(
+                s_echo_play,
+                c(pending.alexa_playing ? T->accent : T->card_bg_2),
+                0);
+        }
 
         if (s_alexa_now_playing) {
             lv_label_set_text(
