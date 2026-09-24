@@ -68,6 +68,10 @@ void app_main(void)
             }
         }
 
+        if (mqtt_started) {
+            mqtt_bridge_poll();
+        }
+
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
