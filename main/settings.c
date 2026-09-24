@@ -69,6 +69,8 @@ static void load_defaults(panel_settings_t *cfg)
     strlcpy(cfg->mqtt_username, CONFIG_PANEL_MQTT_USERNAME, sizeof(cfg->mqtt_username));
     strlcpy(cfg->mqtt_password, CONFIG_PANEL_MQTT_PASSWORD, sizeof(cfg->mqtt_password));
     strlcpy(cfg->mqtt_base_topic, CONFIG_PANEL_MQTT_BASE_TOPIC, sizeof(cfg->mqtt_base_topic));
+    strlcpy(cfg->mqtt_discovery_prefix, CONFIG_PANEL_MQTT_DISCOVERY_PREFIX,
+            sizeof(cfg->mqtt_discovery_prefix));
     default_panel_id(cfg->panel_id, sizeof(cfg->panel_id));
 
     strlcpy(cfg->timezone, CONFIG_PANEL_TIMEZONE, sizeof(cfg->timezone));
@@ -115,6 +117,7 @@ esp_err_t settings_init(void)
     load_string(nvs, "mqtt_user", s_settings->mqtt_username, sizeof(s_settings->mqtt_username));
     load_string(nvs, "mqtt_pass", s_settings->mqtt_password, sizeof(s_settings->mqtt_password));
     load_string(nvs, "mqtt_topic", s_settings->mqtt_base_topic, sizeof(s_settings->mqtt_base_topic));
+    load_string(nvs, "mqtt_disc", s_settings->mqtt_discovery_prefix, sizeof(s_settings->mqtt_discovery_prefix));
     load_string(nvs, "panel_id", s_settings->panel_id, sizeof(s_settings->panel_id));
     load_string(nvs, "ha_tapo", s_settings->ha_tapo_entity, sizeof(s_settings->ha_tapo_entity));
     load_string(nvs, "ha_over", s_settings->ha_overhead_entity, sizeof(s_settings->ha_overhead_entity));
@@ -169,6 +172,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
     clean.mqtt_username[PANEL_MQTT_USERNAME_MAX] = '\0';
     clean.mqtt_password[PANEL_MQTT_PASSWORD_MAX] = '\0';
     clean.mqtt_base_topic[PANEL_MQTT_BASE_TOPIC_MAX] = '\0';
+    clean.mqtt_discovery_prefix[PANEL_MQTT_DISCOVERY_PREFIX_MAX] = '\0';
     clean.panel_id[PANEL_ID_MAX] = '\0';
     clean.ha_tapo_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
     clean.ha_overhead_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
@@ -201,6 +205,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
     SAVE_STR("mqtt_user", mqtt_username);
     SAVE_STR("mqtt_pass", mqtt_password);
     SAVE_STR("mqtt_topic", mqtt_base_topic);
+    SAVE_STR("mqtt_disc", mqtt_discovery_prefix);
     SAVE_STR("panel_id", panel_id);
     SAVE_STR("ha_tapo", ha_tapo_entity);
     SAVE_STR("ha_over", ha_overhead_entity);
