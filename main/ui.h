@@ -18,7 +18,8 @@ void ui_set_mqtt_online(bool online);
 void ui_apply_tapo_state(bool on, uint8_t brightness, uint8_t r, uint8_t g, uint8_t b);
 void ui_apply_overhead_state(bool on, uint8_t brightness);
 void ui_apply_fan_state(bool on);
-void ui_apply_echo_state(uint8_t volume, bool muted, bool playing);
+void ui_apply_echo_state(uint8_t volume, bool muted, bool playing,
+                         const char *title, const char *artist);
 
 #ifdef __cplusplus
 }
