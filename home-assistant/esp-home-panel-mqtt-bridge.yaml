@@ -90,7 +90,10 @@ script:
                   payload: >-
                     {{ {
                       "volume": volume_pct | int,
-                      "muted": state_attr(entity, "is_volume_muted") | default(false, true),
+                      "muted": (
+                        (state_attr(entity, "is_volume_muted") | default(false, true) | bool)
+                        or ((volume_pct | int) == 0)
+                      ),
                       "playing": is_state(entity, "playing"),
                       "title": (state_attr(entity, "media_title") or "") | string,
                       "artist": (state_attr(entity, "media_artist") or "") | string
@@ -134,6 +137,12 @@ automation:
       script_entity: >-
         {% if trigger.id == 'command' %}
           {{ trigger.payload_json.script_entity_id | default('', true) }}
+        {% else %}
+          {{ '' }}
+        {% endif %}
+      event_type: >-
+        {% if trigger.id == 'command' %}
+          {{ trigger.payload_json.event_type | default('', true) }}
         {% else %}
           {{ '' }}
         {% endif %}
@@ -215,32 +224,44 @@ automation:
           - conditions: "{{ trigger.id == 'command' and control == 'echo' and entity | length > 0 }}"
             sequence:
               - choose:
-                  - conditions: "{{ 'volume' in trigger.payload_json }}"
+                  - conditions: "{{ event_type == 'volume' }}"
                     sequence:
                       - action: media_player.volume_set
                         target:
                           entity_id: "{{ entity }}"
                         data:
                           volume_level: "{{ (trigger.payload_json.volume | float) / 100.0 }}"
-                  - conditions: "{{ 'muted' in trigger.payload_json }}"
+
+                  - conditions: "{{ event_type == 'mute' }}"
                     sequence:
-                      - action: media_player.volume_mute
+                      # Alexa entities do not consistently implement
+                      # media_player.volume_mute. volume_set is already known
+                      # to work, so mute uses 0% and unmute restores the volume
+                      # supplied by the panel.
+                      - action: media_player.volume_set
                         target:
                           entity_id: "{{ entity }}"
                         data:
-                          is_volume_muted: "{{ trigger.payload_json.muted | bool }}"
-                  - conditions: "{{ trigger.payload_json.action | default('') == 'play_pause' }}"
+                          volume_level: "{{ (trigger.payload_json.volume | float) / 100.0 }}"
+
+                  - conditions: "{{ event_type == 'play_pause' and trigger.payload_json.playing | bool }}"
                     sequence:
-                      - action: media_player.media_play_pause
+                      - action: media_player.media_play
                         target:
                           entity_id: "{{ entity }}"
-                  - conditions: >-
-                      {{ trigger.payload_json.action | default('') == 'announce'
-                         and script_entity | length > 0 }}
+
+                  - conditions: "{{ event_type == 'play_pause' and not (trigger.payload_json.playing | bool) }}"
+                    sequence:
+                      - action: media_player.media_pause
+                        target:
+                          entity_id: "{{ entity }}"
+
+                  - conditions: "{{ event_type == 'announce' and script_entity | length > 0 }}"
                     sequence:
                       - action: script.turn_on
                         target:
                           entity_id: "{{ script_entity }}"
+
               - delay:
                   milliseconds: 150
               - action: script.esp_home_panel_publish_state
