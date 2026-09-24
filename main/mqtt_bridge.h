@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 esp_err_t mqtt_bridge_start(void);
+void mqtt_bridge_poll(void);
 
 void mqtt_bridge_tapo_power(bool on);
 void mqtt_bridge_tapo_brightness(uint8_t percent);
