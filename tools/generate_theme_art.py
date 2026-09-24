@@ -33,7 +33,7 @@ except NameError:
 OUT = ROOT / "main" / "theme_art_generated.inc"
 WIDTH = 800
 HEIGHT = 480
-GENERATOR_VERSION = "theme-art-v3"
+GENERATOR_VERSION = "theme-art-v4"
 
 THEMES = {
     "kittens": ROOT / "assets" / "kittens-pink" / "screen.svg",
@@ -46,13 +46,15 @@ SPRITES = [
     ("KITTEN_PEEK", "kittens", 0, 45, 110, 75, 14, 52),
     ("KITTEN_SLEEP", "kittens", 205, 300, 165, 95, 12, 48),
     ("KITTEN_PAWS", "kittens", 0, 390, 85, 90, 12, 45),
+    ("KITTEN_FAN", "kittens", 18, 310, 155, 160, 10, 42),
 
     ("SOCCER_BALL", "soccer", 710, 0, 90, 80, 12, 44),
     ("SOCCER_GOAL", "soccer", 635, 120, 165, 115, 7, 30),
+    ("SOCCER_FAN", "soccer", 18, 310, 155, 160, 8, 34),
 
     ("MAGIC_CASTLE", "magic", 385, 0, 245, 78, 9, 36),
     ("MAGIC_LANTERN", "magic", 405, 82, 78, 100, 10, 38),
-    ("MAGIC_FAN_FRAME", "magic", 5, 310, 215, 165, 8, 32),
+    ("MAGIC_FAN", "magic", 5, 310, 215, 165, 8, 32),
     ("MAGIC_OWL", "magic", 410, 300, 100, 100, 11, 42),
     ("MAGIC_QUILL", "magic", 710, 315, 90, 125, 10, 38),
     ("MAGIC_CORNER_TL", "magic", 5, 75, 42, 42, 8, 30),
@@ -325,9 +327,9 @@ def generate() -> None:
     images["MAGIC_CORNER_BL"] = rotate_rgba(corner, cw, ch, 3)
 
     order = [
-        "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS",
-        "SOCCER_BALL", "SOCCER_GOAL",
-        "MAGIC_CASTLE", "MAGIC_LANTERN", "MAGIC_FAN_FRAME",
+        "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS", "KITTEN_FAN",
+        "SOCCER_BALL", "SOCCER_GOAL", "SOCCER_FAN",
+        "MAGIC_CASTLE", "MAGIC_LANTERN", "MAGIC_FAN",
         "MAGIC_OWL", "MAGIC_QUILL",
         "MAGIC_CORNER_TL", "MAGIC_CORNER_TR",
         "MAGIC_CORNER_BL", "MAGIC_CORNER_BR",
