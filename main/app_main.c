@@ -1,7 +1,7 @@
 #include "board_7c.h"
 #include "mqtt_bridge.h"
-#include "network.h"
-#include "ui.h"
+#include "network.h"\n#include "settings.h"
+#include "ui.h"\n#include "web_config.h"
 
 #include "esp_err.h"
 #include "esp_log.h"
@@ -21,6 +21,8 @@ void app_main(void)
         ESP_ERROR_CHECK(err);
     }
 
+    ESP_ERROR_CHECK(settings_init());
+
     board_7c_handles_t board;
     ESP_ERROR_CHECK(board_7c_init(&board));
 
@@ -38,8 +40,17 @@ void app_main(void)
     ui_set_network_online(network_is_connected());
 
     if (err == ESP_OK) {
+        esp_err_t web_err = web_config_start();
+        if (web_err != ESP_OK) {
+            ESP_LOGE(TAG, "Web configuration startup failed: %s", esp_err_to_name(web_err));
+        }
+
+        /*
+         * Start MQTT even while the setup AP is active. The client will retry
+         * in the background and can connect if station Wi-Fi comes up later.
+         */
         esp_err_t mqtt_err = mqtt_bridge_start();
-        if (mqtt_err != ESP_OK) {
+        if (mqtt_err != ESP_OK && mqtt_err != ESP_ERR_INVALID_STATE) {
             ESP_LOGE(TAG, "MQTT startup failed: %s", esp_err_to_name(mqtt_err));
         }
     }
