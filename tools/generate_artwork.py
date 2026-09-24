@@ -2,19 +2,20 @@
 """Generate a native LVGL RGB565 background from the selected theme artwork.
 
 The canonical theme files remain SVGs, but they only contain positioned,
-base64-encoded raster tiles. At build time this script composites those tiles
-once, converts the result to the panel's native RGB565 format, and emits a
-single LVGL lv_image_dsc_t for the compile-time selected theme.
+base64-encoded raster tiles. At build time this script decodes those tiles with
+FFmpeg, composites them in plain Python, converts the result to the panel's
+native RGB565 format, and emits one LVGL lv_image_dsc_t for the selected theme.
 
 Only the selected theme is emitted into main/artwork.c, so unused artwork does
-not consume firmware flash. No SVG/ThorVG/WebP decoder is required on-device.
+not consume firmware flash. No SVG/ThorVG/WebP decoder is required on-device,
+and the build does not depend on Pillow's WebP plugin.
 """
 
 from __future__ import annotations
 
 import base64
-import io
 import re
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -57,12 +58,21 @@ THEMES = [
 ]
 
 
-def ensure_pillow():
+def ensure_ffmpeg() -> str:
+    """Return an FFmpeg executable, installing a bundled one if necessary."""
+
+    system_ffmpeg = shutil.which("ffmpeg")
+    if system_ffmpeg:
+        print(f"[artwork] using system FFmpeg: {system_ffmpeg}")
+        return system_ffmpeg
+
     try:
-        from PIL import Image
-        return Image
+        import imageio_ffmpeg
     except ImportError:
-        print("[artwork] Pillow not found; installing Pillow==11.3.0 into the PlatformIO Python environment")
+        print(
+            "[artwork] FFmpeg not found; installing imageio-ffmpeg "
+            "into the PlatformIO Python environment"
+        )
         try:
             subprocess.check_call(
                 [
@@ -71,18 +81,24 @@ def ensure_pillow():
                     "pip",
                     "install",
                     "--disable-pip-version-check",
-                    "Pillow==11.3.0",
+                    "imageio-ffmpeg==0.5.1",
                 ]
             )
         except subprocess.CalledProcessError as exc:
             raise RuntimeError(
-                "Unable to install Pillow, which is required to convert the embedded "
-                "WebP artwork into native RGB565. Install it manually with: "
-                f"{sys.executable} -m pip install Pillow==11.3.0"
+                "Unable to install the bundled FFmpeg decoder required for artwork "
+                "conversion. Install it manually with: "
+                f"{sys.executable} -m pip install imageio-ffmpeg==0.5.1"
             ) from exc
 
-        from PIL import Image
-        return Image
+        import imageio_ffmpeg
+
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    if not ffmpeg or not Path(ffmpeg).is_file():
+        raise RuntimeError("imageio-ffmpeg did not provide a usable FFmpeg executable")
+
+    print(f"[artwork] using bundled FFmpeg: {ffmpeg}")
+    return ffmpeg
 
 
 def selected_theme():
@@ -123,7 +139,87 @@ def data_href(node: ET.Element) -> str | None:
     return None
 
 
-def render_svg_tiles(path: Path, Image):
+def decode_tile(ffmpeg: str, raw: bytes, width: int, height: int) -> bytes:
+    """Decode one embedded raster image to exactly width*height RGBA bytes."""
+
+    cmd = [
+        ffmpeg,
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-i",
+        "pipe:0",
+        "-frames:v",
+        "1",
+        "-vf",
+        f"scale={width}:{height}:flags=lanczos",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "rgba",
+        "pipe:1",
+    ]
+
+    proc = subprocess.run(
+        cmd,
+        input=raw,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+
+    expected = width * height * 4
+    if proc.returncode != 0:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            "FFmpeg failed to decode an embedded artwork tile"
+            + (f": {detail}" if detail else "")
+        )
+
+    if len(proc.stdout) != expected:
+        detail = proc.stderr.decode("utf-8", errors="replace").strip()
+        raise RuntimeError(
+            f"FFmpeg decoded {len(proc.stdout)} bytes for a {width}x{height} RGBA "
+            f"tile; expected {expected}"
+            + (f". Decoder output: {detail}" if detail else "")
+        )
+
+    return proc.stdout
+
+
+def alpha_composite(canvas: bytearray, tile: bytes, x0: int, y0: int, width: int, height: int) -> None:
+    """Composite an RGBA tile onto the RGBA screen canvas."""
+
+    for y in range(height):
+        canvas_row = ((y0 + y) * WIDTH + x0) * 4
+        tile_row = y * width * 4
+
+        for x in range(width):
+            src = tile_row + x * 4
+            dst = canvas_row + x * 4
+            alpha = tile[src + 3]
+
+            if alpha == 255:
+                canvas[dst : dst + 4] = tile[src : src + 4]
+                continue
+
+            if alpha == 0:
+                continue
+
+            inverse = 255 - alpha
+            dst_alpha = canvas[dst + 3]
+
+            canvas[dst] = (tile[src] * alpha + canvas[dst] * inverse + 127) // 255
+            canvas[dst + 1] = (
+                tile[src + 1] * alpha + canvas[dst + 1] * inverse + 127
+            ) // 255
+            canvas[dst + 2] = (
+                tile[src + 2] * alpha + canvas[dst + 2] * inverse + 127
+            ) // 255
+            canvas[dst + 3] = alpha + (dst_alpha * inverse + 127) // 255
+
+
+def render_svg_tiles(path: Path, ffmpeg: str) -> bytearray:
     root = ET.fromstring(path.read_text(encoding="utf-8"))
 
     svg_width = numeric_attr(root, "width", WIDTH)
@@ -134,7 +230,9 @@ def render_svg_tiles(path: Path, Image):
             f"got {svg_width}x{svg_height}"
         )
 
-    canvas = Image.new("RGBA", (WIDTH, HEIGHT), (0, 0, 0, 255))
+    # Start with opaque black. Current approved artwork covers the full screen,
+    # but this also gives deterministic pixels if a future asset leaves gaps.
+    canvas = bytearray((0, 0, 0, 255)) * (WIDTH * HEIGHT)
     tile_count = 0
 
     for node in root.iter():
@@ -151,44 +249,39 @@ def render_svg_tiles(path: Path, Image):
         if not match:
             raise ValueError(f"Unsupported embedded image URI in {path}")
 
-        raw = base64.b64decode(match.group(1), validate=False)
-        tile = Image.open(io.BytesIO(raw)).convert("RGBA")
-
         x = numeric_attr(node, "x", 0)
         y = numeric_attr(node, "y", 0)
-        w = numeric_attr(node, "width", tile.width)
-        h = numeric_attr(node, "height", tile.height)
+        w = numeric_attr(node, "width", 0)
+        h = numeric_attr(node, "height", 0)
 
         if w <= 0 or h <= 0:
             raise ValueError(f"Invalid embedded image size {w}x{h} in {path}")
-
-        if tile.size != (w, h):
-            tile = tile.resize((w, h), Image.Resampling.LANCZOS)
 
         if x < 0 or y < 0 or x + w > WIDTH or y + h > HEIGHT:
             raise ValueError(
                 f"Embedded image at {x},{y} size {w}x{h} exceeds {WIDTH}x{HEIGHT}"
             )
 
-        canvas.alpha_composite(tile, (x, y))
+        raw = base64.b64decode(match.group(1), validate=False)
+        tile = decode_tile(ffmpeg, raw, w, h)
+        alpha_composite(canvas, tile, x, y, w, h)
         tile_count += 1
 
     if tile_count == 0:
         raise ValueError(f"No embedded raster artwork found in {path}")
 
     print(f"[artwork] composited {tile_count} raster tiles from {path.relative_to(ROOT)}")
-    return canvas.convert("RGB")
+    return canvas
 
 
-def rgb565_le(image) -> bytes:
-    rgb = image.tobytes()
-    out = bytearray((len(rgb) // 3) * 2)
+def rgb565_le(rgba: bytes) -> bytes:
+    out = bytearray((len(rgba) // 4) * 2)
 
     dst = 0
-    for src in range(0, len(rgb), 3):
-        r = rgb[src]
-        g = rgb[src + 1]
-        b = rgb[src + 2]
+    for src in range(0, len(rgba), 4):
+        r = rgba[src]
+        g = rgba[src + 1]
+        b = rgba[src + 2]
         value = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
 
         # ESP32-S3 is little-endian and LVGL's native RGB565 buffer uses host
@@ -213,9 +306,9 @@ def generate() -> None:
     if not source.is_file():
         raise FileNotFoundError(f"Missing artwork asset: {source}")
 
-    Image = ensure_pillow()
-    image = render_svg_tiles(source, Image)
-    data = rgb565_le(image)
+    ffmpeg = ensure_ffmpeg()
+    rgba = render_svg_tiles(source, ffmpeg)
+    data = rgb565_le(rgba)
 
     expected_size = WIDTH * HEIGHT * 2
     if len(data) != expected_size:
