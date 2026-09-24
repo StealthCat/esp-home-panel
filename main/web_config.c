@@ -280,25 +280,37 @@ static esp_err_t root_handler(httpd_req_t *req)
              mqtt_uri, mqtt_topic, mqtt_user);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<section class='card full'><h2>Home Assistant targets</h2>"
+        "<div class='hint'>Mosquitto transports MQTT messages but does not expose Home Assistant's entity registry. "
+        "Enter the entity IDs shown in Home Assistant. The included MQTT bridge automation translates panel commands into Home Assistant actions.</div>"));
+
     snprintf(buf, sizeof(buf),
-             "<section class='card full'><h2>Home Assistant targets</h2>"
-             "<div class='hint'>Mosquitto transports MQTT messages but does not expose Home Assistant's entity registry. "
-             "Enter the entity IDs shown in Home Assistant. The included MQTT bridge automation translates panel commands into Home Assistant actions.</div>"
              "<div class='row'><div><label>Tapo LED strips</label>"
              "<input name='ha_tapo_entity' maxlength='127' value=\"%s\" placeholder='light.tapo_led_strips' autocapitalize='none' spellcheck='false'></div>"
              "<div><label>Overhead light</label>"
-             "<input name='ha_overhead_entity' maxlength='127' value=\"%s\" placeholder='light.office_overhead' autocapitalize='none' spellcheck='false'></div></div>"
+             "<input name='ha_overhead_entity' maxlength='127' value=\"%s\" placeholder='light.office_overhead' autocapitalize='none' spellcheck='false'></div></div>",
+             ha_tapo, ha_overhead);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    snprintf(buf, sizeof(buf),
              "<div class='row'><div><label>Ceiling fan / switch</label>"
              "<input name='ha_fan_entity' maxlength='127' value=\"%s\" placeholder='fan.office_fan or switch.office_fan' autocapitalize='none' spellcheck='false'></div>"
              "<div><label>Echo / media player</label>"
-             "<input name='ha_echo_entity' maxlength='127' value=\"%s\" placeholder='media_player.office_echo' autocapitalize='none' spellcheck='false'></div></div>"
-             "<label>Echo announcement script (optional)</label>"
-             "<input name='ha_echo_announce_script' maxlength='127' value=\"%s\" placeholder='script.office_echo_announce' autocapitalize='none' spellcheck='false'>"
-             "<div class='hint'>Leave a field blank to leave that control unmapped. Light controls require light.*, Echo requires media_player.*, "
-             "fan accepts fan.* or switch.*, and the optional announcement action requires script.*.</div>"
-             "</section>",
-             ha_tapo, ha_overhead, ha_fan, ha_echo, ha_announce);
+             "<input name='ha_echo_entity' maxlength='127' value=\"%s\" placeholder='media_player.office_echo' autocapitalize='none' spellcheck='false'></div></div>",
+             ha_fan, ha_echo);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    snprintf(buf, sizeof(buf),
+             "<label>Echo announcement script (optional)</label>"
+             "<input name='ha_echo_announce_script' maxlength='127' value=\"%s\" placeholder='script.office_echo_announce' autocapitalize='none' spellcheck='false'>",
+             ha_announce);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<div class='hint'>Leave a field blank to leave that control unmapped. Light controls require light.*, Echo requires media_player.*, "
+        "fan accepts fan.* or switch.*, and the optional announcement action requires script.*.</div>"
+        "</section>"));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "</div><div class='actions'><button type='submit'>Save &amp; reboot</button>"
