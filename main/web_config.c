@@ -293,19 +293,33 @@ static esp_err_t root_handler(httpd_req_t *req)
              timezone);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<section class='card full'><h2>MQTT</h2>"));
+
     snprintf(buf, sizeof(buf),
-             "<section class='card full'><h2>MQTT</h2>"
              "<div class='row'><div><label>Broker URI</label><input name='mqtt_uri' maxlength='191' value=\"%s\" placeholder='mqtt://192.168.1.2'></div>"
-             "<div><label>Base topic</label><input name='mqtt_base_topic' maxlength='127' value=\"%s\"></div></div>"
-             "<div class='row'><div><label>Panel ID</label><input name='panel_id' maxlength='31' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
-             "<div><label>Effective topic root</label><input value=\"%s/%s\" readonly></div></div>"
-             "<div class='hint'>Each panel must have a unique ID. Fresh panels default to a stable ID derived from their MAC address, so multiple panels can share one broker and one base topic safely.</div>"
-             "<div class='row'><div><label>Username</label><input name='mqtt_username' maxlength='63' value=\"%s\" autocomplete='off'></div>"
-             "<div><label>Password</label><input name='mqtt_password' type='password' maxlength='127' placeholder='Leave blank to keep current password' autocomplete='new-password'></div></div>"
-             "<label class='check'><input type='checkbox' name='clear_mqtt_password' value='1'>Clear saved MQTT password</label>"
-             "</section>",
-             mqtt_uri, mqtt_topic, panel_id, mqtt_topic, panel_id, mqtt_user);
+             "<div><label>Base topic</label><input name='mqtt_base_topic' maxlength='127' value=\"%s\"></div></div>",
+             mqtt_uri, mqtt_topic);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    snprintf(buf, sizeof(buf),
+             "<div class='row'><div><label>Panel ID</label><input name='panel_id' maxlength='31' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
+             "<div><label>Effective topic root</label><input value=\"%s/%s\" readonly></div></div>",
+             panel_id, mqtt_topic, panel_id);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<div class='hint'>Each panel must have a unique ID. Fresh panels default to a stable ID derived from their MAC address, so multiple panels can share one broker and one base topic safely.</div>"));
+
+    snprintf(buf, sizeof(buf),
+             "<div class='row'><div><label>Username</label><input name='mqtt_username' maxlength='63' value=\"%s\" autocomplete='off'></div>"
+             "<div><label>Password</label><input name='mqtt_password' type='password' maxlength='127' placeholder='Leave blank to keep current password' autocomplete='new-password'></div></div>",
+             mqtt_user);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<label class='check'><input type='checkbox' name='clear_mqtt_password' value='1'>Clear saved MQTT password</label>"
+        "</section>"));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "<section class='card full'><h2>Home Assistant targets</h2>"
