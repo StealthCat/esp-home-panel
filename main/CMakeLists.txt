@@ -2,7 +2,7 @@ idf_component_register(
     SRCS
         "app_main.c"
         "board_7c.c"
-        "network.c"
+        "network.c"\n        "settings.c"\n        "web_config.c"
         "mqtt_bridge.c"
         "ui.c"
         "ui_theme.c"
@@ -12,7 +12,7 @@ idf_component_register(
     REQUIRES
         esp_wifi
         esp_netif
-        esp_event
+        esp_event\n        esp_http_server
         lwip
         nvs_flash
         mqtt
