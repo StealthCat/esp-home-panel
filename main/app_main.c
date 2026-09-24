@@ -1,7 +1,9 @@
 #include "board_7c.h"
 #include "mqtt_bridge.h"
-#include "network.h"\n#include "settings.h"
-#include "ui.h"\n#include "web_config.h"
+#include "network.h"
+#include "settings.h"
+#include "ui.h"
+#include "web_config.h"
 
 #include "esp_err.h"
 #include "esp_log.h"
