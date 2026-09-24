@@ -234,23 +234,26 @@ static void add_circle(lv_obj_t *parent, int x, int y, int d, uint32_t color, lv
 
 static void add_soccer_decor(lv_obj_t *screen)
 {
+    /* Grass/pitch treatment from the original soccer mockup. */
+    for (int i = 0; i < 10; ++i) {
+        lv_obj_t *stripe = add_decor_box(screen, -40 + i * 95, 72, 48, 408,
+                                         (i % 2) ? 0x0A3A20 : 0x0D4727,
+                                         28, 0);
+        lv_obj_set_style_transform_rotation(stripe, 70, 0);
+    }
+
     lv_obj_t *pitch = lv_obj_create(screen);
     lv_obj_set_pos(pitch, 0, 72);
     lv_obj_set_size(pitch, 800, 408);
     lv_obj_set_style_bg_opa(pitch, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(pitch, 1, 0);
-    lv_obj_set_style_border_color(pitch, c(0x2FA358), 0);
-    lv_obj_set_style_border_opa(pitch, 38, 0);
+    lv_obj_set_style_border_color(pitch, c(0x50C878), 0);
+    lv_obj_set_style_border_opa(pitch, 34, 0);
     lv_obj_set_style_radius(pitch, 0, 0);
     lv_obj_set_style_pad_all(pitch, 0, 0);
     lv_obj_remove_flag(pitch, LV_OBJ_FLAG_SCROLLABLE);
 
-    lv_obj_t *mid = lv_obj_create(pitch);
-    lv_obj_set_pos(mid, 399, 0);
-    lv_obj_set_size(mid, 2, 408);
-    lv_obj_set_style_bg_color(mid, c(0x50C878), 0);
-    lv_obj_set_style_bg_opa(mid, 28, 0);
-    lv_obj_set_style_border_width(mid, 0, 0);
+    add_decor_box(pitch, 399, 0, 2, 408, 0x50C878, 28, 0);
 
     lv_obj_t *center = lv_obj_create(pitch);
     lv_obj_set_pos(center, 330, 130);
@@ -261,9 +264,8 @@ static void add_soccer_decor(lv_obj_t *screen)
     lv_obj_set_style_border_color(center, c(0x50C878), 0);
     lv_obj_set_style_border_opa(center, 28, 0);
 
-    add_circle(screen, 735, 6, 52, 0x0C3F23, 220);
-    add_circle(screen, 748, 19, 26, 0xE6F6EA, 70);
-    add_circle(screen, 754, 25, 14, 0x082A18, 180);
+    /* Ball tucked into the upper-right exactly where the mockup places it. */
+    add_soccer_ball(screen, 760, -5, 54, 115);
 }
 
 static void add_paw(lv_obj_t *parent, int x, int y, uint32_t color, lv_opa_t opa)
@@ -458,38 +460,50 @@ static void add_sleeping_cat(lv_obj_t *parent, int x, int y)
 
 static void add_kittens_decor(lv_obj_t *screen)
 {
-    /* Keep the header clear for time/network information. Decorative paws live
-     * in the otherwise-unused outer corners and the richer cat art is inside
-     * the individual cards. */
-    add_paw(screen, 1, 448, T->accent, 115);
-    add_paw(screen, 774, 448, T->accent, 115);
+    /* Header paws/hearts and the cat peeking over the first card match the
+     * original kittens composition without baking controls into a bitmap. */
+    add_paw(screen, 8, 3, T->accent, 150);
+    add_paw(screen, 318, 4, T->accent, 155);
+    lv_obj_t *heart = make_label(screen, "<3", 10, 46,
+                                 &lv_font_montserrat_14, T->accent);
+    lv_obj_set_style_text_opa(heart, 165, 0);
+
+    add_cat_face(screen, 18, 57, T->accent_2, 190);
+    add_paw(screen, 2, 448, T->accent, 105);
+    add_paw(screen, 776, 448, T->accent, 105);
 }
 
 static void add_magic_decor(lv_obj_t *screen)
 {
-    /* Moon */
-    add_circle(screen, 625, 5, 52, 0xB7D8FF, 95);
-    add_circle(screen, 638, 4, 45, T->screen_bg, 245);
+    /* Moon and castle skyline from the original magical night header. */
+    add_circle(screen, 548, 4, 58, 0xD4E8FF, 110);
+    add_circle(screen, 565, 2, 48, T->screen_bg, 248);
 
-    /* Simple castle skyline behind header text. */
-    for (int i = 0; i < 5; ++i) {
-        int x = 470 + i * 29;
-        int h = 26 + (i % 2) * 15;
-        lv_obj_t *tower = lv_obj_create(screen);
-        lv_obj_set_pos(tower, x, 48 - h);
-        lv_obj_set_size(tower, 20, h);
-        lv_obj_set_style_bg_color(tower, c(0x071830), 0);
-        lv_obj_set_style_bg_opa(tower, 230, 0);
-        lv_obj_set_style_border_width(tower, 0, 0);
-        lv_obj_set_style_radius(tower, 0, 0);
-        lv_obj_set_style_pad_all(tower, 0, 0);
-        make_label(tower, "*", 6, h - 20, &lv_font_montserrat_14, T->accent_2);
+    for (int i = 0; i < 8; ++i) {
+        int x = 410 + i * 28;
+        int h = 24 + ((i * 17) % 28);
+        lv_obj_t *tower = add_decor_box(screen, x, 66 - h, 20, h,
+                                        0x06172F, 235, 0);
+        (void)tower;
+        add_decor_box(screen, x + 4, 60 - h, 12, 10,
+                      0x06172F, 235, 0);
+        add_decor_box(screen, x + 7, 54 - h, 6, 8,
+                      0x06172F, 235, 0);
+
+        if (i % 2 == 0) {
+            add_decor_box(screen, x + 6, 52, 3, 5,
+                          T->warm, 155, 1);
+            add_decor_box(screen, x + 12, 52, 3, 5,
+                          T->warm, 155, 1);
+        }
     }
 
-    for (int i = 0; i < 9; ++i) {
-        lv_obj_t *star = make_label(screen, "*", 410 + i * 41, 5 + (i % 3) * 13,
+    const int sx[12] = {20,75,130,188,250,310,365,610,652,694,744,780};
+    const int sy[12] = {7,18,3,32,10,27,6,8,29,5,34,11};
+    for (int i = 0; i < 12; ++i) {
+        lv_obj_t *star = make_label(screen, "*", sx[i], sy[i],
                                     &lv_font_montserrat_14, T->accent_2);
-        lv_obj_set_style_text_opa(star, 150 + (i % 2) * 70, 0);
+        lv_obj_set_style_text_opa(star, 115 + (i % 3) * 45, 0);
     }
 }
 
