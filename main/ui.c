@@ -15,6 +15,7 @@
 #include "lvgl.h"
 #include "mqtt_bridge.h"
 #include "ui_theme.h"
+#include "theme_art.h"
 #ifdef WOKWI_EMULATOR
 #include "wokwi_panel.h"
 #endif
@@ -150,20 +151,32 @@ static void init_styles(void)
     lv_style_set_transform_height(&s_button_pressed_style, -2);
 }
 
-static void add_magic_card_ornaments(lv_obj_t *card, int w, int h);
-
-static lv_obj_t *make_label(lv_obj_t *parent, const char *text, int x, int y,
-                            const lv_font_t *font, uint32_t color)
+static void add_magic_card_ornaments(lv_obj_t *card, int w, int h)
 {
-    lv_obj_t *label = lv_label_create(parent);
-    lv_label_set_text(label, text);
-    lv_obj_set_pos(label, x, y);
-    lv_obj_set_style_text_font(label, font, 0);
-    lv_obj_set_style_text_color(label, c(color), 0);
-    if (s_artwork_mode) {
-        lv_obj_set_style_text_opa(label, LV_OPA_TRANSP, 0);
+    const int s = 42;
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TL, 0, 0, false);
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TR, w - s, 0, false);
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_BL, 0, h - s, false);
+    add_theme_sprite(card, THEME_ART_MAGIC_CORNER_BR, w - s, h - s, false);
+}
+
+static lv_obj_t *add_theme_sprite(lv_obj_t *parent, theme_art_id_t id,
+                                  int x, int y, bool background)
+{
+    const lv_image_dsc_t *src = theme_art_get(id);
+    if (!src || !src->data || src->data_size == 0) {
+        return NULL;
     }
-    return label;
+
+    lv_obj_t *img = lv_image_create(parent);
+    lv_image_set_src(img, src);
+    lv_obj_set_pos(img, x, y);
+    lv_obj_remove_flag(img, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(img, LV_OBJ_FLAG_SCROLLABLE);
+    if (background) {
+        lv_obj_move_background(img);
+    }
+    return img;
 }
 
 static lv_obj_t *make_card(lv_obj_t *parent, int x, int y, int w, int h)
@@ -275,7 +288,6 @@ static void add_soccer_ball(lv_obj_t *parent, int x, int y, int size, lv_opa_t o
 
 static void add_soccer_decor(lv_obj_t *screen)
 {
-    /* Grass/pitch treatment from the original soccer mockup. */
     for (int i = 0; i < 10; ++i) {
         lv_obj_t *stripe = add_decor_box(screen, -40 + i * 95, 72, 48, 408,
                                          (i % 2) ? 0x0A3A20 : 0x0D4727,
@@ -305,9 +317,10 @@ static void add_soccer_decor(lv_obj_t *screen)
     lv_obj_set_style_border_width(center, 2, 0);
     lv_obj_set_style_border_color(center, c(0x50C878), 0);
     lv_obj_set_style_border_opa(center, 28, 0);
+    lv_obj_remove_flag(center, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(center, LV_OBJ_FLAG_CLICKABLE);
 
-    /* Ball tucked into the upper-right exactly where the mockup places it. */
-    add_soccer_ball(screen, 760, -5, 54, 115);
+    add_theme_sprite(screen, THEME_ART_SOCCER_BALL, 710, 0, false);
 }
 
 static void add_paw(lv_obj_t *parent, int x, int y, uint32_t color, lv_opa_t opa)
@@ -501,51 +514,13 @@ static void add_sleeping_cat(lv_obj_t *parent, int x, int y)
 
 static void add_kittens_decor(lv_obj_t *screen)
 {
-    /* Header paws/hearts and the cat peeking over the first card match the
-     * original kittens composition without baking controls into a bitmap. */
-    add_paw(screen, 8, 3, T->accent, 150);
-    add_paw(screen, 318, 4, T->accent, 155);
-    lv_obj_t *heart = make_label(screen, "<3", 10, 46,
-                                 &lv_font_montserrat_14, T->accent);
-    lv_obj_set_style_text_opa(heart, 165, 0);
-
-    add_cat_face(screen, 18, 57, T->accent_2, 190);
-    add_paw(screen, 2, 448, T->accent, 105);
-    add_paw(screen, 776, 448, T->accent, 105);
+    add_theme_sprite(screen, THEME_ART_KITTEN_PEEK, 0, 45, false);
+    add_theme_sprite(screen, THEME_ART_KITTEN_PAWS, 0, 390, false);
 }
 
 static void add_magic_decor(lv_obj_t *screen)
 {
-    /* Moon and castle skyline from the original magical night header. */
-    add_circle(screen, 548, 4, 58, 0xD4E8FF, 110);
-    add_circle(screen, 565, 2, 48, T->screen_bg, 248);
-
-    for (int i = 0; i < 8; ++i) {
-        int x = 410 + i * 28;
-        int h = 24 + ((i * 17) % 28);
-        lv_obj_t *tower = add_decor_box(screen, x, 66 - h, 20, h,
-                                        0x06172F, 235, 0);
-        (void)tower;
-        add_decor_box(screen, x + 4, 60 - h, 12, 10,
-                      0x06172F, 235, 0);
-        add_decor_box(screen, x + 7, 54 - h, 6, 8,
-                      0x06172F, 235, 0);
-
-        if (i % 2 == 0) {
-            add_decor_box(screen, x + 6, 52, 3, 5,
-                          T->warm, 155, 1);
-            add_decor_box(screen, x + 12, 52, 3, 5,
-                          T->warm, 155, 1);
-        }
-    }
-
-    const int sx[12] = {20,75,130,188,250,310,365,610,652,694,744,780};
-    const int sy[12] = {7,18,3,32,10,27,6,8,29,5,34,11};
-    for (int i = 0; i < 12; ++i) {
-        lv_obj_t *star = make_label(screen, "*", sx[i], sy[i],
-                                    &lv_font_montserrat_14, T->accent_2);
-        lv_obj_set_style_text_opa(star, 115 + (i % 3) * 45, 0);
-    }
+    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 385, 0, true);
 }
 
 static void add_classic_decor(lv_obj_t *screen)
