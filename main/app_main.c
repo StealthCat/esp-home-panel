@@ -46,19 +46,28 @@ void app_main(void)
         if (web_err != ESP_OK) {
             ESP_LOGE(TAG, "Web configuration startup failed: %s", esp_err_to_name(web_err));
         }
-
-        /*
-         * Start MQTT even while the setup AP is active. The client will retry
-         * in the background and can connect if station Wi-Fi comes up later.
-         */
-        esp_err_t mqtt_err = mqtt_bridge_start();
-        if (mqtt_err != ESP_OK && mqtt_err != ESP_ERR_INVALID_STATE) {
-            ESP_LOGE(TAG, "MQTT startup failed: %s", esp_err_to_name(mqtt_err));
-        }
     }
 
+    bool mqtt_started = false;
+
     while (true) {
-        ui_set_network_online(network_is_connected());
+        bool online = network_is_connected();
+        ui_set_network_online(online);
+
+        if (online && !mqtt_started) {
+            const panel_settings_t *settings = settings_get();
+            if (settings && settings->mqtt_uri[0] != '\0') {
+                esp_err_t mqtt_err = mqtt_bridge_start();
+                if (mqtt_err == ESP_OK) {
+                    mqtt_started = true;
+                } else {
+                    ESP_LOGE(TAG, "MQTT startup failed: %s", esp_err_to_name(mqtt_err));
+                }
+            } else {
+                mqtt_started = true;
+            }
+        }
+
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
