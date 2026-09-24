@@ -54,6 +54,8 @@ static lv_obj_t *s_echo_slider;
 static lv_obj_t *s_echo_pct;
 static lv_obj_t *s_echo_status;
 static lv_obj_t *s_echo_mute;
+static lv_obj_t *s_alexa_now_playing;
+static lv_obj_t *s_alexa_artist;
 static lv_obj_t *s_wave[14];
 
 static bool s_syncing;
@@ -92,6 +94,8 @@ typedef struct {
     uint8_t alexa_volume;
     bool alexa_muted;
     bool alexa_playing;
+    char alexa_title[96];
+    char alexa_artist[64];
 } pending_ui_state_t;
 
 static pending_ui_state_t s_pending_ui;
@@ -150,6 +154,9 @@ static void init_styles(void)
     lv_style_set_transform_width(&s_button_pressed_style, -2);
     lv_style_set_transform_height(&s_button_pressed_style, -2);
 }
+
+static lv_obj_t *add_theme_sprite(lv_obj_t *parent, theme_art_id_t id,
+                                  int x, int y, bool background);
 
 static void add_magic_card_ornaments(lv_obj_t *card, int w, int h)
 {
@@ -817,11 +824,13 @@ static void create_overhead_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 78, 382, 187);
     make_label(card, "Overhead Light", 70, 15, &lv_font_montserrat_22, T->text);
+
     if (T->magic) {
-        add_lantern(card, 18, 4);
+        add_theme_sprite(card, THEME_ART_MAGIC_LANTERN, 4, 0, false);
     } else {
         add_bulb_icon(card, 23, 13, T->warm);
     }
+
     make_status_dot(card, &s_overhead_status, 72, 48);
 
     s_overhead_switch = make_switch(card, 309, 13);
@@ -833,7 +842,6 @@ static void create_overhead_card(lv_obj_t *root)
     s_overhead_slider = make_slider(card, 50, 110, 250, T->warm);
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_RELEASED, NULL);
-
     s_overhead_pct = make_label(card, "--%", 314, 106, &lv_font_montserrat_16, T->text);
 
     const int pcts[4] = {25, 50, 75, 100};
@@ -841,36 +849,16 @@ static void create_overhead_card(lv_obj_t *root)
         char txt[8];
         snprintf(txt, sizeof(txt), "%d%%", pcts[i]);
         lv_obj_t *btn = make_button(card, txt, 18 + i * 88, 140, 78, 38);
-        lv_obj_add_event_cb(btn, overhead_preset_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)pcts[i]);
+        lv_obj_add_event_cb(btn, overhead_preset_cb, LV_EVENT_CLICKED,
+                            (void *)(uintptr_t)pcts[i]);
     }
 
     if (T->soccer) {
-        lv_obj_t *goal = lv_obj_create(card);
-        lv_obj_set_pos(goal, 270, 62);
-        lv_obj_set_size(goal, 92, 64);
-        lv_obj_set_style_bg_opa(goal, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(goal, 2, 0);
-        lv_obj_set_style_border_color(goal, c(T->accent), 0);
-        lv_obj_set_style_border_opa(goal, 65, 0);
-        lv_obj_set_style_radius(goal, 0, 0);
-        lv_obj_remove_flag(goal, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_remove_flag(goal, LV_OBJ_FLAG_CLICKABLE);
-        for (int i = 1; i < 4; ++i) {
-            add_decor_box(goal, i * 21, 0, 1, 64, T->accent, 32, 0);
-        }
-        for (int i = 1; i < 3; ++i) {
-            add_decor_box(goal, 0, i * 20, 92, 1, T->accent, 32, 0);
-        }
+        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 217, 55, true);
     } else if (T->kittens) {
         lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home <3", 238, 69,
                                        &lv_font_montserrat_14, T->accent_2);
         lv_obj_set_style_text_opa(caption, 185, 0);
-        add_paw(card, 335, 102, T->accent, 90);
-    } else if (T->magic) {
-        make_label(card, "*", 240, 68, &lv_font_montserrat_18, T->accent_2);
-        make_label(card, "*", 305, 82, &lv_font_montserrat_14, T->accent_2);
-        make_label(card, "*", 345, 66, &lv_font_montserrat_18, T->accent_2);
-        add_decor_box(card, 245, 105, 95, 2, T->accent, 55, 1);
     }
 }
 
@@ -927,67 +915,47 @@ static lv_obj_t *create_fan_graphic(lv_obj_t *card, int x, int y)
 static void create_fan_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 274, 382, 192);
+
+    if (T->kittens) {
+        add_theme_sprite(card, THEME_ART_KITTEN_FAN, 4, 36, false);
+    } else if (T->soccer) {
+        add_theme_sprite(card, THEME_ART_SOCCER_FAN, 4, 36, false);
+    } else if (T->magic) {
+        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 0, 36, false);
+    }
+
     make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
     add_mini_fan_icon(card, 20, 14, T->accent);
     make_status_dot(card, &s_fan_status, 72, 48);
 
-    s_fan_icon = create_fan_graphic(card, 25, 65);
+    if (!T->kittens && !T->soccer && !T->magic) {
+        s_fan_icon = create_fan_graphic(card, 25, 65);
+    } else {
+        s_fan_icon = NULL;
+    }
 
     s_fan_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    s_fan_state_label = make_label(card, "Fan is Off", 226, 116, &lv_font_montserrat_18, T->text);
-    make_label(card, "Smart Switch", 226, 143, &lv_font_montserrat_14, T->muted);
-
-    if (T->soccer) {
-        add_decor_box(card, 188, 58, 2, 134, T->accent, 38, 0);
-        lv_obj_t *center = lv_obj_create(card);
-        lv_obj_set_pos(center, 143, 83);
-        lv_obj_set_size(center, 92, 92);
-        lv_obj_set_style_radius(center, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_opa(center, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(center, 2, 0);
-        lv_obj_set_style_border_color(center, c(T->accent), 0);
-        lv_obj_set_style_border_opa(center, 28, 0);
-    } else if (T->kittens) {
-        add_sleeping_cat(card, 178, 61);
-        make_label(card, "z", 215, 47, &lv_font_montserrat_14, T->accent_2);
-        make_label(card, "z", 234, 38, &lv_font_montserrat_14, T->accent_2);
-        make_label(card, "<3", 329, 79, &lv_font_montserrat_14, T->accent);
-        make_label(card, "<3", 159, 88, &lv_font_montserrat_14, T->accent);
-        add_paw(card, 20, 156, T->accent, 90);
-    } else if (T->magic) {
-        lv_obj_t *shield = lv_obj_create(card);
-        lv_obj_set_pos(shield, 18, 56);
-        lv_obj_set_size(shield, 128, 126);
-        lv_obj_set_style_radius(shield, 24, 0);
-        lv_obj_set_style_bg_color(shield, c(0x0A2E5F), 0);
-        lv_obj_set_style_bg_opa(shield, 65, 0);
-        lv_obj_set_style_border_width(shield, 3, 0);
-        lv_obj_set_style_border_color(shield, c(T->accent_2), 0);
-        lv_obj_set_style_border_opa(shield, 190, 0);
-        lv_obj_set_style_pad_all(shield, 0, 0);
-        lv_obj_move_background(shield);
-        for (int i = 0; i < 6; ++i) {
-            add_decor_box(card, 7, 74 + i * 14, 12, 5, T->accent_2, 145, 3);
-            add_decor_box(card, 146, 74 + i * 14, 12, 5, T->accent_2, 145, 3);
-        }
-        make_label(card, "*", 170, 70, &lv_font_montserrat_18, T->accent_2);
-        make_label(card, "*", 347, 147, &lv_font_montserrat_18, T->accent_2);
-    }
+    s_fan_state_label = make_label(card, "Fan is Off", 226, 116,
+                                   &lv_font_montserrat_18, T->text);
+    make_label(card, "Smart Switch", 226, 143,
+               &lv_font_montserrat_14, T->muted);
 }
 
 static void create_echo_wave(lv_obj_t *card)
 {
     for (int i = 0; i < 14; ++i) {
         lv_obj_t *bar = lv_obj_create(card);
-        lv_obj_set_pos(bar, 145 + i * 10, 71);
-        lv_obj_set_size(bar, 5, 10 + ((i * 7) % 26));
+        lv_obj_set_pos(bar, 246 + i * 8, 51);
+        lv_obj_set_size(bar, 4, 8 + ((i * 7) % 18));
         lv_obj_set_style_bg_color(bar, c(T->accent), 0);
-        lv_obj_set_style_bg_opa(bar, s_artwork_mode ? LV_OPA_TRANSP : 100, 0);
+        lv_obj_set_style_bg_opa(bar, 90, 0);
         lv_obj_set_style_border_width(bar, 0, 0);
-        lv_obj_set_style_radius(bar, 3, 0);
+        lv_obj_set_style_radius(bar, 2, 0);
         lv_obj_set_style_pad_all(bar, 0, 0);
+        lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
+        lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
         s_wave[i] = bar;
     }
 }
@@ -995,39 +963,52 @@ static void create_echo_wave(lv_obj_t *card)
 static void create_echo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 274, 382, 192);
-    make_label(card, "Alexa", 70, 15, &lv_font_montserrat_22, T->text);
-    make_label(card, LV_SYMBOL_VOLUME_MAX, 22, 18, &lv_font_montserrat_22, T->accent);
-    make_status_dot(card, &s_echo_status, 72, 48);
 
+    const int title_x = T->magic ? 104 : 70;
+    const int status_x = T->magic ? 106 : 72;
+
+    if (T->magic) {
+        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 0, 5, false);
+        add_theme_sprite(card, THEME_ART_MAGIC_QUILL, 292, 38, false);
+    }
+
+    make_label(card, "Alexa", title_x, 15, &lv_font_montserrat_22, T->text);
+    if (!T->magic) {
+        make_label(card, LV_SYMBOL_VOLUME_MAX, 22, 18,
+                   &lv_font_montserrat_22, T->accent);
+    }
+    make_status_dot(card, &s_echo_status, status_x, 48);
+
+    s_alexa_now_playing = make_label(card, "Nothing playing", 96, 45,
+                                     &lv_font_montserrat_14, T->text);
+    lv_obj_set_width(s_alexa_now_playing, 145);
+    lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+
+    s_alexa_artist = make_label(card, "", 96, 64,
+                                &lv_font_montserrat_14, T->muted);
+    lv_obj_set_width(s_alexa_artist, 145);
+    lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     create_echo_wave(card);
 
-    make_label(card, "Volume", 20, 82, &lv_font_montserrat_16, T->muted);
-    make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 109, &lv_font_montserrat_18, T->accent);
+    make_label(card, "Volume", 20, 87, &lv_font_montserrat_16, T->muted);
+    make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 114,
+               &lv_font_montserrat_18, T->accent);
 
-    s_echo_slider = make_slider(card, 50, 112, 250, T->accent);
+    s_echo_slider = make_slider(card, 50, 117, 250, T->accent);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_RELEASED, NULL);
-    s_echo_pct = make_label(card, "--%", 314, 108, &lv_font_montserrat_16, T->text);
+    s_echo_pct = make_label(card, "--%", 314, 113, &lv_font_montserrat_16, T->text);
 
-    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 143, 94, 40);
+    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 146, 94, 38);
     lv_obj_add_event_cb(s_echo_mute, echo_mute_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *play = make_button(card, LV_SYMBOL_PLAY " " LV_SYMBOL_PAUSE, 126, 143, 96, 40);
+    lv_obj_t *play = make_button(card, LV_SYMBOL_PLAY " " LV_SYMBOL_PAUSE,
+                                 126, 146, 96, 38);
     lv_obj_add_event_cb(play, echo_play_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *announce = make_button(card, "Announce", 236, 143, 128, 40);
+    lv_obj_t *announce = make_button(card, "Announce", 236, 146, 128, 38);
     lv_obj_add_event_cb(announce, echo_announce_cb, LV_EVENT_CLICKED, NULL);
-
-    if (T->kittens) {
-        add_paw(card, 286, 60, T->accent, 90);
-        add_paw(card, 338, 72, T->accent_2, 65);
-    } else if (T->magic) {
-        add_owl_on_books(card, 12, 14);
-        add_quill_and_ink(card, 334, 64);
-        make_label(card, "*", 280, 60, &lv_font_montserrat_14, T->accent_2);
-        make_label(card, "*", 310, 83, &lv_font_montserrat_14, T->accent_2);
-    }
 }
 
 static void create_header(lv_obj_t *root)
