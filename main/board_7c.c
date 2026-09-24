@@ -45,7 +45,7 @@ static const char *TAG = "board_7c";
 #define I2C_PORT            I2C_NUM_0
 #define I2C_SDA             GPIO_NUM_47
 #define I2C_SCL             GPIO_NUM_48
-#define I2C_FREQ_HZ         400000
+#define I2C_FREQ_HZ         100000
 
 #define IOX_ADDR            0x24
 #define IOX_REG_MODE        0x02
@@ -88,6 +88,30 @@ static esp_err_t iox_set_pin(uint8_t pin, bool value)
     return iox_write3(IOX_REG_OUTPUT, s_iox_output);
 }
 
+static void log_i2c_devices(void)
+{
+    static const uint8_t expected[] = { 0x20, 0x24, 0x51, 0x55, 0x5D };
+    bool found_any = false;
+
+    ESP_LOGI(TAG, "Scanning known 7C BOX I2C addresses on SDA=%d SCL=%d",
+             I2C_SDA, I2C_SCL);
+
+    for (size_t i = 0; i < sizeof(expected); ++i) {
+        esp_err_t err = i2c_master_probe(s_i2c_bus, expected[i], 50);
+        if (err == ESP_OK) {
+            ESP_LOGI(TAG, "I2C device ACK at 0x%02X", expected[i]);
+            found_any = true;
+        } else {
+            ESP_LOGW(TAG, "No ACK at I2C address 0x%02X (%s)",
+                     expected[i], esp_err_to_name(err));
+        }
+    }
+
+    if (!found_any) {
+        ESP_LOGE(TAG, "No known 7C BOX I2C devices responded on GPIO47/GPIO48");
+    }
+}
+
 static esp_err_t board_i2c_init(void)
 {
     const i2c_master_bus_config_t bus_cfg = {
@@ -101,6 +125,27 @@ static esp_err_t board_i2c_init(void)
 
     ESP_RETURN_ON_ERROR(i2c_new_master_bus(&bus_cfg, &s_i2c_bus), TAG, "I2C bus init failed");
 
+    /*
+     * Probe uses a conservative 100 kHz timing in ESP-IDF. Retry once after a
+     * bus reset before declaring the expander absent, then log the other known
+     * devices so a hardware/pinout problem is obvious from the serial log.
+     */
+    esp_err_t probe_err = i2c_master_probe(s_i2c_bus, IOX_ADDR, 100);
+    if (probe_err != ESP_OK) {
+        ESP_LOGW(TAG, "IO expander did not ACK at 0x%02X; resetting I2C bus and retrying", IOX_ADDR);
+        ESP_RETURN_ON_ERROR(i2c_master_bus_reset(s_i2c_bus), TAG, "I2C bus reset failed");
+        vTaskDelay(pdMS_TO_TICKS(20));
+        probe_err = i2c_master_probe(s_i2c_bus, IOX_ADDR, 100);
+    }
+
+    if (probe_err != ESP_OK) {
+        log_i2c_devices();
+        ESP_LOGE(TAG, "IO expander 0x%02X not found", IOX_ADDR);
+        return probe_err;
+    }
+
+    ESP_LOGI(TAG, "IO expander ACK at 0x%02X", IOX_ADDR);
+
     const i2c_device_config_t iox_cfg = {
         .dev_addr_length = I2C_ADDR_BIT_LEN_7,
         .device_address = IOX_ADDR,
@@ -108,7 +153,15 @@ static esp_err_t board_i2c_init(void)
     };
     ESP_RETURN_ON_ERROR(i2c_master_bus_add_device(s_i2c_bus, &iox_cfg, &s_iox), TAG, "IO expander add failed");
 
-    ESP_RETURN_ON_ERROR(iox_write3(IOX_REG_MODE, s_iox_mode), TAG, "IO expander mode write failed");
+    esp_err_t err = iox_write3(IOX_REG_MODE, s_iox_mode);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "Initial IO expander mode write failed (%s); resetting bus and retrying",
+                 esp_err_to_name(err));
+        ESP_RETURN_ON_ERROR(i2c_master_bus_reset(s_i2c_bus), TAG, "I2C bus reset failed");
+        vTaskDelay(pdMS_TO_TICKS(20));
+        err = iox_write3(IOX_REG_MODE, s_iox_mode);
+    }
+    ESP_RETURN_ON_ERROR(err, TAG, "IO expander mode write failed");
     ESP_RETURN_ON_ERROR(iox_write3(IOX_REG_OUTPUT, s_iox_output), TAG, "IO expander output write failed");
 
     return ESP_OK;
