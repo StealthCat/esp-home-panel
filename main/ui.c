@@ -81,31 +81,31 @@ static void style_screen(lv_obj_t *screen)
 static void init_styles(void)
 {
     lv_style_init(&s_card_style);
-    lv_style_set_radius(&s_card_style, 16);
+    lv_style_set_radius(&s_card_style, 14);
     lv_style_set_bg_color(&s_card_style, c(T->card_bg));
     lv_style_set_bg_grad_color(&s_card_style, c(T->card_bg_2));
     lv_style_set_bg_grad_dir(&s_card_style, LV_GRAD_DIR_VER);
-    lv_style_set_bg_opa(&s_card_style, s_artwork_mode ? LV_OPA_TRANSP : 242);
+    lv_style_set_bg_opa(&s_card_style, 238);
     lv_style_set_border_width(&s_card_style, T->magic ? 2 : 1);
     lv_style_set_border_color(&s_card_style, c(T->card_border));
-    lv_style_set_border_opa(&s_card_style, s_artwork_mode ? LV_OPA_TRANSP : (T->magic ? 220 : 150));
-    lv_style_set_shadow_width(&s_card_style, 14);
-    lv_style_set_shadow_spread(&s_card_style, 1);
+    lv_style_set_border_opa(&s_card_style, T->magic ? 185 : 125);
+    lv_style_set_shadow_width(&s_card_style, 8);
+    lv_style_set_shadow_spread(&s_card_style, 0);
     lv_style_set_shadow_color(&s_card_style, c(T->accent));
-    lv_style_set_shadow_opa(&s_card_style, s_artwork_mode ? LV_OPA_TRANSP : (T->kittens ? 45 : 30));
+    lv_style_set_shadow_opa(&s_card_style, T->kittens ? 28 : 18);
     lv_style_set_pad_all(&s_card_style, 0);
 
     lv_style_init(&s_button_style);
-    lv_style_set_radius(&s_button_style, 11);
+    lv_style_set_radius(&s_button_style, 10);
     lv_style_set_bg_color(&s_button_style, c(T->card_bg_2));
-    lv_style_set_bg_opa(&s_button_style, s_artwork_mode ? LV_OPA_TRANSP : 220);
+    lv_style_set_bg_opa(&s_button_style, 212);
     lv_style_set_border_width(&s_button_style, 1);
     lv_style_set_border_color(&s_button_style, c(T->card_border));
-    lv_style_set_border_opa(&s_button_style, s_artwork_mode ? LV_OPA_TRANSP : 160);
+    lv_style_set_border_opa(&s_button_style, 130);
     lv_style_set_text_color(&s_button_style, c(T->text));
-    lv_style_set_shadow_width(&s_button_style, 5);
+    lv_style_set_shadow_width(&s_button_style, 3);
     lv_style_set_shadow_color(&s_button_style, c(T->accent));
-    lv_style_set_shadow_opa(&s_button_style, s_artwork_mode ? LV_OPA_TRANSP : 30);
+    lv_style_set_shadow_opa(&s_button_style, 18);
 
     lv_style_init(&s_button_pressed_style);
     lv_style_set_bg_color(&s_button_pressed_style, c(T->accent));
@@ -142,13 +142,13 @@ static lv_obj_t *make_switch(lv_obj_t *parent, int x, int y)
 {
     lv_obj_t *sw = lv_switch_create(parent);
     lv_obj_set_pos(sw, x, y);
-    lv_obj_set_size(sw, 58, 32);
+    lv_obj_set_size(sw, 56, 30);
     lv_obj_set_style_bg_color(sw, c(0x33475B), LV_PART_MAIN);
     lv_obj_set_style_bg_opa(sw, LV_OPA_COVER, LV_PART_MAIN);
     lv_obj_set_style_bg_color(sw, c(T->accent), LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_set_style_bg_opa(sw, LV_OPA_COVER, LV_PART_INDICATOR | LV_STATE_CHECKED);
     lv_obj_set_style_bg_color(sw, c(0xFFFFFF), LV_PART_KNOB);
-    lv_obj_set_style_shadow_width(sw, 7, LV_PART_KNOB);
+    lv_obj_set_style_shadow_width(sw, 4, LV_PART_KNOB);
     lv_obj_set_style_shadow_opa(sw, 80, LV_PART_KNOB);
     return sw;
 }
@@ -157,7 +157,7 @@ static lv_obj_t *make_slider(lv_obj_t *parent, int x, int y, int w, uint32_t acc
 {
     lv_obj_t *slider = lv_slider_create(parent);
     lv_obj_set_pos(slider, x, y);
-    lv_obj_set_size(slider, w, 18);
+    lv_obj_set_size(slider, w, 16);
     lv_slider_set_range(slider, 0, 100);
 
     lv_obj_set_style_bg_color(slider, c(0x3B4A58), LV_PART_MAIN);
@@ -170,8 +170,8 @@ static lv_obj_t *make_slider(lv_obj_t *parent, int x, int y, int w, uint32_t acc
 
     lv_obj_set_style_bg_color(slider, c(0xFFFFFF), LV_PART_KNOB);
     lv_obj_set_style_radius(slider, LV_RADIUS_CIRCLE, LV_PART_KNOB);
-    lv_obj_set_style_pad_all(slider, 5, LV_PART_KNOB);
-    lv_obj_set_style_shadow_width(slider, 7, LV_PART_KNOB);
+    lv_obj_set_style_pad_all(slider, 4, LV_PART_KNOB);
+    lv_obj_set_style_shadow_width(slider, 4, LV_PART_KNOB);
     lv_obj_set_style_shadow_color(slider, c(accent), LV_PART_KNOB);
     lv_obj_set_style_shadow_opa(slider, 80, LV_PART_KNOB);
     return slider;
@@ -204,6 +204,14 @@ static void set_switch(lv_obj_t *sw, bool on)
     } else {
         lv_obj_remove_state(sw, LV_STATE_CHECKED);
     }
+}
+
+static void set_percent_label(lv_obj_t *label, int value)
+{
+    if (!label) return;
+    if (value < 0) value = 0;
+    if (value > 100) value = 100;
+    lv_label_set_text_fmt(label, "%d%%", value);
 }
 
 static void add_circle(lv_obj_t *parent, int x, int y, int d, uint32_t color, lv_opa_t opa)
@@ -261,17 +269,71 @@ static void add_paw(lv_obj_t *parent, int x, int y, uint32_t color, lv_opa_t opa
     add_circle(parent, x + 18, y + 3, 6, color, opa);
 }
 
+static void add_cat_face(lv_obj_t *parent, int x, int y, uint32_t color, lv_opa_t opa)
+{
+    lv_obj_t *face = lv_obj_create(parent);
+    lv_obj_set_pos(face, x + 4, y + 6);
+    lv_obj_set_size(face, 34, 28);
+    lv_obj_set_style_radius(face, 14, 0);
+    lv_obj_set_style_bg_color(face, c(color), 0);
+    lv_obj_set_style_bg_opa(face, opa, 0);
+    lv_obj_set_style_border_width(face, 0, 0);
+    lv_obj_set_style_pad_all(face, 0, 0);
+    lv_obj_remove_flag(face, LV_OBJ_FLAG_SCROLLABLE);
+
+    for (int i = 0; i < 2; ++i) {
+        lv_obj_t *ear = lv_obj_create(parent);
+        lv_obj_set_pos(ear, x + 7 + i * 20, y + 1);
+        lv_obj_set_size(ear, 12, 12);
+        lv_obj_set_style_radius(ear, 3, 0);
+        lv_obj_set_style_bg_color(ear, c(color), 0);
+        lv_obj_set_style_bg_opa(ear, opa, 0);
+        lv_obj_set_style_border_width(ear, 0, 0);
+        lv_obj_set_style_transform_rotation(ear, 450, 0);
+        lv_obj_set_style_pad_all(ear, 0, 0);
+    }
+
+    add_circle(parent, x + 13, y + 17, 4, T->screen_bg, 220);
+    add_circle(parent, x + 27, y + 17, 4, T->screen_bg, 220);
+    add_circle(parent, x + 20, y + 23, 4, T->accent, 220);
+
+    for (int i = 0; i < 2; ++i) {
+        lv_obj_t *whisker = lv_obj_create(parent);
+        lv_obj_set_pos(whisker, x + (i ? 24 : 1), y + 25);
+        lv_obj_set_size(whisker, 14, 2);
+        lv_obj_set_style_bg_color(whisker, c(color), 0);
+        lv_obj_set_style_bg_opa(whisker, opa > 50 ? opa - 40 : opa, 0);
+        lv_obj_set_style_border_width(whisker, 0, 0);
+        lv_obj_set_style_pad_all(whisker, 0, 0);
+    }
+}
+
+static void add_sleeping_cat(lv_obj_t *parent, int x, int y)
+{
+    lv_obj_t *body = lv_obj_create(parent);
+    lv_obj_set_pos(body, x, y + 11);
+    lv_obj_set_size(body, 62, 24);
+    lv_obj_set_style_radius(body, 12, 0);
+    lv_obj_set_style_bg_color(body, c(T->accent_2), 0);
+    lv_obj_set_style_bg_opa(body, 165, 0);
+    lv_obj_set_style_border_width(body, 0, 0);
+    lv_obj_set_style_pad_all(body, 0, 0);
+
+    add_cat_face(parent, x + 45, y + 1, T->accent_2, 190);
+    add_circle(parent, x + 3, y + 28, 14, T->accent_2, 145);
+
+    lv_obj_t *sleep = make_label(parent, "z  z", x + 12, y - 3,
+                                 &lv_font_montserrat_14, T->accent_2);
+    lv_obj_set_style_text_opa(sleep, 170, 0);
+}
+
 static void add_kittens_decor(lv_obj_t *screen)
 {
-    add_paw(screen, 15, 18, T->accent, 180);
-    add_paw(screen, 610, 25, T->accent, 90);
-    add_paw(screen, 760, 52, T->accent, 140);
-
-    lv_obj_t *cat = make_label(screen, "=^.^=", 690, 8, &lv_font_montserrat_20, T->accent_2);
-    lv_obj_set_style_text_opa(cat, 220, 0);
-
-    lv_obj_t *heart = make_label(screen, "<3", 760, 42, &lv_font_montserrat_18, T->accent);
-    lv_obj_set_style_text_opa(heart, 180, 0);
+    /* Keep the header clear for time/network information. Decorative paws live
+     * in the otherwise-unused outer corners and the richer cat art is inside
+     * the individual cards. */
+    add_paw(screen, 1, 448, T->accent, 115);
+    add_paw(screen, 774, 448, T->accent, 115);
 }
 
 static void add_magic_decor(lv_obj_t *screen)
@@ -344,21 +406,30 @@ static void tapo_brightness_cb(lv_event_t *e)
 {
     if (s_syncing) return;
     int value = lv_slider_get_value(lv_event_get_target(e));
-    mqtt_bridge_tapo_brightness((uint8_t)value);
+    set_percent_label(s_tapo_pct, value);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        mqtt_bridge_tapo_brightness((uint8_t)value);
+    }
 }
 
 static void overhead_brightness_cb(lv_event_t *e)
 {
     if (s_syncing) return;
     int value = lv_slider_get_value(lv_event_get_target(e));
-    mqtt_bridge_overhead_brightness((uint8_t)value);
+    set_percent_label(s_overhead_pct, value);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        mqtt_bridge_overhead_brightness((uint8_t)value);
+    }
 }
 
 static void echo_volume_cb(lv_event_t *e)
 {
     if (s_syncing) return;
     int value = lv_slider_get_value(lv_event_get_target(e));
-    mqtt_bridge_echo_volume((uint8_t)value);
+    set_percent_label(s_echo_pct, value);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        mqtt_bridge_echo_volume((uint8_t)value);
+    }
 }
 
 static void preset_color_cb(lv_event_t *e)
@@ -370,6 +441,12 @@ static void preset_color_cb(lv_event_t *e)
 static void overhead_preset_cb(lv_event_t *e)
 {
     uintptr_t pct = (uintptr_t)lv_event_get_user_data(e);
+    if (s_overhead_slider) {
+        s_syncing = true;
+        lv_slider_set_value(s_overhead_slider, (int32_t)pct, LV_ANIM_OFF);
+        set_percent_label(s_overhead_pct, (int)pct);
+        s_syncing = false;
+    }
     mqtt_bridge_overhead_brightness((uint8_t)pct);
 }
 
@@ -524,7 +601,7 @@ static void create_tapo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 78, 382, 187);
     make_label(card, "Tapo LED Strips", 70, 15, &lv_font_montserrat_22, T->text);
-    make_label(card, "LED", 19, 14, &lv_font_montserrat_18, T->accent_2);
+    make_label(card, "LED", 20, 16, &lv_font_montserrat_14, T->accent_2);
     make_status_dot(card, &s_tapo_status, 76, 47);
 
     s_tapo_switch = make_switch(card, 309, 13);
@@ -556,9 +633,14 @@ static void create_tapo_card(lv_obj_t *root)
     make_label(card, "*", 145, 140, &lv_font_montserrat_18, T->accent);
 
     s_tapo_slider = make_slider(card, 174, 143, 150, T->accent);
+    lv_obj_add_event_cb(s_tapo_slider, tapo_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_tapo_slider, tapo_brightness_cb, LV_EVENT_RELEASED, NULL);
 
     s_tapo_pct = make_label(card, "0%", 328, 139, &lv_font_montserrat_16, T->text);
+
+    if (T->kittens) {
+        add_paw(card, 282, 48, T->accent, 80);
+    }
 }
 
 static void create_overhead_card(lv_obj_t *root)
@@ -575,6 +657,7 @@ static void create_overhead_card(lv_obj_t *root)
     make_label(card, "*", 20, 107, &lv_font_montserrat_18, T->warm);
 
     s_overhead_slider = make_slider(card, 50, 110, 250, T->warm);
+    lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_RELEASED, NULL);
 
     s_overhead_pct = make_label(card, "0%", 310, 106, &lv_font_montserrat_16, T->text);
@@ -597,8 +680,8 @@ static void create_overhead_card(lv_obj_t *root)
         lv_obj_set_style_border_opa(goal, 42, 0);
         lv_obj_set_style_radius(goal, 0, 0);
     } else if (T->kittens) {
-        make_label(card, "A brighter\nhappier home", 240, 70, &lv_font_montserrat_14, T->accent_2);
-        add_paw(card, 330, 94, T->accent, 100);
+        add_cat_face(card, 320, 67, T->accent_2, 175);
+        add_paw(card, 286, 88, T->accent, 85);
     } else if (T->magic) {
         make_label(card, "*  *   *", 245, 69, &lv_font_montserrat_16, T->accent_2);
     }
@@ -649,7 +732,7 @@ static void create_fan_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 274, 382, 192);
     make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
-    make_label(card, "FAN", 19, 18, &lv_font_montserrat_16, T->accent);
+    make_label(card, "FAN", 20, 17, &lv_font_montserrat_14, T->accent);
     make_status_dot(card, &s_fan_status, 76, 47);
 
     s_fan_icon = create_fan_graphic(card, 25, 65);
@@ -668,8 +751,7 @@ static void create_fan_card(lv_obj_t *root)
         lv_obj_set_style_bg_opa(line, 40, 0);
         lv_obj_set_style_border_width(line, 0, 0);
     } else if (T->kittens) {
-        make_label(card, "=^..^=", 210, 64, &lv_font_montserrat_18, T->accent_2);
-        make_label(card, "z  z  z", 215, 48, &lv_font_montserrat_14, T->accent_2);
+        add_sleeping_cat(card, 160, 66);
         add_paw(card, 20, 156, T->accent, 90);
     } else if (T->magic) {
         lv_obj_set_style_border_color(s_fan_icon, c(T->accent_2), 0);
@@ -708,6 +790,7 @@ static void create_echo_card(lv_obj_t *root)
     make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 109, &lv_font_montserrat_18, T->accent);
 
     s_echo_slider = make_slider(card, 50, 112, 250, T->accent);
+    lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_RELEASED, NULL);
     s_echo_pct = make_label(card, "0%", 310, 108, &lv_font_montserrat_16, T->text);
 
@@ -721,7 +804,8 @@ static void create_echo_card(lv_obj_t *root)
     lv_obj_add_event_cb(announce, echo_announce_cb, LV_EVENT_CLICKED, NULL);
 
     if (T->kittens) {
-        add_paw(card, 325, 66, T->accent, 100);
+        add_cat_face(card, 322, 62, T->accent_2, 150);
+        add_paw(card, 292, 67, T->accent, 75);
     } else if (T->magic) {
         make_label(card, "* * *", 275, 67, &lv_font_montserrat_14, T->accent_2);
     }
@@ -913,7 +997,7 @@ void ui_apply_tapo_state(bool on, uint8_t brightness, uint8_t r, uint8_t g, uint
     s_syncing = true;
     set_switch(s_tapo_switch, on);
     lv_slider_set_value(s_tapo_slider, brightness, LV_ANIM_ON);
-    lv_label_set_text_fmt(s_tapo_pct, "%u%%", brightness);
+    set_percent_label(s_tapo_pct, brightness);
     lv_label_set_text(s_tapo_status, on ? "Online • On" : "Online • Off");
     lv_color_hsv_t hsv = lv_color_rgb_to_hsv(r, g, b);
     colorwheel_position_knob(hsv.h, hsv.s);
@@ -929,7 +1013,7 @@ void ui_apply_overhead_state(bool on, uint8_t brightness)
     s_syncing = true;
     set_switch(s_overhead_switch, on);
     lv_slider_set_value(s_overhead_slider, brightness, LV_ANIM_ON);
-    lv_label_set_text_fmt(s_overhead_pct, "%u%%", brightness);
+    set_percent_label(s_overhead_pct, brightness);
     lv_label_set_text(s_overhead_status, on ? "Online • On" : "Online • Off");
     s_syncing = false;
 
@@ -959,7 +1043,7 @@ void ui_apply_echo_state(uint8_t volume, bool muted, bool playing)
     s_echo_muted = muted;
     s_echo_playing = playing;
     lv_slider_set_value(s_echo_slider, volume, LV_ANIM_ON);
-    lv_label_set_text_fmt(s_echo_pct, "%u%%", volume);
+    set_percent_label(s_echo_pct, volume);
     lv_label_set_text(s_echo_status, playing ? "Online • Playing" : "Online");
     lv_obj_set_style_bg_color(s_echo_mute, c(muted ? T->accent : T->card_bg_2), 0);
     s_syncing = false;
