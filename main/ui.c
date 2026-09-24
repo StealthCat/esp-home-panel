@@ -230,7 +230,12 @@ static void add_circle(lv_obj_t *parent, int x, int y, int d, uint32_t color, lv
     lv_obj_set_style_border_width(o, 0, 0);
     lv_obj_set_style_pad_all(o, 0, 0);
     lv_obj_remove_flag(o, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(o, LV_OBJ_FLAG_CLICKABLE);
 }
+
+static lv_obj_t *add_decor_box(lv_obj_t *parent, int x, int y, int w, int h,
+                               uint32_t color, lv_opa_t opa, int radius);
+static void add_soccer_ball(lv_obj_t *parent, int x, int y, int size, lv_opa_t opa);
 
 static void add_soccer_decor(lv_obj_t *screen)
 {
