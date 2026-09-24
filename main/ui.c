@@ -114,7 +114,7 @@ static void init_styles(void)
     lv_style_set_transform_height(&s_button_pressed_style, -2);
 }
 
-static void add_magic_card_ornaments(lv_obj_t *card);
+static void add_magic_card_ornaments(lv_obj_t *card, int w, int h);
 
 static lv_obj_t *make_label(lv_obj_t *parent, const char *text, int x, int y,
                             const lv_font_t *font, uint32_t color)
@@ -138,7 +138,7 @@ static lv_obj_t *make_card(lv_obj_t *parent, int x, int y, int w, int h)
     lv_obj_add_style(card, &s_card_style, 0);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
     if (T->magic) {
-        add_magic_card_ornaments(card);
+        add_magic_card_ornaments(card, w, h);
     }
     return card;
 }
@@ -252,6 +252,7 @@ static void add_soccer_decor(lv_obj_t *screen)
     lv_obj_set_style_radius(pitch, 0, 0);
     lv_obj_set_style_pad_all(pitch, 0, 0);
     lv_obj_remove_flag(pitch, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(pitch, LV_OBJ_FLAG_CLICKABLE);
 
     add_decor_box(pitch, 399, 0, 2, 408, 0x50C878, 28, 0);
 
@@ -288,6 +289,7 @@ static lv_obj_t *add_decor_box(lv_obj_t *parent, int x, int y, int w, int h,
     lv_obj_set_style_border_width(obj, 0, 0);
     lv_obj_set_style_pad_all(obj, 0, 0);
     lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_CLICKABLE);
     return obj;
 }
 
@@ -305,6 +307,7 @@ static void add_chain_icon(lv_obj_t *parent, int x, int y, uint32_t color)
         lv_obj_set_style_pad_all(link, 0, 0);
         lv_obj_set_style_transform_rotation(link, i ? 3250 : 350, 0);
         lv_obj_remove_flag(link, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(link, LV_OBJ_FLAG_CLICKABLE);
     }
 }
 
@@ -342,11 +345,9 @@ static void add_soccer_ball(lv_obj_t *parent, int x, int y, int size, lv_opa_t o
     }
 }
 
-static void add_magic_card_ornaments(lv_obj_t *card)
+static void add_magic_card_ornaments(lv_obj_t *card, int w, int h)
 {
     const uint32_t gold = T->accent_2;
-    const int w = lv_obj_get_width(card);
-    const int h = lv_obj_get_height(card);
 
     /* Four small gold corner brackets matching the original ornate frames. */
     const int xs[4] = {7, w - 28, 7, w - 28};
@@ -411,6 +412,7 @@ static void add_cat_face(lv_obj_t *parent, int x, int y, uint32_t color, lv_opa_
     lv_obj_set_style_border_width(face, 0, 0);
     lv_obj_set_style_pad_all(face, 0, 0);
     lv_obj_remove_flag(face, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(face, LV_OBJ_FLAG_CLICKABLE);
 
     for (int i = 0; i < 2; ++i) {
         lv_obj_t *ear = lv_obj_create(parent);
