@@ -873,7 +873,7 @@ static lv_obj_t *create_fan_graphic(lv_obj_t *card, int x, int y)
     lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(ring, 4, 0);
-    lv_obj_set_style_border_color(ring, c(T->accent), 0);
+    lv_obj_set_style_border_color(ring, c(T->magic ? T->accent_2 : T->accent), 0);
     lv_obj_set_style_border_opa(ring, 195, 0);
     lv_obj_set_style_pad_all(ring, 0, 0);
     lv_obj_remove_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
@@ -946,7 +946,6 @@ static void create_fan_card(lv_obj_t *root)
         make_label(card, "<3", 159, 88, &lv_font_montserrat_14, T->accent);
         add_paw(card, 20, 156, T->accent, 90);
     } else if (T->magic) {
-        lv_obj_set_style_border_color(s_fan_icon, c(T->accent_2), 0);
         lv_obj_t *shield = lv_obj_create(card);
         lv_obj_set_pos(shield, 18, 56);
         lv_obj_set_size(shield, 128, 126);
