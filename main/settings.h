@@ -14,6 +14,7 @@ extern "C" {
 #define PANEL_MQTT_USERNAME_MAX   63
 #define PANEL_MQTT_PASSWORD_MAX   127
 #define PANEL_MQTT_BASE_TOPIC_MAX 127
+#define PANEL_HA_ENTITY_ID_MAX    127
 #define PANEL_TIMEZONE_MAX        95
 
 typedef struct {
@@ -24,6 +25,17 @@ typedef struct {
     char mqtt_username[PANEL_MQTT_USERNAME_MAX + 1];
     char mqtt_password[PANEL_MQTT_PASSWORD_MAX + 1];
     char mqtt_base_topic[PANEL_MQTT_BASE_TOPIC_MAX + 1];
+
+    /*
+     * Existing Home Assistant entities controlled through the MQTT bridge.
+     * These are entity IDs such as light.kitchen or media_player.office_echo.
+     * Empty strings leave that control unmapped.
+     */
+    char ha_tapo_entity[PANEL_HA_ENTITY_ID_MAX + 1];
+    char ha_overhead_entity[PANEL_HA_ENTITY_ID_MAX + 1];
+    char ha_fan_entity[PANEL_HA_ENTITY_ID_MAX + 1];
+    char ha_echo_entity[PANEL_HA_ENTITY_ID_MAX + 1];
+    char ha_echo_announce_script[PANEL_HA_ENTITY_ID_MAX + 1];
 
     char timezone[PANEL_TIMEZONE_MAX + 1];
 
