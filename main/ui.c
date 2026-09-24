@@ -1171,7 +1171,7 @@ static void pending_state_timer_cb(lv_timer_t *timer)
         s_syncing = false;
     }
 
-    ESP_LOGD(TAG, "Applied pending UI state mask=0x%02lx",
+    ESP_LOGI(TAG, "UI APPLY pending state mask=0x%02lx",
              (unsigned long)pending.dirty);
 }
 
