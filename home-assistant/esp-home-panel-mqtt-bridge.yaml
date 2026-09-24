@@ -92,8 +92,8 @@ script:
                       "volume": volume_pct | int,
                       "muted": state_attr(entity, "is_volume_muted") | default(false, true),
                       "playing": is_state(entity, "playing"),
-                      "title": state_attr(entity, "media_title") | default("", true),
-                      "artist": state_attr(entity, "media_artist") | default("", true)
+                      "title": (state_attr(entity, "media_title") or "") | string,
+                      "artist": (state_attr(entity, "media_artist") or "") | string
                     } | to_json }}
                   qos: 1
                   retain: true
