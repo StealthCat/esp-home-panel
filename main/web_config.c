@@ -373,14 +373,14 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     snprintf(buf, sizeof(buf),
-             "<label>Echo announcement script (optional)</label>"
+             "<label>Echo announcement script (required for Announce button)</label>"
              "<input name='ha_echo_announce_script' maxlength='127' value=\"%s\" placeholder='script.office_echo_announce' autocapitalize='none' spellcheck='false'>",
              ha_announce);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "<div class='hint'>Leave a field blank to leave that control unmapped. Light controls require light.*, Echo requires media_player.*, "
-        "fan accepts fan.* or switch.*, and the optional announcement action requires script.*.</div>"
+        "fan accepts fan.* or switch.*, and the Announce button requires a script.* mapping.</div>"
         "</section>"));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
