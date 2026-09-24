@@ -134,30 +134,23 @@ homeassistant:
 If you do not use packages, merge the `script:` and `automation:` sections
 from the bridge file into the corresponding Home Assistant configuration.
 
-The included bridge listens to both supported `home` layouts:
+The included bridge listens to:
 
 ```text
-home/+/cmd/+
-home/+/request_state
-
 home/7c-panel/+/cmd/+
 home/7c-panel/+/request_state
 ```
 
-The `+` immediately before `cmd` or `request_state` is the panel ID. This
-means both of these work without editing the package:
+The `+` is the panel ID.
+
+The supported runtime layout is therefore:
 
 ```text
-home/panel-a3ffa0/request_state
-home/7c-panel/panel-a3ffa0/request_state
+home/7c-panel/<panel-id>/...
 ```
 
-The bridge derives each individual panel's response topic from the actual
-incoming topic, so state replies are sent back into the matching panel
-namespace.
-
-If you use a completely different runtime base such as `house/panels`, add
-matching MQTT trigger entries using that prefix.
+The bridge derives each individual panel's response topic from the incoming
+topic, so no per-panel Home Assistant configuration is required.
 
 Restart Home Assistant or reload the affected YAML configuration after
 installation.
