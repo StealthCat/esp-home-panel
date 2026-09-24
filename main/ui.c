@@ -469,6 +469,7 @@ static void echo_volume_cb(lv_event_t *e)
 
 static void preset_color_cb(lv_event_t *e)
 {
+    discard_pending_ui(UI_PENDING_TAPO);
     uintptr_t rgb = (uintptr_t)lv_event_get_user_data(e);
     mqtt_bridge_tapo_rgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
 }
