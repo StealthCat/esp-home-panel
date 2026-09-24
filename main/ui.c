@@ -852,6 +852,7 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
 
     s_disp = lvgl_port_add_disp_rgb(&disp_cfg, &rgb_cfg);
     ESP_RETURN_ON_FALSE(s_disp, ESP_FAIL, TAG, "Failed to add RGB display to LVGL");
+    ESP_LOGI(TAG, "RGB display: two PSRAM framebuffers, full refresh, bounce-buffer scanout, tear avoidance");
 
     const lvgl_port_touch_cfg_t touch_cfg = {
         .disp = s_disp,
