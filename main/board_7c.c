@@ -1,4 +1,5 @@
-#include "board_7c.h"\n#include "settings.h"
+#include "board_7c.h"
+#include "settings.h"
 
 #include <string.h>
 
