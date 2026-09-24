@@ -467,6 +467,10 @@ static esp_err_t save_handler(httpd_req_t *req)
 
     free(body);
 
+    size_t mqtt_base_len = strlen(updated.mqtt_base_topic);
+    while (mqtt_base_len > 0 && updated.mqtt_base_topic[mqtt_base_len - 1] == '/') {
+        updated.mqtt_base_topic[--mqtt_base_len] = '\0';
+    }
     if (updated.mqtt_base_topic[0] == '\0') {
         strlcpy(updated.mqtt_base_topic, "home/7c-panel", sizeof(updated.mqtt_base_topic));
     }
