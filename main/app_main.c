@@ -72,6 +72,8 @@ void app_main(void)
             mqtt_bridge_poll();
         }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        /* Keep command reconciliation responsive; mqtt_bridge_poll() still
+         * rate-limits ordinary state requests to 10 seconds. */
+        vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
