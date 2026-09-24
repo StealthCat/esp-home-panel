@@ -842,6 +842,8 @@ static void create_overhead_card(lv_obj_t *root)
         lv_obj_set_style_border_color(goal, c(T->accent), 0);
         lv_obj_set_style_border_opa(goal, 65, 0);
         lv_obj_set_style_radius(goal, 0, 0);
+        lv_obj_remove_flag(goal, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(goal, LV_OBJ_FLAG_CLICKABLE);
         for (int i = 1; i < 4; ++i) {
             add_decor_box(goal, i * 21, 0, 1, 64, T->accent, 32, 0);
         }
@@ -1012,6 +1014,21 @@ static void create_echo_card(lv_obj_t *root)
 
 static void create_header(lv_obj_t *root)
 {
+    if (T->magic) {
+        lv_obj_t *home_frame = lv_obj_create(root);
+        lv_obj_set_pos(home_frame, 12, 8);
+        lv_obj_set_size(home_frame, 46, 46);
+        lv_obj_set_style_radius(home_frame, 6, 0);
+        lv_obj_set_style_bg_color(home_frame, c(0x0A2E5F), 0);
+        lv_obj_set_style_bg_opa(home_frame, 80, 0);
+        lv_obj_set_style_border_width(home_frame, 2, 0);
+        lv_obj_set_style_border_color(home_frame, c(T->accent_2), 0);
+        lv_obj_set_style_border_opa(home_frame, 210, 0);
+        lv_obj_set_style_pad_all(home_frame, 0, 0);
+        lv_obj_remove_flag(home_frame, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(home_frame, LV_OBJ_FLAG_CLICKABLE);
+    }
+
     make_label(root, LV_SYMBOL_HOME, 20, 17, &lv_font_montserrat_28, T->accent);
     make_label(root, T->name, 64, 10, &lv_font_montserrat_32, T->text);
     make_label(root, T->tagline, 64, 48, &lv_font_montserrat_14, T->muted);
@@ -1019,7 +1036,7 @@ static void create_header(lv_obj_t *root)
     s_clock = make_label(root, "--:--", 635, 8, &lv_font_montserrat_28, T->text);
     s_date = make_label(root, "---, --- --", 620, 42, &lv_font_montserrat_14, T->muted);
 
-    s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, 754, 20, &lv_font_montserrat_22, T->muted);
+    s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, 733, 20, &lv_font_montserrat_22, T->muted);
 
     s_mqtt_dot = lv_obj_create(root);
     lv_obj_set_pos(s_mqtt_dot, 720, 53);
