@@ -129,6 +129,29 @@ static bool form_has(const char *body, const char *key)
     return form_get(body, key, tmp, sizeof(tmp));
 }
 
+static bool valid_panel_id(const char *value)
+{
+    if (!value || value[0] == '\0') {
+        return false;
+    }
+
+    size_t len = strlen(value);
+    if (len > PANEL_ID_MAX) {
+        return false;
+    }
+
+    for (const char *p = value; *p; ++p) {
+        if ((*p >= 'a' && *p <= 'z') ||
+            (*p >= '0' && *p <= '9') ||
+            *p == '-' || *p == '_') {
+            continue;
+        }
+        return false;
+    }
+
+    return true;
+}
+
 static bool valid_entity_syntax(const char *value)
 {
     if (!value || value[0] == '\0') {
@@ -200,12 +223,13 @@ static esp_err_t root_handler(httpd_req_t *req)
 {
     const panel_settings_t *cfg = settings_get();
 
-    char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], timezone[224];
+    char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], panel_id[96], timezone[224];
     char ha_tapo[160], ha_overhead[160], ha_fan[160], ha_echo[160], ha_announce[160];
     html_escape(cfg->wifi_ssid, ssid, sizeof(ssid));
     html_escape(cfg->mqtt_uri, mqtt_uri, sizeof(mqtt_uri));
     html_escape(cfg->mqtt_username, mqtt_user, sizeof(mqtt_user));
     html_escape(cfg->mqtt_base_topic, mqtt_topic, sizeof(mqtt_topic));
+    html_escape(cfg->panel_id, panel_id, sizeof(panel_id));
     html_escape(cfg->ha_tapo_entity, ha_tapo, sizeof(ha_tapo));
     html_escape(cfg->ha_overhead_entity, ha_overhead, sizeof(ha_overhead));
     html_escape(cfg->ha_fan_entity, ha_fan, sizeof(ha_fan));
@@ -273,11 +297,14 @@ static esp_err_t root_handler(httpd_req_t *req)
              "<section class='card full'><h2>MQTT</h2>"
              "<div class='row'><div><label>Broker URI</label><input name='mqtt_uri' maxlength='191' value=\"%s\" placeholder='mqtt://192.168.1.2'></div>"
              "<div><label>Base topic</label><input name='mqtt_base_topic' maxlength='127' value=\"%s\"></div></div>"
+             "<div class='row'><div><label>Panel ID</label><input name='panel_id' maxlength='31' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
+             "<div><label>Effective topic root</label><input value=\"%s/%s\" readonly></div></div>"
+             "<div class='hint'>Each panel must have a unique ID. Fresh panels default to a stable ID derived from their MAC address, so multiple panels can share one broker and one base topic safely.</div>"
              "<div class='row'><div><label>Username</label><input name='mqtt_username' maxlength='63' value=\"%s\" autocomplete='off'></div>"
              "<div><label>Password</label><input name='mqtt_password' type='password' maxlength='127' placeholder='Leave blank to keep current password' autocomplete='new-password'></div></div>"
              "<label class='check'><input type='checkbox' name='clear_mqtt_password' value='1'>Clear saved MQTT password</label>"
              "</section>",
-             mqtt_uri, mqtt_topic, mqtt_user);
+             mqtt_uri, mqtt_topic, panel_id, mqtt_topic, panel_id, mqtt_user);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
@@ -377,6 +404,7 @@ static esp_err_t save_handler(httpd_req_t *req)
     form_get(body, "mqtt_uri", updated.mqtt_uri, sizeof(updated.mqtt_uri));
     form_get(body, "mqtt_username", updated.mqtt_username, sizeof(updated.mqtt_username));
     form_get(body, "mqtt_base_topic", updated.mqtt_base_topic, sizeof(updated.mqtt_base_topic));
+    form_get(body, "panel_id", updated.panel_id, sizeof(updated.panel_id));
     form_get(body, "ha_tapo_entity", updated.ha_tapo_entity, sizeof(updated.ha_tapo_entity));
     form_get(body, "ha_overhead_entity", updated.ha_overhead_entity, sizeof(updated.ha_overhead_entity));
     form_get(body, "ha_fan_entity", updated.ha_fan_entity, sizeof(updated.ha_fan_entity));
@@ -403,6 +431,15 @@ static esp_err_t save_handler(httpd_req_t *req)
         if (backlight >= 0 && backlight <= 100) {
             updated.backlight_percent = (uint8_t)backlight;
         }
+    }
+
+    if (!valid_panel_id(updated.panel_id)) {
+        free(body);
+        httpd_resp_send_err(
+            req,
+            HTTPD_400_BAD_REQUEST,
+            "Invalid panel ID. Use 1-31 lowercase letters, digits, '-' or '_'.");
+        return ESP_OK;
     }
 
     if (!valid_home_assistant_targets(&updated)) {
