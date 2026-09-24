@@ -129,6 +129,68 @@ static bool form_has(const char *body, const char *key)
     return form_get(body, key, tmp, sizeof(tmp));
 }
 
+static bool valid_entity_syntax(const char *value)
+{
+    if (!value || value[0] == '\0') {
+        return true;
+    }
+
+    const char *dot = strchr(value, '.');
+    if (!dot || dot == value || dot[1] == '\0' || strchr(dot + 1, '.')) {
+        return false;
+    }
+
+    for (const char *p = value; *p; ++p) {
+        if (*p == '.') {
+            continue;
+        }
+        if ((*p >= 'a' && *p <= 'z') ||
+            (*p >= '0' && *p <= '9') ||
+            *p == '_') {
+            continue;
+        }
+        return false;
+    }
+
+    return true;
+}
+
+static bool entity_domain_is(const char *value, const char *domain)
+{
+    if (!value || value[0] == '\0') {
+        return true;
+    }
+
+    size_t len = strlen(domain);
+    return strncmp(value, domain, len) == 0 && value[len] == '.';
+}
+
+static bool valid_home_assistant_targets(const panel_settings_t *cfg)
+{
+    if (!valid_entity_syntax(cfg->ha_tapo_entity) ||
+        !valid_entity_syntax(cfg->ha_overhead_entity) ||
+        !valid_entity_syntax(cfg->ha_fan_entity) ||
+        !valid_entity_syntax(cfg->ha_echo_entity) ||
+        !valid_entity_syntax(cfg->ha_echo_announce_script)) {
+        return false;
+    }
+
+    if (!entity_domain_is(cfg->ha_tapo_entity, "light") ||
+        !entity_domain_is(cfg->ha_overhead_entity, "light") ||
+        !entity_domain_is(cfg->ha_echo_entity, "media_player") ||
+        !entity_domain_is(cfg->ha_echo_announce_script, "script")) {
+        return false;
+    }
+
+    if (cfg->ha_fan_entity[0] != '\0' &&
+        !entity_domain_is(cfg->ha_fan_entity, "fan") &&
+        !entity_domain_is(cfg->ha_fan_entity, "switch")) {
+        return false;
+    }
+
+    return true;
+}
+
 static esp_err_t send_chunk(httpd_req_t *req, const char *text)
 {
     return httpd_resp_send_chunk(req, text, HTTPD_RESP_USE_STRLEN);
@@ -139,10 +201,16 @@ static esp_err_t root_handler(httpd_req_t *req)
     const panel_settings_t *cfg = settings_get();
 
     char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], timezone[224];
+    char ha_tapo[160], ha_overhead[160], ha_fan[160], ha_echo[160], ha_announce[160];
     html_escape(cfg->wifi_ssid, ssid, sizeof(ssid));
     html_escape(cfg->mqtt_uri, mqtt_uri, sizeof(mqtt_uri));
     html_escape(cfg->mqtt_username, mqtt_user, sizeof(mqtt_user));
     html_escape(cfg->mqtt_base_topic, mqtt_topic, sizeof(mqtt_topic));
+    html_escape(cfg->ha_tapo_entity, ha_tapo, sizeof(ha_tapo));
+    html_escape(cfg->ha_overhead_entity, ha_overhead, sizeof(ha_overhead));
+    html_escape(cfg->ha_fan_entity, ha_fan, sizeof(ha_fan));
+    html_escape(cfg->ha_echo_entity, ha_echo, sizeof(ha_echo));
+    html_escape(cfg->ha_echo_announce_script, ha_announce, sizeof(ha_announce));
     html_escape(cfg->timezone, timezone, sizeof(timezone));
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -212,6 +280,26 @@ static esp_err_t root_handler(httpd_req_t *req)
              mqtt_uri, mqtt_topic, mqtt_user);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
+    snprintf(buf, sizeof(buf),
+             "<section class='card full'><h2>Home Assistant targets</h2>"
+             "<div class='hint'>Mosquitto transports MQTT messages but does not expose Home Assistant's entity registry. "
+             "Enter the entity IDs shown in Home Assistant. The included MQTT bridge automation translates panel commands into Home Assistant actions.</div>"
+             "<div class='row'><div><label>Tapo LED strips</label>"
+             "<input name='ha_tapo_entity' maxlength='127' value=\"%s\" placeholder='light.tapo_led_strips' autocapitalize='none' spellcheck='false'></div>"
+             "<div><label>Overhead light</label>"
+             "<input name='ha_overhead_entity' maxlength='127' value=\"%s\" placeholder='light.office_overhead' autocapitalize='none' spellcheck='false'></div></div>"
+             "<div class='row'><div><label>Ceiling fan / switch</label>"
+             "<input name='ha_fan_entity' maxlength='127' value=\"%s\" placeholder='fan.office_fan or switch.office_fan' autocapitalize='none' spellcheck='false'></div>"
+             "<div><label>Echo / media player</label>"
+             "<input name='ha_echo_entity' maxlength='127' value=\"%s\" placeholder='media_player.office_echo' autocapitalize='none' spellcheck='false'></div></div>"
+             "<label>Echo announcement script (optional)</label>"
+             "<input name='ha_echo_announce_script' maxlength='127' value=\"%s\" placeholder='script.office_echo_announce' autocapitalize='none' spellcheck='false'>"
+             "<div class='hint'>Leave a field blank to leave that control unmapped. Light controls require light.*, Echo requires media_player.*, "
+             "fan accepts fan.* or switch.*, and the optional announcement action requires script.*.</div>"
+             "</section>",
+             ha_tapo, ha_overhead, ha_fan, ha_echo, ha_announce);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "</div><div class='actions'><button type='submit'>Save &amp; reboot</button>"
         "<button class='secondary' type='button' onclick=\"location.reload()\">Reload</button>"
@@ -277,6 +365,12 @@ static esp_err_t save_handler(httpd_req_t *req)
     form_get(body, "mqtt_uri", updated.mqtt_uri, sizeof(updated.mqtt_uri));
     form_get(body, "mqtt_username", updated.mqtt_username, sizeof(updated.mqtt_username));
     form_get(body, "mqtt_base_topic", updated.mqtt_base_topic, sizeof(updated.mqtt_base_topic));
+    form_get(body, "ha_tapo_entity", updated.ha_tapo_entity, sizeof(updated.ha_tapo_entity));
+    form_get(body, "ha_overhead_entity", updated.ha_overhead_entity, sizeof(updated.ha_overhead_entity));
+    form_get(body, "ha_fan_entity", updated.ha_fan_entity, sizeof(updated.ha_fan_entity));
+    form_get(body, "ha_echo_entity", updated.ha_echo_entity, sizeof(updated.ha_echo_entity));
+    form_get(body, "ha_echo_announce_script", updated.ha_echo_announce_script,
+             sizeof(updated.ha_echo_announce_script));
     form_get(body, "timezone", updated.timezone, sizeof(updated.timezone));
 
     if (form_has(body, "clear_mqtt_password")) {
@@ -297,6 +391,15 @@ static esp_err_t save_handler(httpd_req_t *req)
         if (backlight >= 0 && backlight <= 100) {
             updated.backlight_percent = (uint8_t)backlight;
         }
+    }
+
+    if (!valid_home_assistant_targets(&updated)) {
+        free(body);
+        httpd_resp_send_err(
+            req,
+            HTTPD_400_BAD_REQUEST,
+            "Invalid Home Assistant entity ID or entity domain");
+        return ESP_OK;
     }
 
     free(body);
