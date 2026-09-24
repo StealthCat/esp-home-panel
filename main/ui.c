@@ -10,7 +10,6 @@
 #include "esp_heap_caps.h"
 #include "esp_lvgl_port.h"
 #include "board_7c.h"
-#include "artwork.h"
 #include "lvgl.h"
 #include "mqtt_bridge.h"
 #include "ui_theme.h"
@@ -23,8 +22,7 @@ static const char *TAG = "ui";
 static const panel_theme_t *T;
 
 static lv_display_t *s_disp;
-static bool s_artwork_mode = true;
-static lv_obj_t *s_artwork_image;
+static bool s_artwork_mode = false;
 
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_mqtt_dot;
@@ -69,49 +67,6 @@ static lv_style_t s_button_pressed_style;
 static inline lv_color_t c(uint32_t hex)
 {
     return lv_color_hex(hex);
-}
-
-static void create_artwork_background(lv_obj_t *root)
-{
-    const lv_image_dsc_t *art = artwork_get_active_image();
-    if (!art || !art->data || art->data_size == 0) {
-        ESP_LOGW(TAG, "No native artwork image available; using LVGL fallback");
-        s_artwork_mode = false;
-        return;
-    }
-
-    if (art->header.magic != LV_IMAGE_HEADER_MAGIC ||
-        art->header.cf != LV_COLOR_FORMAT_RGB565 ||
-        art->header.w != PANEL_H_RES ||
-        art->header.h != PANEL_V_RES ||
-        art->header.stride != PANEL_H_RES * 2) {
-        ESP_LOGE(TAG,
-                 "Artwork descriptor mismatch: magic=0x%02X cf=%u %ux%u stride=%u",
-                 (unsigned)art->header.magic,
-                 (unsigned)art->header.cf,
-                 (unsigned)art->header.w,
-                 (unsigned)art->header.h,
-                 (unsigned)art->header.stride);
-        s_artwork_mode = false;
-        return;
-    }
-
-    s_artwork_image = lv_image_create(root);
-    if (!s_artwork_image) {
-        ESP_LOGE(TAG, "Unable to create artwork image object");
-        s_artwork_mode = false;
-        return;
-    }
-
-    lv_image_set_src(s_artwork_image, art);
-    lv_obj_set_pos(s_artwork_image, 0, 0);
-    lv_obj_set_size(s_artwork_image, PANEL_H_RES, PANEL_V_RES);
-    lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_remove_flag(s_artwork_image, LV_OBJ_FLAG_SCROLLABLE);
-
-    s_artwork_mode = true;
-    ESP_LOGI(TAG, "Loaded %u-byte native RGB565 artwork background",
-             (unsigned)art->data_size);
 }
 
 static void style_screen(lv_obj_t *screen)
@@ -869,7 +824,7 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
     const lvgl_port_display_cfg_t disp_cfg = {
         .panel_handle = panel,
         .buffer_size = PANEL_H_RES * PANEL_V_RES,
-        .double_buffer = false,
+        .double_buffer = true,
         .hres = PANEL_H_RES,
         .vres = PANEL_V_RES,
         .monochrome = false,
@@ -881,8 +836,9 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
         },
         .flags = {
             .buff_dma = false,
-            .buff_spiram = false,
-            .direct_mode = true,
+            .buff_spiram = true,
+            .full_refresh = true,
+            .direct_mode = false,
             .swap_bytes = false,
         },
     };
@@ -912,15 +868,14 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
     style_screen(root);
 
     /*
-     * Determine whether artwork rendering is usable before initializing
-     * styles, because style opacity depends on s_artwork_mode.
+     * The previous full-screen raster assets were complete UI mockups rather
+     * than background-only art. Drawing live LVGL controls over those images
+     * duplicated switches, sliders, labels, and status graphics. Render the
+     * entire interface natively so every visible control has one owner.
      */
-    create_artwork_background(root);
+    s_artwork_mode = false;
     init_styles();
-
-    if (!s_artwork_mode) {
-        add_theme_decor(root);
-    }
+    add_theme_decor(root);
     create_header(root);
     create_tapo_card(root);
     create_overhead_card(root);
