@@ -5,7 +5,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "esp_event.h"
+#include "esp_check.h"\n#include "esp_event.h"
 #include "esp_log.h"
 #include "esp_mac.h"
 #include "esp_netif.h"
@@ -154,9 +154,8 @@ esp_err_t network_start(void)
         IP_EVENT, IP_EVENT_STA_GOT_IP, wifi_event_handler, NULL));
 
     if (settings->wifi_ssid[0] == '\0') {
-        ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_AP));
-        ESP_ERROR_CHECK(esp_wifi_start());
-        return configure_config_ap(false);
+        ESP_RETURN_ON_ERROR(configure_config_ap(false), TAG, "Setup AP configuration failed");
+        return esp_wifi_start();
     }
 
     wifi_config_t sta_cfg = {0};
