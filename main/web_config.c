@@ -150,7 +150,7 @@ static esp_err_t root_handler(httpd_req_t *req)
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, PAGE_HEAD));
 
-    char buf[1024];
+    char buf[2048];
     const char *ip = network_get_sta_ip();
     snprintf(buf, sizeof(buf),
              "<div class='top'><div><h1>ESP Home Panel</h1>"
@@ -234,7 +234,7 @@ static esp_err_t read_request_body(httpd_req_t *req, char **out_body)
         return ESP_ERR_NO_MEM;
     }
 
-    int received = 0;
+    size_t received = 0;
     while (received < req->content_len) {
         int n = httpd_req_recv(req, body + received, req->content_len - received);
         if (n == HTTPD_SOCK_ERR_TIMEOUT) {
@@ -244,7 +244,7 @@ static esp_err_t read_request_body(httpd_req_t *req, char **out_body)
             free(body);
             return ESP_FAIL;
         }
-        received += n;
+        received += (size_t)n;
     }
 
     body[received] = '\0';
@@ -353,7 +353,7 @@ esp_err_t web_config_start(void)
 
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 8;
-    config.stack_size = 6144;
+    config.stack_size = 8192;
     config.lru_purge_enable = true;
 
     esp_err_t err = httpd_start(&s_server, &config);
