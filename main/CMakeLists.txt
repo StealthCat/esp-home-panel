@@ -8,7 +8,6 @@ idf_component_register(
         "mqtt_bridge.c"
         "ui.c"
         "ui_theme.c"
-        "artwork.c"
         "wokwi_panel.c"
     INCLUDE_DIRS "."
     REQUIRES
