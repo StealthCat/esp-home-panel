@@ -21,8 +21,8 @@ void mqtt_bridge_overhead_brightness(uint8_t percent);
 void mqtt_bridge_fan_power(bool on);
 
 void mqtt_bridge_echo_volume(uint8_t percent);
-void mqtt_bridge_echo_mute(bool muted);
-void mqtt_bridge_echo_play_pause(void);
+void mqtt_bridge_echo_mute(bool muted, uint8_t target_volume);
+void mqtt_bridge_echo_play_pause(bool playing);
 void mqtt_bridge_echo_announce(void);
 
 #ifdef __cplusplus
