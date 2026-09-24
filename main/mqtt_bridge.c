@@ -5,9 +5,10 @@
 #include <string.h>
 
 #include "cJSON.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "mqtt_client.h"
-#include "sdkconfig.h"
+#include "settings.h"
 #include "ui.h"
 
 static const char *TAG = "mqtt_bridge";
@@ -15,22 +16,18 @@ static const char *TAG = "mqtt_bridge";
 static esp_mqtt_client_handle_t s_client;
 static bool s_connected;
 
-/*
- * MQTT topics are compile-time strings. Keeping them in read-only storage
- * avoids reserving ten 160-byte buffers in scarce internal DRAM (.bss).
- */
-static const char s_topic_state_tapo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/tapo";
-static const char s_topic_state_overhead[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/overhead";
-static const char s_topic_state_fan[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/fan";
-static const char s_topic_state_echo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/state/echo";
+static char *s_topic_state_tapo;
+static char *s_topic_state_overhead;
+static char *s_topic_state_fan;
+static char *s_topic_state_echo;
 
-static const char s_topic_cmd_tapo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/tapo";
-static const char s_topic_cmd_overhead[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/overhead";
-static const char s_topic_cmd_fan[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/fan";
-static const char s_topic_cmd_echo[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/cmd/echo";
+static char *s_topic_cmd_tapo;
+static char *s_topic_cmd_overhead;
+static char *s_topic_cmd_fan;
+static char *s_topic_cmd_echo;
 
-static const char s_topic_availability[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/availability";
-static const char s_topic_request_state[] = CONFIG_PANEL_MQTT_BASE_TOPIC "/request_state";
+static char *s_topic_availability;
+static char *s_topic_request_state;
 
 static uint8_t clamp_pct(int value)
 {
@@ -46,8 +43,48 @@ static uint8_t clamp_u8(int value)
     return (uint8_t)value;
 }
 
+static char *make_topic(const char *base, const char *suffix)
+{
+    size_t len = strlen(base) + strlen(suffix) + 1;
+    char *topic = heap_caps_malloc(len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!topic) {
+        topic = malloc(len);
+    }
+    if (!topic) {
+        return NULL;
+    }
+
+    snprintf(topic, len, "%s%s", base, suffix);
+    return topic;
+}
+
+static esp_err_t build_topics(const char *base)
+{
+#define MAKE_TOPIC(dst, suffix) do { \
+        dst = make_topic(base, suffix); \
+        if (!dst) return ESP_ERR_NO_MEM; \
+    } while (0)
+
+    MAKE_TOPIC(s_topic_state_tapo, "/state/tapo");
+    MAKE_TOPIC(s_topic_state_overhead, "/state/overhead");
+    MAKE_TOPIC(s_topic_state_fan, "/state/fan");
+    MAKE_TOPIC(s_topic_state_echo, "/state/echo");
+
+    MAKE_TOPIC(s_topic_cmd_tapo, "/cmd/tapo");
+    MAKE_TOPIC(s_topic_cmd_overhead, "/cmd/overhead");
+    MAKE_TOPIC(s_topic_cmd_fan, "/cmd/fan");
+    MAKE_TOPIC(s_topic_cmd_echo, "/cmd/echo");
+
+    MAKE_TOPIC(s_topic_availability, "/availability");
+    MAKE_TOPIC(s_topic_request_state, "/request_state");
+
+#undef MAKE_TOPIC
+    return ESP_OK;
+}
+
 static bool topic_equals(const esp_mqtt_event_handle_t event, const char *expected)
 {
+    if (!expected) return false;
     size_t len = strlen(expected);
     return event->topic_len == (int)len && memcmp(event->topic, expected, len) == 0;
 }
@@ -147,10 +184,23 @@ static void publish_json(const char *topic, const char *json)
 
 esp_err_t mqtt_bridge_start(void)
 {
+    const panel_settings_t *settings = settings_get();
+
+    if (settings->mqtt_uri[0] == '\0') {
+        ESP_LOGW(TAG, "MQTT URI is empty; MQTT disabled");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = build_topics(settings->mqtt_base_topic);
+    if (err != ESP_OK) {
+        return err;
+    }
+
     const esp_mqtt_client_config_t cfg = {
-        .broker.address.uri = CONFIG_PANEL_MQTT_URI,
-        .credentials.username = CONFIG_PANEL_MQTT_USERNAME[0] ? CONFIG_PANEL_MQTT_USERNAME : NULL,
-        .credentials.authentication.password = CONFIG_PANEL_MQTT_PASSWORD[0] ? CONFIG_PANEL_MQTT_PASSWORD : NULL,
+        .broker.address.uri = settings->mqtt_uri,
+        .credentials.username = settings->mqtt_username[0] ? settings->mqtt_username : NULL,
+        .credentials.authentication.password =
+            settings->mqtt_password[0] ? settings->mqtt_password : NULL,
         .session.last_will = {
             .topic = s_topic_availability,
             .msg = "offline",
@@ -165,7 +215,8 @@ esp_err_t mqtt_bridge_start(void)
         return ESP_ERR_NO_MEM;
     }
 
-    ESP_ERROR_CHECK(esp_mqtt_client_register_event(s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL));
+    ESP_ERROR_CHECK(esp_mqtt_client_register_event(
+        s_client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL));
     return esp_mqtt_client_start(s_client);
 }
 
