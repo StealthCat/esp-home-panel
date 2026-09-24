@@ -14,6 +14,7 @@ extern "C" {
 #define PANEL_MQTT_USERNAME_MAX   63
 #define PANEL_MQTT_PASSWORD_MAX   127
 #define PANEL_MQTT_BASE_TOPIC_MAX 127
+#define PANEL_ID_MAX              31
 #define PANEL_HA_ENTITY_ID_MAX    127
 #define PANEL_TIMEZONE_MAX        95
 
@@ -25,6 +26,12 @@ typedef struct {
     char mqtt_username[PANEL_MQTT_USERNAME_MAX + 1];
     char mqtt_password[PANEL_MQTT_PASSWORD_MAX + 1];
     char mqtt_base_topic[PANEL_MQTT_BASE_TOPIC_MAX + 1];
+
+    /*
+     * Unique MQTT namespace segment for this physical panel. Defaults to a
+     * stable value derived from the Wi-Fi STA MAC address.
+     */
+    char panel_id[PANEL_ID_MAX + 1];
 
     /*
      * Existing Home Assistant entities controlled through the MQTT bridge.
