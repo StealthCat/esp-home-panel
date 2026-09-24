@@ -2,7 +2,7 @@
 
 #include <string.h>
 
-#include "esp_log.h"
+#include "esp_heap_caps.h"\n#include "esp_log.h"
 #include "nvs.h"
 #include "sdkconfig.h"
 
@@ -57,7 +57,12 @@ static void load_string(nvs_handle_t nvs, const char *key, char *dst, size_t dst
 
 esp_err_t settings_init(void)
 {
-    load_defaults(&s_settings);
+    esp_err_t storage_err = ensure_storage();
+    if (storage_err != ESP_OK) {
+        return storage_err;
+    }
+
+    load_defaults(s_settings);
 
     nvs_handle_t nvs;
     esp_err_t err = nvs_open(NAMESPACE, NVS_READONLY, &nvs);
@@ -70,20 +75,20 @@ esp_err_t settings_init(void)
         return err;
     }
 
-    load_string(nvs, "wifi_ssid", s_settings.wifi_ssid, sizeof(s_settings.wifi_ssid));
-    load_string(nvs, "wifi_pass", s_settings.wifi_password, sizeof(s_settings.wifi_password));
-    load_string(nvs, "mqtt_uri", s_settings.mqtt_uri, sizeof(s_settings.mqtt_uri));
-    load_string(nvs, "mqtt_user", s_settings.mqtt_username, sizeof(s_settings.mqtt_username));
-    load_string(nvs, "mqtt_pass", s_settings.mqtt_password, sizeof(s_settings.mqtt_password));
-    load_string(nvs, "mqtt_topic", s_settings.mqtt_base_topic, sizeof(s_settings.mqtt_base_topic));
-    load_string(nvs, "timezone", s_settings.timezone, sizeof(s_settings.timezone));
+    load_string(nvs, "wifi_ssid", s_settings->wifi_ssid, sizeof(s_settings->wifi_ssid));
+    load_string(nvs, "wifi_pass", s_settings->wifi_password, sizeof(s_settings->wifi_password));
+    load_string(nvs, "mqtt_uri", s_settings->mqtt_uri, sizeof(s_settings->mqtt_uri));
+    load_string(nvs, "mqtt_user", s_settings->mqtt_username, sizeof(s_settings->mqtt_username));
+    load_string(nvs, "mqtt_pass", s_settings->mqtt_password, sizeof(s_settings->mqtt_password));
+    load_string(nvs, "mqtt_topic", s_settings->mqtt_base_topic, sizeof(s_settings->mqtt_base_topic));
+    load_string(nvs, "timezone", s_settings->timezone, sizeof(s_settings->timezone));
 
     uint8_t value = 0;
     if (nvs_get_u8(nvs, "theme", &value) == ESP_OK && value <= 3) {
-        s_settings.theme = value;
+        s_settings->theme = value;
     }
     if (nvs_get_u8(nvs, "backlight", &value) == ESP_OK && value <= 100) {
-        s_settings.backlight_percent = value;
+        s_settings->backlight_percent = value;
     }
 
     nvs_close(nvs);
@@ -95,17 +100,25 @@ esp_err_t settings_init(void)
 
 const panel_settings_t *settings_get(void)
 {
+    if (!s_settings && ensure_storage() != ESP_OK) {
+        return NULL;
+    }
     if (!s_initialized) {
-        load_defaults(&s_settings);
+        load_defaults(s_settings);
         s_initialized = true;
     }
-    return &s_settings;
+    return s_settings;
 }
 
 esp_err_t settings_save(const panel_settings_t *settings)
 {
     if (!settings) {
         return ESP_ERR_INVALID_ARG;
+    }
+
+    esp_err_t storage_err = ensure_storage();
+    if (storage_err != ESP_OK) {
+        return storage_err;
     }
 
     panel_settings_t clean = *settings;
@@ -152,7 +165,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
 
     err = nvs_commit(nvs);
     if (err == ESP_OK) {
-        s_settings = clean;
+        *s_settings = clean;
         s_initialized = true;
     }
 
@@ -163,6 +176,11 @@ out:
 
 esp_err_t settings_reset(void)
 {
+    esp_err_t storage_err = ensure_storage();
+    if (storage_err != ESP_OK) {
+        return storage_err;
+    }
+
     nvs_handle_t nvs;
     esp_err_t err = nvs_open(NAMESPACE, NVS_READWRITE, &nvs);
     if (err != ESP_OK) {
@@ -176,7 +194,7 @@ esp_err_t settings_reset(void)
     nvs_close(nvs);
 
     if (err == ESP_OK) {
-        load_defaults(&s_settings);
+        load_defaults(s_settings);
         s_initialized = true;
     }
     return err;
