@@ -103,15 +103,6 @@ automation:
     mode: parallel
     max: 64
     triggers:
-      # Shallow runtime base, e.g. home/panel-a3ffa0/...
-      - trigger: mqtt
-        topic: "home/+/cmd/+"
-        id: command
-      - trigger: mqtt
-        topic: "home/+/request_state"
-        id: request_state
-
-      # Default firmware runtime base, e.g. home/7c-panel/panel-a3ffa0/...
       - trigger: mqtt
         topic: "home/7c-panel/+/cmd/+"
         id: command
