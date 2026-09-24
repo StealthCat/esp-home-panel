@@ -624,8 +624,8 @@ static void create_tapo_card(lv_obj_t *root)
         lv_obj_set_style_bg_color(btn, c(colors[i]), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(btn, 0, 0);
-        lv_obj_set_style_shadow_width(btn, 5, 0);
-        lv_obj_set_style_shadow_opa(btn, 80, 0);
+        lv_obj_set_style_shadow_width(btn, 3, 0);
+        lv_obj_set_style_shadow_opa(btn, 55, 0);
         lv_obj_add_event_cb(btn, preset_color_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)payloads[i]);
     }
 
@@ -636,7 +636,7 @@ static void create_tapo_card(lv_obj_t *root)
     lv_obj_add_event_cb(s_tapo_slider, tapo_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_tapo_slider, tapo_brightness_cb, LV_EVENT_RELEASED, NULL);
 
-    s_tapo_pct = make_label(card, "0%", 328, 139, &lv_font_montserrat_16, T->text);
+    s_tapo_pct = make_label(card, "--%", 328, 139, &lv_font_montserrat_16, T->text);
 
     if (T->kittens) {
         add_paw(card, 282, 48, T->accent, 80);
@@ -660,7 +660,7 @@ static void create_overhead_card(lv_obj_t *root)
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_RELEASED, NULL);
 
-    s_overhead_pct = make_label(card, "0%", 310, 106, &lv_font_montserrat_16, T->text);
+    s_overhead_pct = make_label(card, "--%", 310, 106, &lv_font_montserrat_16, T->text);
 
     const int pcts[4] = {25, 50, 75, 100};
     for (int i = 0; i < 4; ++i) {
@@ -737,11 +737,11 @@ static void create_fan_card(lv_obj_t *root)
 
     s_fan_icon = create_fan_graphic(card, 25, 65);
 
-    s_fan_switch = make_switch(card, 248, 72);
+    s_fan_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    s_fan_state_label = make_label(card, "Fan is Off", 237, 116, &lv_font_montserrat_18, T->text);
-    make_label(card, "Smart Switch", 237, 143, &lv_font_montserrat_14, T->muted);
+    s_fan_state_label = make_label(card, "Fan is Off", 230, 116, &lv_font_montserrat_18, T->text);
+    make_label(card, "Smart Switch", 230, 143, &lv_font_montserrat_14, T->muted);
 
     if (T->soccer) {
         lv_obj_t *line = lv_obj_create(card);
@@ -792,7 +792,7 @@ static void create_echo_card(lv_obj_t *root)
     s_echo_slider = make_slider(card, 50, 112, 250, T->accent);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_RELEASED, NULL);
-    s_echo_pct = make_label(card, "0%", 310, 108, &lv_font_montserrat_16, T->text);
+    s_echo_pct = make_label(card, "--%", 310, 108, &lv_font_montserrat_16, T->text);
 
     s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 143, 94, 40);
     lv_obj_add_event_cb(s_echo_mute, echo_mute_cb, LV_EVENT_CLICKED, NULL);
