@@ -351,20 +351,6 @@ static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
     add_decor_box(parent, x,      y + 11, 15, 10, color, 225, 7);
 }
 
-static void add_soccer_ball(lv_obj_t *parent, int x, int y, int size, lv_opa_t opa)
-{
-    add_circle(parent, x, y, size, 0xE8F5EC, opa);
-    int p = size / 4;
-    add_circle(parent, x + size / 2 - p / 2, y + size / 2 - p / 2, p,
-               0x0A2A18, opa);
-    const int dx[5] = {size / 2, size - p, size - p / 2, p / 2, 0};
-    const int dy[5] = {0, size / 3, size - p, size - p, size / 3};
-    for (int i = 0; i < 5; ++i) {
-        add_circle(parent, x + dx[i], y + dy[i], p, 0x123820,
-                   opa > 35 ? opa - 25 : opa);
-    }
-}
-
 static void add_magic_card_ornaments(lv_obj_t *card, int w, int h)
 {
     const uint32_t gold = T->accent_2;
