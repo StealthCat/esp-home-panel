@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "cJSON.h"
+#include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_timer.h"
