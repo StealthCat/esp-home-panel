@@ -9,6 +9,8 @@
 #include "esp_check.h"
 #include "esp_heap_caps.h"
 #include "esp_lvgl_port.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/portmacro.h"
 #include "board_7c.h"
 #include "lvgl.h"
 #include "mqtt_bridge.h"
@@ -59,6 +61,40 @@ static bool s_echo_playing;
 static bool s_echo_muted;
 static int s_fan_angle;
 static int s_wave_phase;
+
+enum {
+    UI_PENDING_NETWORK  = 1u << 0,
+    UI_PENDING_MQTT     = 1u << 1,
+    UI_PENDING_TAPO     = 1u << 2,
+    UI_PENDING_OVERHEAD = 1u << 3,
+    UI_PENDING_FAN      = 1u << 4,
+    UI_PENDING_ALEXA    = 1u << 5,
+};
+
+typedef struct {
+    uint32_t dirty;
+
+    bool network_online;
+    bool mqtt_online;
+
+    bool tapo_on;
+    uint8_t tapo_brightness;
+    uint8_t tapo_r;
+    uint8_t tapo_g;
+    uint8_t tapo_b;
+
+    bool overhead_on;
+    uint8_t overhead_brightness;
+
+    bool fan_on;
+
+    uint8_t alexa_volume;
+    bool alexa_muted;
+    bool alexa_playing;
+} pending_ui_state_t;
+
+static pending_ui_state_t s_pending_ui;
+static portMUX_TYPE s_pending_ui_mux = portMUX_INITIALIZER_UNLOCKED;
 
 static lv_style_t s_card_style;
 static lv_style_t s_button_style;
@@ -1054,6 +1090,91 @@ static void create_header(lv_obj_t *root)
     lv_obj_set_style_border_width(s_mqtt_dot, 0, 0);
 }
 
+static void pending_state_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+
+    pending_ui_state_t pending = {0};
+
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    if (s_pending_ui.dirty == 0) {
+        portEXIT_CRITICAL(&s_pending_ui_mux);
+        return;
+    }
+
+    pending = s_pending_ui;
+    s_pending_ui.dirty = 0;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
+
+    if ((pending.dirty & UI_PENDING_NETWORK) && s_wifi_icon) {
+        lv_obj_set_style_text_color(
+            s_wifi_icon,
+            c(pending.network_online ? T->online : T->muted),
+            0);
+    }
+
+    if ((pending.dirty & UI_PENDING_MQTT) && s_mqtt_dot) {
+        lv_obj_set_style_bg_color(
+            s_mqtt_dot,
+            c(pending.mqtt_online ? T->online : T->muted),
+            0);
+    }
+
+    if ((pending.dirty & UI_PENDING_TAPO) &&
+        s_tapo_switch && s_tapo_slider && s_tapo_pct) {
+        s_syncing = true;
+        set_switch(s_tapo_switch, pending.tapo_on);
+        lv_slider_set_value(
+            s_tapo_slider, pending.tapo_brightness, LV_ANIM_OFF);
+        set_percent_label(s_tapo_pct, pending.tapo_brightness);
+        lv_color_hsv_t hsv = lv_color_rgb_to_hsv(
+            pending.tapo_r, pending.tapo_g, pending.tapo_b);
+        colorwheel_position_knob(hsv.h, hsv.s);
+        s_syncing = false;
+    }
+
+    if ((pending.dirty & UI_PENDING_OVERHEAD) &&
+        s_overhead_switch && s_overhead_slider && s_overhead_pct) {
+        s_syncing = true;
+        set_switch(s_overhead_switch, pending.overhead_on);
+        lv_slider_set_value(
+            s_overhead_slider, pending.overhead_brightness, LV_ANIM_OFF);
+        set_percent_label(s_overhead_pct, pending.overhead_brightness);
+        s_syncing = false;
+    }
+
+    if ((pending.dirty & UI_PENDING_FAN) &&
+        s_fan_switch && s_fan_state_label && s_fan_icon) {
+        s_syncing = true;
+        s_fan_on = pending.fan_on;
+        set_switch(s_fan_switch, pending.fan_on);
+        lv_label_set_text(
+            s_fan_state_label,
+            pending.fan_on ? "Fan is On" : "Fan is Off");
+        lv_obj_set_style_shadow_opa(
+            s_fan_icon, pending.fan_on ? 100 : 20, 0);
+        s_syncing = false;
+    }
+
+    if ((pending.dirty & UI_PENDING_ALEXA) &&
+        s_echo_slider && s_echo_pct && s_echo_mute) {
+        s_syncing = true;
+        s_echo_muted = pending.alexa_muted;
+        s_echo_playing = pending.alexa_playing;
+        lv_slider_set_value(
+            s_echo_slider, pending.alexa_volume, LV_ANIM_OFF);
+        set_percent_label(s_echo_pct, pending.alexa_volume);
+        lv_obj_set_style_bg_color(
+            s_echo_mute,
+            c(pending.alexa_muted ? T->accent : T->card_bg_2),
+            0);
+        s_syncing = false;
+    }
+
+    ESP_LOGD(TAG, "Applied pending UI state mask=0x%02lx",
+             (unsigned long)pending.dirty);
+}
+
 static void clock_timer_cb(lv_timer_t *timer)
 {
     time_t now;
@@ -1189,6 +1310,7 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
     create_fan_card(root);
     create_echo_card(root);
 
+    lv_timer_create(pending_state_timer_cb, 20, NULL);
     lv_timer_create(clock_timer_cb, 1000, NULL);
     lv_timer_create(animation_timer_cb, 70, NULL);
     clock_timer_cb(NULL);
@@ -1200,71 +1322,55 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
 
 void ui_set_network_online(bool online)
 {
-    if (!s_wifi_icon || !lvgl_port_lock(50)) return;
-    lv_obj_set_style_text_color(s_wifi_icon, c(online ? T->online : T->muted), 0);
-    lvgl_port_unlock();
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    s_pending_ui.network_online = online;
+    s_pending_ui.dirty |= UI_PENDING_NETWORK;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
 }
 
 void ui_set_mqtt_online(bool online)
 {
-    if (!s_mqtt_dot || !lvgl_port_lock(50)) return;
-    lv_obj_set_style_bg_color(s_mqtt_dot, c(online ? T->online : T->muted), 0);
-    lvgl_port_unlock();
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    s_pending_ui.mqtt_online = online;
+    s_pending_ui.dirty |= UI_PENDING_MQTT;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
 }
 
 void ui_apply_tapo_state(bool on, uint8_t brightness, uint8_t r, uint8_t g, uint8_t b)
 {
-    if (!s_tapo_switch || !lvgl_port_lock(100)) return;
-
-    s_syncing = true;
-    set_switch(s_tapo_switch, on);
-    lv_slider_set_value(s_tapo_slider, brightness, LV_ANIM_ON);
-    set_percent_label(s_tapo_pct, brightness);
-    lv_color_hsv_t hsv = lv_color_rgb_to_hsv(r, g, b);
-    colorwheel_position_knob(hsv.h, hsv.s);
-    s_syncing = false;
-
-    lvgl_port_unlock();
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    s_pending_ui.tapo_on = on;
+    s_pending_ui.tapo_brightness = brightness;
+    s_pending_ui.tapo_r = r;
+    s_pending_ui.tapo_g = g;
+    s_pending_ui.tapo_b = b;
+    s_pending_ui.dirty |= UI_PENDING_TAPO;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
 }
 
 void ui_apply_overhead_state(bool on, uint8_t brightness)
 {
-    if (!s_overhead_switch || !lvgl_port_lock(100)) return;
-
-    s_syncing = true;
-    set_switch(s_overhead_switch, on);
-    lv_slider_set_value(s_overhead_slider, brightness, LV_ANIM_ON);
-    set_percent_label(s_overhead_pct, brightness);
-    s_syncing = false;
-
-    lvgl_port_unlock();
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    s_pending_ui.overhead_on = on;
+    s_pending_ui.overhead_brightness = brightness;
+    s_pending_ui.dirty |= UI_PENDING_OVERHEAD;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
 }
 
 void ui_apply_fan_state(bool on)
 {
-    if (!s_fan_switch || !lvgl_port_lock(100)) return;
-
-    s_syncing = true;
-    s_fan_on = on;
-    set_switch(s_fan_switch, on);
-    lv_label_set_text(s_fan_state_label, on ? "Fan is On" : "Fan is Off");
-    lv_obj_set_style_shadow_opa(s_fan_icon, on ? 100 : 20, 0);
-    s_syncing = false;
-
-    lvgl_port_unlock();
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    s_pending_ui.fan_on = on;
+    s_pending_ui.dirty |= UI_PENDING_FAN;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
 }
 
 void ui_apply_echo_state(uint8_t volume, bool muted, bool playing)
 {
-    if (!s_echo_slider || !lvgl_port_lock(100)) return;
-
-    s_syncing = true;
-    s_echo_muted = muted;
-    s_echo_playing = playing;
-    lv_slider_set_value(s_echo_slider, volume, LV_ANIM_ON);
-    set_percent_label(s_echo_pct, volume);
-    lv_obj_set_style_bg_color(s_echo_mute, c(muted ? T->accent : T->card_bg_2), 0);
-    s_syncing = false;
-
-    lvgl_port_unlock();
+    portENTER_CRITICAL(&s_pending_ui_mux);
+    s_pending_ui.alexa_volume = volume;
+    s_pending_ui.alexa_muted = muted;
+    s_pending_ui.alexa_playing = playing;
+    s_pending_ui.dirty |= UI_PENDING_ALEXA;
+    portEXIT_CRITICAL(&s_pending_ui_mux);
 }
