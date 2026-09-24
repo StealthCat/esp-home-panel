@@ -1100,15 +1100,17 @@ static void pending_state_timer_cb(lv_timer_t *timer)
     }
 
     if ((pending.dirty & UI_PENDING_FAN) &&
-        s_fan_switch && s_fan_state_label && s_fan_icon) {
+        s_fan_switch && s_fan_state_label) {
         s_syncing = true;
         s_fan_on = pending.fan_on;
         set_switch(s_fan_switch, pending.fan_on);
         lv_label_set_text(
             s_fan_state_label,
             pending.fan_on ? "Fan is On" : "Fan is Off");
-        lv_obj_set_style_shadow_opa(
-            s_fan_icon, pending.fan_on ? 100 : 20, 0);
+        if (s_fan_icon) {
+            lv_obj_set_style_shadow_opa(
+                s_fan_icon, pending.fan_on ? 100 : 20, 0);
+        }
         s_syncing = false;
     }
 
@@ -1124,6 +1126,16 @@ static void pending_state_timer_cb(lv_timer_t *timer)
             s_echo_mute,
             c(pending.alexa_muted ? T->accent : T->card_bg_2),
             0);
+
+        if (s_alexa_now_playing) {
+            lv_label_set_text(
+                s_alexa_now_playing,
+                pending.alexa_title[0] ? pending.alexa_title : "Nothing playing");
+        }
+        if (s_alexa_artist) {
+            lv_label_set_text(s_alexa_artist, pending.alexa_artist);
+        }
+
         s_syncing = false;
     }
 
@@ -1321,12 +1333,17 @@ void ui_apply_fan_state(bool on)
     portEXIT_CRITICAL(&s_pending_ui_mux);
 }
 
-void ui_apply_echo_state(uint8_t volume, bool muted, bool playing)
+void ui_apply_echo_state(uint8_t volume, bool muted, bool playing,
+                         const char *title, const char *artist)
 {
     portENTER_CRITICAL(&s_pending_ui_mux);
     s_pending_ui.alexa_volume = volume;
     s_pending_ui.alexa_muted = muted;
     s_pending_ui.alexa_playing = playing;
+    strlcpy(s_pending_ui.alexa_title, title ? title : "",
+            sizeof(s_pending_ui.alexa_title));
+    strlcpy(s_pending_ui.alexa_artist, artist ? artist : "",
+            sizeof(s_pending_ui.alexa_artist));
     s_pending_ui.dirty |= UI_PENDING_ALEXA;
     portEXIT_CRITICAL(&s_pending_ui_mux);
 }
