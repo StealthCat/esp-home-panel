@@ -1,16 +1,33 @@
 #include "settings.h"
 
+#include <stdlib.h>
 #include <string.h>
 
-#include "esp_heap_caps.h"\n#include "esp_log.h"
+#include "esp_heap_caps.h"
+#include "esp_log.h"
 #include "nvs.h"
 #include "sdkconfig.h"
 
 static const char *TAG = "settings";
 static const char *NAMESPACE = "panelcfg";
 
-static panel_settings_t s_settings;
+static panel_settings_t *s_settings;
 static bool s_initialized;
+
+static esp_err_t ensure_storage(void)
+{
+    if (s_settings) {
+        return ESP_OK;
+    }
+
+    s_settings = heap_caps_calloc(
+        1, sizeof(*s_settings), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_settings) {
+        s_settings = calloc(1, sizeof(*s_settings));
+    }
+
+    return s_settings ? ESP_OK : ESP_ERR_NO_MEM;
+}
 
 static uint8_t default_theme(void)
 {
@@ -57,15 +74,15 @@ static void load_string(nvs_handle_t nvs, const char *key, char *dst, size_t dst
 
 esp_err_t settings_init(void)
 {
-    esp_err_t storage_err = ensure_storage();
-    if (storage_err != ESP_OK) {
-        return storage_err;
+    esp_err_t err = ensure_storage();
+    if (err != ESP_OK) {
+        return err;
     }
 
     load_defaults(s_settings);
 
     nvs_handle_t nvs;
-    esp_err_t err = nvs_open(NAMESPACE, NVS_READONLY, &nvs);
+    err = nvs_open(NAMESPACE, NVS_READONLY, &nvs);
     if (err == ESP_ERR_NVS_NOT_FOUND) {
         s_initialized = true;
         ESP_LOGI(TAG, "No saved web configuration; using build defaults");
@@ -93,7 +110,6 @@ esp_err_t settings_init(void)
 
     nvs_close(nvs);
     s_initialized = true;
-
     ESP_LOGI(TAG, "Loaded saved panel configuration");
     return ESP_OK;
 }
@@ -103,10 +119,12 @@ const panel_settings_t *settings_get(void)
     if (!s_settings && ensure_storage() != ESP_OK) {
         return NULL;
     }
+
     if (!s_initialized) {
         load_defaults(s_settings);
         s_initialized = true;
     }
+
     return s_settings;
 }
 
@@ -116,9 +134,9 @@ esp_err_t settings_save(const panel_settings_t *settings)
         return ESP_ERR_INVALID_ARG;
     }
 
-    esp_err_t storage_err = ensure_storage();
-    if (storage_err != ESP_OK) {
-        return storage_err;
+    esp_err_t err = ensure_storage();
+    if (err != ESP_OK) {
+        return err;
     }
 
     panel_settings_t clean = *settings;
@@ -138,7 +156,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
     }
 
     nvs_handle_t nvs;
-    esp_err_t err = nvs_open(NAMESPACE, NVS_READWRITE, &nvs);
+    err = nvs_open(NAMESPACE, NVS_READWRITE, &nvs);
     if (err != ESP_OK) {
         return err;
     }
@@ -160,6 +178,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
 
     err = nvs_set_u8(nvs, "theme", clean.theme);
     if (err != ESP_OK) goto out;
+
     err = nvs_set_u8(nvs, "backlight", clean.backlight_percent);
     if (err != ESP_OK) goto out;
 
@@ -176,13 +195,13 @@ out:
 
 esp_err_t settings_reset(void)
 {
-    esp_err_t storage_err = ensure_storage();
-    if (storage_err != ESP_OK) {
-        return storage_err;
+    esp_err_t err = ensure_storage();
+    if (err != ESP_OK) {
+        return err;
     }
 
     nvs_handle_t nvs;
-    esp_err_t err = nvs_open(NAMESPACE, NVS_READWRITE, &nvs);
+    err = nvs_open(NAMESPACE, NVS_READWRITE, &nvs);
     if (err != ESP_OK) {
         return err;
     }
@@ -197,5 +216,6 @@ esp_err_t settings_reset(void)
         load_defaults(s_settings);
         s_initialized = true;
     }
+
     return err;
 }
