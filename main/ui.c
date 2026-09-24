@@ -114,6 +114,8 @@ static void init_styles(void)
     lv_style_set_transform_height(&s_button_pressed_style, -2);
 }
 
+static void add_magic_card_ornaments(lv_obj_t *card);
+
 static lv_obj_t *make_label(lv_obj_t *parent, const char *text, int x, int y,
                             const lv_font_t *font, uint32_t color)
 {
@@ -135,6 +137,9 @@ static lv_obj_t *make_card(lv_obj_t *parent, int x, int y, int w, int h)
     lv_obj_set_size(card, w, h);
     lv_obj_add_style(card, &s_card_style, 0);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+    if (T->magic) {
+        add_magic_card_ornaments(card);
+    }
     return card;
 }
 
@@ -267,6 +272,130 @@ static void add_paw(lv_obj_t *parent, int x, int y, uint32_t color, lv_opa_t opa
     add_circle(parent, x + 2, y + 2, 6, color, opa);
     add_circle(parent, x + 10, y, 6, color, opa);
     add_circle(parent, x + 18, y + 3, 6, color, opa);
+}
+
+static lv_obj_t *add_decor_box(lv_obj_t *parent, int x, int y, int w, int h,
+                               uint32_t color, lv_opa_t opa, int radius)
+{
+    lv_obj_t *obj = lv_obj_create(parent);
+    lv_obj_set_pos(obj, x, y);
+    lv_obj_set_size(obj, w, h);
+    lv_obj_set_style_radius(obj, radius, 0);
+    lv_obj_set_style_bg_color(obj, c(color), 0);
+    lv_obj_set_style_bg_opa(obj, opa, 0);
+    lv_obj_set_style_border_width(obj, 0, 0);
+    lv_obj_set_style_pad_all(obj, 0, 0);
+    lv_obj_remove_flag(obj, LV_OBJ_FLAG_SCROLLABLE);
+    return obj;
+}
+
+static void add_chain_icon(lv_obj_t *parent, int x, int y, uint32_t color)
+{
+    for (int i = 0; i < 2; ++i) {
+        lv_obj_t *link = lv_obj_create(parent);
+        lv_obj_set_pos(link, x + i * 13, y + (i ? 4 : 0));
+        lv_obj_set_size(link, 25, 12);
+        lv_obj_set_style_radius(link, 7, 0);
+        lv_obj_set_style_bg_opa(link, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(link, 3, 0);
+        lv_obj_set_style_border_color(link, c(color), 0);
+        lv_obj_set_style_border_opa(link, 235, 0);
+        lv_obj_set_style_pad_all(link, 0, 0);
+        lv_obj_set_style_transform_rotation(link, i ? 3250 : 350, 0);
+        lv_obj_remove_flag(link, LV_OBJ_FLAG_SCROLLABLE);
+    }
+}
+
+static void add_bulb_icon(lv_obj_t *parent, int x, int y, uint32_t color)
+{
+    add_circle(parent, x + 2, y, 22, color, 235);
+    add_decor_box(parent, x + 8, y + 21, 11, 8, color, 230, 2);
+    add_decor_box(parent, x + 10, y + 31, 7, 3, color, 190, 1);
+}
+
+static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
+{
+    add_circle(parent, x + 13, y + 13, 8, color, 240);
+    const int px[4] = {10, 22, 10, 0};
+    const int py[4] = {0, 10, 22, 10};
+    const int pw[4] = {10, 16, 10, 16};
+    const int ph[4] = {16, 10, 16, 10};
+    for (int i = 0; i < 4; ++i) {
+        add_decor_box(parent, x + px[i], y + py[i], pw[i], ph[i],
+                      color, 220, 8);
+    }
+}
+
+static void add_soccer_ball(lv_obj_t *parent, int x, int y, int size, lv_opa_t opa)
+{
+    add_circle(parent, x, y, size, 0xE8F5EC, opa);
+    int p = size / 4;
+    add_circle(parent, x + size / 2 - p / 2, y + size / 2 - p / 2, p,
+               0x0A2A18, opa);
+    const int dx[5] = {size / 2, size - p, size - p / 2, p / 2, 0};
+    const int dy[5] = {0, size / 3, size - p, size - p, size / 3};
+    for (int i = 0; i < 5; ++i) {
+        add_circle(parent, x + dx[i], y + dy[i], p, 0x123820,
+                   opa > 35 ? opa - 25 : opa);
+    }
+}
+
+static void add_magic_card_ornaments(lv_obj_t *card)
+{
+    const uint32_t gold = T->accent_2;
+    const int w = lv_obj_get_width(card);
+    const int h = lv_obj_get_height(card);
+
+    /* Four small gold corner brackets matching the original ornate frames. */
+    const int xs[4] = {7, w - 28, 7, w - 28};
+    const int ys[4] = {7, 7, h - 24, h - 24};
+    for (int i = 0; i < 4; ++i) {
+        add_decor_box(card, xs[i], ys[i], 21, 2, gold, 175, 1);
+        add_decor_box(card, xs[i], ys[i], 2, 17, gold, 175, 1);
+    }
+}
+
+static void add_lantern(lv_obj_t *parent, int x, int y)
+{
+    add_circle(parent, x + 3, y + 8, 34, T->warm, 38);
+    lv_obj_t *frame = lv_obj_create(parent);
+    lv_obj_set_pos(frame, x + 8, y + 7);
+    lv_obj_set_size(frame, 23, 38);
+    lv_obj_set_style_bg_color(frame, c(0x7B4A13), 0);
+    lv_obj_set_style_bg_opa(frame, 70, 0);
+    lv_obj_set_style_border_width(frame, 2, 0);
+    lv_obj_set_style_border_color(frame, c(T->accent_2), 0);
+    lv_obj_set_style_border_opa(frame, 230, 0);
+    lv_obj_set_style_radius(frame, 7, 0);
+    lv_obj_set_style_pad_all(frame, 0, 0);
+    add_circle(parent, x + 13, y + 17, 14, T->warm, 180);
+    add_decor_box(parent, x + 16, y + 2, 7, 6, T->accent_2, 220, 2);
+    add_decor_box(parent, x + 17, y + 45, 5, 7, T->accent_2, 210, 1);
+}
+
+static void add_owl_on_books(lv_obj_t *parent, int x, int y)
+{
+    /* Books */
+    add_decor_box(parent, x, y + 34, 62, 8, 0x7A4E2A, 220, 2);
+    add_decor_box(parent, x + 4, y + 42, 56, 7, 0x4B2E18, 220, 2);
+
+    /* Owl body and head */
+    add_decor_box(parent, x + 16, y + 15, 27, 25, 0xE8D9B8, 235, 12);
+    add_circle(parent, x + 13, y, 34, 0xF1E3C2, 240);
+    add_circle(parent, x + 18, y + 8, 9, 0xFFFFFF, 245);
+    add_circle(parent, x + 32, y + 8, 9, 0xFFFFFF, 245);
+    add_circle(parent, x + 21, y + 11, 4, 0x151A24, 250);
+    add_circle(parent, x + 35, y + 11, 4, 0x151A24, 250);
+    add_decor_box(parent, x + 27, y + 19, 7, 6, T->warm, 235, 2);
+}
+
+static void add_quill_and_ink(lv_obj_t *parent, int x, int y)
+{
+    lv_obj_t *quill = add_decor_box(parent, x + 17, y, 3, 42,
+                                    0xD9C6A0, 210, 2);
+    lv_obj_set_style_transform_rotation(quill, 250, 0);
+    add_decor_box(parent, x, y + 33, 24, 18, 0x251B2E, 230, 5);
+    add_decor_box(parent, x + 4, y + 29, 16, 7, T->accent_2, 190, 3);
 }
 
 static void add_cat_face(lv_obj_t *parent, int x, int y, uint32_t color, lv_opa_t opa)
