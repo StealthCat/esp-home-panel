@@ -1,0 +1,269 @@
+# ESP Home Panel -> Home Assistant MQTT bridge
+#
+# Install this as a Home Assistant package (for example
+# config/packages/esp_home_panel.yaml), or merge the script and automation
+# sections into your existing configuration.
+#
+# If the panel's MQTT base topic is not "home/7c-panel", replace that prefix
+# in the two MQTT trigger topics below. Response topics are derived
+# automatically from the incoming topic.
+#
+# The panel includes the configured Home Assistant entity_id in every command.
+# This bridge performs the Home Assistant action and publishes normalized state
+# back to the panel. State requests are also handled, allowing the panel to
+# refresh changes made elsewhere in Home Assistant.
+
+script:
+  esp_home_panel_publish_state:
+    alias: ESP Home Panel - publish entity state
+    description: Publish normalized Home Assistant state back to the ESP panel.
+    mode: parallel
+    max: 16
+    fields:
+      kind:
+        description: Panel control name (tapo, overhead, fan, or echo)
+      entity:
+        description: Home Assistant entity ID
+      base_topic:
+        description: ESP Home Panel MQTT base topic
+    sequence:
+      - choose:
+          - conditions: "{{ kind == 'tapo' and entity | length > 0 }}"
+            sequence:
+              - variables:
+                  rgb: "{{ state_attr(entity, 'rgb_color') or [255, 255, 255] }}"
+                  brightness_pct: >-
+                    {{ ((state_attr(entity, 'brightness') | int(0)) * 100 / 255)
+                       | round(0) | int }}
+              - action: mqtt.publish
+                data:
+                  topic: "{{ base_topic }}/state/tapo"
+                  payload: >-
+                    {{ {
+                      "on": is_state(entity, "on"),
+                      "brightness": brightness_pct | int,
+                      "r": rgb[0] | int,
+                      "g": rgb[1] | int,
+                      "b": rgb[2] | int
+                    } | to_json }}
+                  qos: 1
+                  retain: true
+
+          - conditions: "{{ kind == 'overhead' and entity | length > 0 }}"
+            sequence:
+              - variables:
+                  brightness_pct: >-
+                    {{ ((state_attr(entity, 'brightness') | int(0)) * 100 / 255)
+                       | round(0) | int }}
+              - action: mqtt.publish
+                data:
+                  topic: "{{ base_topic }}/state/overhead"
+                  payload: >-
+                    {{ {
+                      "on": is_state(entity, "on"),
+                      "brightness": brightness_pct | int
+                    } | to_json }}
+                  qos: 1
+                  retain: true
+
+          - conditions: "{{ kind == 'fan' and entity | length > 0 }}"
+            sequence:
+              - action: mqtt.publish
+                data:
+                  topic: "{{ base_topic }}/state/fan"
+                  payload: >-
+                    {{ {"on": is_state(entity, "on")} | to_json }}
+                  qos: 1
+                  retain: true
+
+          - conditions: "{{ kind == 'echo' and entity | length > 0 }}"
+            sequence:
+              - variables:
+                  volume_pct: >-
+                    {{ ((state_attr(entity, 'volume_level') | float(0)) * 100)
+                       | round(0) | int }}
+              - action: mqtt.publish
+                data:
+                  topic: "{{ base_topic }}/state/echo"
+                  payload: >-
+                    {{ {
+                      "volume": volume_pct | int,
+                      "muted": state_attr(entity, "is_volume_muted") | default(false, true),
+                      "playing": is_state(entity, "playing")
+                    } | to_json }}
+                  qos: 1
+                  retain: true
+
+automation:
+  - id: esp_home_panel_mqtt_bridge
+    alias: ESP Home Panel - MQTT bridge
+    description: Route ESP Home Panel MQTT commands to configured Home Assistant entities.
+    mode: queued
+    max: 20
+    triggers:
+      - trigger: mqtt
+        topic: "home/7c-panel/cmd/+"
+        id: command
+      - trigger: mqtt
+        topic: "home/7c-panel/request_state"
+        id: request_state
+
+    variables:
+      base_topic: >-
+        {% if '/cmd/' in trigger.topic %}
+          {{ trigger.topic.split('/cmd/')[0] }}
+        {% else %}
+          {{ trigger.topic.rsplit('/request_state', 1)[0] }}
+        {% endif %}
+      control: >-
+        {% if '/cmd/' in trigger.topic %}
+          {{ trigger.topic.split('/cmd/')[1] }}
+        {% else %}
+          request_state
+        {% endif %}
+      entity: >-
+        {% if trigger.id == 'command' %}
+          {{ trigger.payload_json.entity_id | default('', true) }}
+        {% else %}
+          {{ '' }}
+        {% endif %}
+      script_entity: >-
+        {% if trigger.id == 'command' %}
+          {{ trigger.payload_json.script_entity_id | default('', true) }}
+        {% else %}
+          {{ '' }}
+        {% endif %}
+
+    actions:
+      - choose:
+          - conditions: "{{ trigger.id == 'command' and control == 'tapo' and entity | length > 0 }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ 'on' in trigger.payload_json }}"
+                    sequence:
+                      - action: "{{ 'light.turn_on' if trigger.payload_json.on else 'light.turn_off' }}"
+                        target:
+                          entity_id: "{{ entity }}"
+                  - conditions: "{{ 'brightness' in trigger.payload_json }}"
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: "{{ entity }}"
+                        data:
+                          brightness_pct: "{{ trigger.payload_json.brightness | int }}"
+                  - conditions: >-
+                      {{ 'r' in trigger.payload_json and
+                         'g' in trigger.payload_json and
+                         'b' in trigger.payload_json }}
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: "{{ entity }}"
+                        data:
+                          rgb_color:
+                            - "{{ trigger.payload_json.r | int }}"
+                            - "{{ trigger.payload_json.g | int }}"
+                            - "{{ trigger.payload_json.b | int }}"
+              - delay:
+                  milliseconds: 150
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: tapo
+                  entity: "{{ entity }}"
+                  base_topic: "{{ base_topic }}"
+
+          - conditions: "{{ trigger.id == 'command' and control == 'overhead' and entity | length > 0 }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ 'on' in trigger.payload_json }}"
+                    sequence:
+                      - action: "{{ 'light.turn_on' if trigger.payload_json.on else 'light.turn_off' }}"
+                        target:
+                          entity_id: "{{ entity }}"
+                  - conditions: "{{ 'brightness' in trigger.payload_json }}"
+                    sequence:
+                      - action: light.turn_on
+                        target:
+                          entity_id: "{{ entity }}"
+                        data:
+                          brightness_pct: "{{ trigger.payload_json.brightness | int }}"
+              - delay:
+                  milliseconds: 150
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: overhead
+                  entity: "{{ entity }}"
+                  base_topic: "{{ base_topic }}"
+
+          - conditions: "{{ trigger.id == 'command' and control == 'fan' and entity | length > 0 }}"
+            sequence:
+              - action: "{{ 'homeassistant.turn_on' if trigger.payload_json.on else 'homeassistant.turn_off' }}"
+                target:
+                  entity_id: "{{ entity }}"
+              - delay:
+                  milliseconds: 150
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: fan
+                  entity: "{{ entity }}"
+                  base_topic: "{{ base_topic }}"
+
+          - conditions: "{{ trigger.id == 'command' and control == 'echo' and entity | length > 0 }}"
+            sequence:
+              - choose:
+                  - conditions: "{{ 'volume' in trigger.payload_json }}"
+                    sequence:
+                      - action: media_player.volume_set
+                        target:
+                          entity_id: "{{ entity }}"
+                        data:
+                          volume_level: "{{ (trigger.payload_json.volume | float) / 100.0 }}"
+                  - conditions: "{{ 'muted' in trigger.payload_json }}"
+                    sequence:
+                      - action: media_player.volume_mute
+                        target:
+                          entity_id: "{{ entity }}"
+                        data:
+                          is_volume_muted: "{{ trigger.payload_json.muted | bool }}"
+                  - conditions: "{{ trigger.payload_json.action | default('') == 'play_pause' }}"
+                    sequence:
+                      - action: media_player.media_play_pause
+                        target:
+                          entity_id: "{{ entity }}"
+                  - conditions: >-
+                      {{ trigger.payload_json.action | default('') == 'announce'
+                         and script_entity | length > 0 }}
+                    sequence:
+                      - action: script.turn_on
+                        target:
+                          entity_id: "{{ script_entity }}"
+              - delay:
+                  milliseconds: 150
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: echo
+                  entity: "{{ entity }}"
+                  base_topic: "{{ base_topic }}"
+
+          - conditions: "{{ trigger.id == 'request_state' }}"
+            sequence:
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: tapo
+                  entity: "{{ trigger.payload_json.tapo | default('', true) }}"
+                  base_topic: "{{ base_topic }}"
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: overhead
+                  entity: "{{ trigger.payload_json.overhead | default('', true) }}"
+                  base_topic: "{{ base_topic }}"
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: fan
+                  entity: "{{ trigger.payload_json.fan | default('', true) }}"
+                  base_topic: "{{ base_topic }}"
+              - action: script.esp_home_panel_publish_state
+                data:
+                  kind: echo
+                  entity: "{{ trigger.payload_json.echo | default('', true) }}"
+                  base_topic: "{{ base_topic }}"
