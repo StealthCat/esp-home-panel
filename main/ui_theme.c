@@ -1,4 +1,4 @@
-#include "ui_theme.h"
+#include "ui_theme.h"\n#include "settings.h"
 
 static const panel_theme_t __attribute__((unused)) THEME_CLASSIC = {
     .id = PANEL_THEME_CLASSIC_DARK,
@@ -73,13 +73,15 @@ static const panel_theme_t __attribute__((unused)) THEME_MAGIC = {
 
 const panel_theme_t *panel_theme_get(void)
 {
-#if CONFIG_PANEL_THEME_SOCCER
-    return &THEME_SOCCER;
-#elif CONFIG_PANEL_THEME_KITTENS
-    return &THEME_KITTENS;
-#elif CONFIG_PANEL_THEME_MAGIC
-    return &THEME_MAGIC;
-#else
-    return &THEME_CLASSIC;
-#endif
+    switch (settings_get()->theme) {
+    case PANEL_THEME_SOCCER_GREEN:
+        return &THEME_SOCCER;
+    case PANEL_THEME_KITTENS_PINK:
+        return &THEME_KITTENS;
+    case PANEL_THEME_MAGIC_BLUE:
+        return &THEME_MAGIC;
+    case PANEL_THEME_CLASSIC_DARK:
+    default:
+        return &THEME_CLASSIC;
+    }
 }
