@@ -152,6 +152,24 @@ static bool valid_panel_id(const char *value)
     return true;
 }
 
+static bool valid_mqtt_prefix(const char *value)
+{
+    if (!value || value[0] == '\0') {
+        return false;
+    }
+
+    for (const char *p = value; *p; ++p) {
+        if (*p == '+' || *p == '#') {
+            return false;
+        }
+        if ((unsigned char)*p < 0x20) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static bool valid_entity_syntax(const char *value)
 {
     if (!value || value[0] == '\0') {
@@ -223,12 +241,13 @@ static esp_err_t root_handler(httpd_req_t *req)
 {
     const panel_settings_t *cfg = settings_get();
 
-    char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], panel_id[96], timezone[224];
+    char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], mqtt_discovery[160], panel_id[96], timezone[224];
     char ha_tapo[160], ha_overhead[160], ha_fan[160], ha_echo[160], ha_announce[160];
     html_escape(cfg->wifi_ssid, ssid, sizeof(ssid));
     html_escape(cfg->mqtt_uri, mqtt_uri, sizeof(mqtt_uri));
     html_escape(cfg->mqtt_username, mqtt_user, sizeof(mqtt_user));
     html_escape(cfg->mqtt_base_topic, mqtt_topic, sizeof(mqtt_topic));
+    html_escape(cfg->mqtt_discovery_prefix, mqtt_discovery, sizeof(mqtt_discovery));
     html_escape(cfg->panel_id, panel_id, sizeof(panel_id));
     html_escape(cfg->ha_tapo_entity, ha_tapo, sizeof(ha_tapo));
     html_escape(cfg->ha_overhead_entity, ha_overhead, sizeof(ha_overhead));
@@ -310,6 +329,17 @@ static esp_err_t root_handler(httpd_req_t *req)
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "<div class='hint'>Each panel must have a unique ID. Fresh panels default to a stable ID derived from their MAC address, so multiple panels can share one broker and one base topic safely.</div>"));
+
+    snprintf(buf, sizeof(buf),
+             "<div class='row'><div><label>Home Assistant discovery prefix</label>"
+             "<input name='mqtt_discovery_prefix' maxlength='63' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
+             "<div><label>Discovery status topic</label><input value=\"%s/status\" readonly></div></div>",
+             mqtt_discovery, mqtt_discovery);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<div class='hint'>Home Assistant's default MQTT discovery prefix is <b>homeassistant</b>. "
+        "This is separate from the panel runtime base topic <b>home/7c-panel</b>.</div>"));
 
     snprintf(buf, sizeof(buf),
              "<div class='row'><div><label>Username</label><input name='mqtt_username' maxlength='63' value=\"%s\" autocomplete='off'></div>"
@@ -418,6 +448,8 @@ static esp_err_t save_handler(httpd_req_t *req)
     form_get(body, "mqtt_uri", updated.mqtt_uri, sizeof(updated.mqtt_uri));
     form_get(body, "mqtt_username", updated.mqtt_username, sizeof(updated.mqtt_username));
     form_get(body, "mqtt_base_topic", updated.mqtt_base_topic, sizeof(updated.mqtt_base_topic));
+    form_get(body, "mqtt_discovery_prefix", updated.mqtt_discovery_prefix,
+             sizeof(updated.mqtt_discovery_prefix));
     form_get(body, "panel_id", updated.panel_id, sizeof(updated.panel_id));
     form_get(body, "ha_tapo_entity", updated.ha_tapo_entity, sizeof(updated.ha_tapo_entity));
     form_get(body, "ha_overhead_entity", updated.ha_overhead_entity, sizeof(updated.ha_overhead_entity));
@@ -456,6 +488,15 @@ static esp_err_t save_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    if (!valid_mqtt_prefix(updated.mqtt_discovery_prefix)) {
+        free(body);
+        httpd_resp_send_err(
+            req,
+            HTTPD_400_BAD_REQUEST,
+            "Invalid Home Assistant MQTT discovery prefix.");
+        return ESP_OK;
+    }
+
     if (!valid_home_assistant_targets(&updated)) {
         free(body);
         httpd_resp_send_err(
@@ -473,6 +514,14 @@ static esp_err_t save_handler(httpd_req_t *req)
     }
     if (updated.mqtt_base_topic[0] == '\0') {
         strlcpy(updated.mqtt_base_topic, "home/7c-panel", sizeof(updated.mqtt_base_topic));
+    }
+    size_t discovery_len = strlen(updated.mqtt_discovery_prefix);
+    while (discovery_len > 0 && updated.mqtt_discovery_prefix[discovery_len - 1] == '/') {
+        updated.mqtt_discovery_prefix[--discovery_len] = '\0';
+    }
+    if (updated.mqtt_discovery_prefix[0] == '\0') {
+        strlcpy(updated.mqtt_discovery_prefix, "homeassistant",
+                sizeof(updated.mqtt_discovery_prefix));
     }
     if (updated.timezone[0] == '\0') {
         strlcpy(updated.timezone, "EST5EDT,M3.2.0/2,M11.1.0/2", sizeof(updated.timezone));
