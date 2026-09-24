@@ -104,9 +104,11 @@ static esp_err_t configure_config_ap(bool keep_station)
     ap_cfg.ap.authmode = WIFI_AUTH_WPA2_PSK;
     ap_cfg.ap.pmf_cfg.required = false;
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(
-        esp_wifi_set_mode(keep_station ? WIFI_MODE_APSTA : WIFI_MODE_AP));
-    esp_err_t err = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
+    esp_err_t err = esp_wifi_set_mode(keep_station ? WIFI_MODE_APSTA : WIFI_MODE_AP);
+    if (err != ESP_OK) {
+        return err;
+    }
+    err = esp_wifi_set_config(WIFI_IF_AP, &ap_cfg);
     if (err != ESP_OK) {
         return err;
     }
