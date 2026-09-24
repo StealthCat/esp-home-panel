@@ -1,4 +1,5 @@
-#include "ui_theme.h"\n#include "settings.h"
+#include "ui_theme.h"
+#include "settings.h"
 
 static const panel_theme_t __attribute__((unused)) THEME_CLASSIC = {
     .id = PANEL_THEME_CLASSIC_DARK,
