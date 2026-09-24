@@ -325,15 +325,13 @@ static void add_bulb_icon(lv_obj_t *parent, int x, int y, uint32_t color)
 
 static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
 {
-    add_circle(parent, x + 13, y + 13, 8, color, 240);
-    const int px[4] = {10, 22, 10, 0};
-    const int py[4] = {0, 10, 22, 10};
-    const int pw[4] = {10, 16, 10, 16};
-    const int ph[4] = {16, 10, 16, 10};
-    for (int i = 0; i < 4; ++i) {
-        add_decor_box(parent, x + px[i], y + py[i], pw[i], ph[i],
-                      color, 220, 8);
-    }
+    /* Compact four-blade fan matching the mockup title artwork. */
+    add_circle(parent, x + 13, y + 13, 8, color, 245);
+
+    add_decor_box(parent, x + 11, y,      10, 15, color, 225, 7);
+    add_decor_box(parent, x + 19, y + 11, 15, 10, color, 225, 7);
+    add_decor_box(parent, x + 11, y + 19, 10, 15, color, 225, 7);
+    add_decor_box(parent, x,      y + 11, 15, 10, color, 225, 7);
 }
 
 static void add_soccer_ball(lv_obj_t *parent, int x, int y, int size, lv_opa_t opa)
@@ -744,7 +742,9 @@ static void echo_announce_cb(lv_event_t *e)
 static void make_status_dot(lv_obj_t *card, lv_obj_t **status, int x, int y)
 {
     add_circle(card, x, y + 3, 9, T->online, LV_OPA_COVER);
-    *status = make_label(card, "Online", x + 15, y, &lv_font_montserrat_14, T->online);
+    if (status) {
+        *status = NULL;
+    }
 }
 
 static void create_tapo_card(lv_obj_t *root)
@@ -752,7 +752,7 @@ static void create_tapo_card(lv_obj_t *root)
     lv_obj_t *card = make_card(root, 14, 78, 382, 187);
     make_label(card, "Tapo LED Strips", 70, 15, &lv_font_montserrat_22, T->text);
     add_chain_icon(card, 20, 20, T->accent_2);
-    make_status_dot(card, &s_tapo_status, 76, 47);
+    make_status_dot(card, &s_tapo_status, 72, 48);
 
     s_tapo_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_tapo_switch, switch_tapo_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -786,7 +786,7 @@ static void create_tapo_card(lv_obj_t *root)
     lv_obj_add_event_cb(s_tapo_slider, tapo_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_tapo_slider, tapo_brightness_cb, LV_EVENT_RELEASED, NULL);
 
-    s_tapo_pct = make_label(card, "--%", 328, 139, &lv_font_montserrat_16, T->text);
+    s_tapo_pct = make_label(card, "--%", 332, 139, &lv_font_montserrat_16, T->text);
 
     if (T->kittens) {
         add_paw(card, 330, 148, T->accent, 72);
@@ -811,7 +811,7 @@ static void create_overhead_card(lv_obj_t *root)
     } else {
         add_bulb_icon(card, 23, 13, T->warm);
     }
-    make_status_dot(card, &s_overhead_status, 76, 47);
+    make_status_dot(card, &s_overhead_status, 72, 48);
 
     s_overhead_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_overhead_switch, switch_overhead_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -823,7 +823,7 @@ static void create_overhead_card(lv_obj_t *root)
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_overhead_slider, overhead_brightness_cb, LV_EVENT_RELEASED, NULL);
 
-    s_overhead_pct = make_label(card, "--%", 310, 106, &lv_font_montserrat_16, T->text);
+    s_overhead_pct = make_label(card, "--%", 314, 106, &lv_font_montserrat_16, T->text);
 
     const int pcts[4] = {25, 50, 75, 100};
     for (int i = 0; i < 4; ++i) {
@@ -865,43 +865,52 @@ static void create_overhead_card(lv_obj_t *root)
 
 static lv_obj_t *create_fan_graphic(lv_obj_t *card, int x, int y)
 {
-    lv_obj_t *fan = lv_obj_create(card);
-    lv_obj_set_pos(fan, x, y);
-    lv_obj_set_size(fan, 112, 112);
-    lv_obj_set_style_radius(fan, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(fan, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(fan, 4, 0);
-    lv_obj_set_style_border_color(fan, c(T->accent), 0);
-    lv_obj_set_style_border_opa(fan, 180, 0);
-    lv_obj_set_style_pad_all(fan, 0, 0);
-    lv_obj_remove_flag(fan, LV_OBJ_FLAG_SCROLLABLE);
+    /* Fixed outer bezel. The rotor itself is a separate object so animation
+     * rotates only the blades, not the ring. */
+    lv_obj_t *ring = lv_obj_create(card);
+    lv_obj_set_pos(ring, x, y);
+    lv_obj_set_size(ring, 112, 112);
+    lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
+    lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(ring, 4, 0);
+    lv_obj_set_style_border_color(ring, c(T->accent), 0);
+    lv_obj_set_style_border_opa(ring, 195, 0);
+    lv_obj_set_style_pad_all(ring, 0, 0);
+    lv_obj_remove_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(ring, LV_OBJ_FLAG_CLICKABLE);
 
-    add_circle(fan, 47, 47, 18, T->accent, LV_OPA_COVER);
+    lv_obj_t *rotor = lv_obj_create(card);
+    lv_obj_set_pos(rotor, x + 13, y + 13);
+    lv_obj_set_size(rotor, 86, 86);
+    lv_obj_set_style_bg_opa(rotor, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(rotor, 0, 0);
+    lv_obj_set_style_pad_all(rotor, 0, 0);
+    lv_obj_remove_flag(rotor, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_remove_flag(rotor, LV_OBJ_FLAG_CLICKABLE);
 
-    /* Four rounded blades. */
-    const int bx[4] = {44, 65, 44, 24};
-    const int by[4] = {12, 43, 68, 43};
-    const int bw[4] = {24, 34, 24, 34};
-    const int bh[4] = {34, 24, 34, 24};
+    /* Four broad rounded blades, matching the original mockup proportions. */
+    const int bx[4] = {34, 50, 34, 6};
+    const int by[4] = {5, 34, 50, 34};
+    const int bw[4] = {18, 30, 18, 30};
+    const int bh[4] = {30, 18, 30, 18};
+
     for (int i = 0; i < 4; ++i) {
-        lv_obj_t *blade = lv_obj_create(fan);
+        lv_obj_t *blade = lv_obj_create(rotor);
         lv_obj_set_pos(blade, bx[i], by[i]);
         lv_obj_set_size(blade, bw[i], bh[i]);
-        lv_obj_set_style_radius(blade, 18, 0);
+        lv_obj_set_style_radius(blade, 12, 0);
         lv_obj_set_style_bg_color(blade, c(T->accent), 0);
         lv_obj_set_style_bg_grad_color(blade, c(T->accent_2), 0);
         lv_obj_set_style_bg_grad_dir(blade, LV_GRAD_DIR_VER, 0);
-        lv_obj_set_style_bg_opa(blade, 220, 0);
+        lv_obj_set_style_bg_opa(blade, 235, 0);
         lv_obj_set_style_border_width(blade, 0, 0);
         lv_obj_set_style_pad_all(blade, 0, 0);
+        lv_obj_remove_flag(blade, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(blade, LV_OBJ_FLAG_CLICKABLE);
     }
 
-    lv_obj_set_style_transform_width(fan, 18, 0);
-    lv_obj_set_style_transform_height(fan, 18, 0);
-    if (s_artwork_mode) {
-        lv_obj_set_style_opa(fan, LV_OPA_TRANSP, 0);
-    }
-    return fan;
+    add_circle(rotor, 34, 34, 18, T->accent_2, LV_OPA_COVER);
+    return rotor;
 }
 
 static void create_fan_card(lv_obj_t *root)
@@ -909,15 +918,15 @@ static void create_fan_card(lv_obj_t *root)
     lv_obj_t *card = make_card(root, 14, 274, 382, 192);
     make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
     add_mini_fan_icon(card, 20, 14, T->accent);
-    make_status_dot(card, &s_fan_status, 76, 47);
+    make_status_dot(card, &s_fan_status, 72, 48);
 
     s_fan_icon = create_fan_graphic(card, 25, 65);
 
     s_fan_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    s_fan_state_label = make_label(card, "Fan is Off", 230, 116, &lv_font_montserrat_18, T->text);
-    make_label(card, "Smart Switch", 230, 143, &lv_font_montserrat_14, T->muted);
+    s_fan_state_label = make_label(card, "Fan is Off", 226, 116, &lv_font_montserrat_18, T->text);
+    make_label(card, "Smart Switch", 226, 143, &lv_font_montserrat_14, T->muted);
 
     if (T->soccer) {
         add_decor_box(card, 188, 58, 2, 134, T->accent, 38, 0);
@@ -976,11 +985,10 @@ static void create_echo_wave(lv_obj_t *card)
 static void create_echo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 274, 382, 192);
-    make_label(card, "Echo Dot", 70, 15, &lv_font_montserrat_22, T->text);
+    make_label(card, "Alexa", 70, 15, &lv_font_montserrat_22, T->text);
     make_label(card, LV_SYMBOL_VOLUME_MAX, 22, 18, &lv_font_montserrat_22, T->accent);
-    make_status_dot(card, &s_echo_status, 76, 47);
+    make_status_dot(card, &s_echo_status, 72, 48);
 
-    make_label(card, "alexa", 310, 18, &lv_font_montserrat_16, T->accent);
 
     create_echo_wave(card);
 
@@ -990,7 +998,7 @@ static void create_echo_card(lv_obj_t *root)
     s_echo_slider = make_slider(card, 50, 112, 250, T->accent);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_RELEASED, NULL);
-    s_echo_pct = make_label(card, "--%", 310, 108, &lv_font_montserrat_16, T->text);
+    s_echo_pct = make_label(card, "--%", 314, 108, &lv_font_montserrat_16, T->text);
 
     s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 143, 94, 40);
     lv_obj_add_event_cb(s_echo_mute, echo_mute_cb, LV_EVENT_CLICKED, NULL);
@@ -1213,7 +1221,6 @@ void ui_apply_tapo_state(bool on, uint8_t brightness, uint8_t r, uint8_t g, uint
     set_switch(s_tapo_switch, on);
     lv_slider_set_value(s_tapo_slider, brightness, LV_ANIM_ON);
     set_percent_label(s_tapo_pct, brightness);
-    lv_label_set_text(s_tapo_status, on ? "Online • On" : "Online • Off");
     lv_color_hsv_t hsv = lv_color_rgb_to_hsv(r, g, b);
     colorwheel_position_knob(hsv.h, hsv.s);
     s_syncing = false;
@@ -1229,7 +1236,6 @@ void ui_apply_overhead_state(bool on, uint8_t brightness)
     set_switch(s_overhead_switch, on);
     lv_slider_set_value(s_overhead_slider, brightness, LV_ANIM_ON);
     set_percent_label(s_overhead_pct, brightness);
-    lv_label_set_text(s_overhead_status, on ? "Online • On" : "Online • Off");
     s_syncing = false;
 
     lvgl_port_unlock();
@@ -1242,7 +1248,6 @@ void ui_apply_fan_state(bool on)
     s_syncing = true;
     s_fan_on = on;
     set_switch(s_fan_switch, on);
-    lv_label_set_text(s_fan_status, on ? "Online • On" : "Online • Off");
     lv_label_set_text(s_fan_state_label, on ? "Fan is On" : "Fan is Off");
     lv_obj_set_style_shadow_opa(s_fan_icon, on ? 100 : 20, 0);
     s_syncing = false;
@@ -1259,7 +1264,6 @@ void ui_apply_echo_state(uint8_t volume, bool muted, bool playing)
     s_echo_playing = playing;
     lv_slider_set_value(s_echo_slider, volume, LV_ANIM_ON);
     set_percent_label(s_echo_pct, volume);
-    lv_label_set_text(s_echo_status, playing ? "Online • Playing" : "Online");
     lv_obj_set_style_bg_color(s_echo_mute, c(muted ? T->accent : T->card_bg_2), 0);
     s_syncing = false;
 
