@@ -43,6 +43,56 @@ static char *s_discovery_overhead_event_config;
 static char *s_discovery_fan_event_config;
 static char *s_discovery_echo_event_config;
 
+typedef enum {
+    CONTROL_TAPO = 0,
+    CONTROL_OVERHEAD,
+    CONTROL_FAN,
+    CONTROL_ALEXA,
+    CONTROL_COUNT,
+} control_id_t;
+
+#define STATE_HOLDOFF_US      (900LL * 1000LL)
+#define STATE_REFRESH_DELAY_US (1200LL * 1000LL)
+
+static int64_t s_state_hold_until_us[CONTROL_COUNT];
+static int64_t s_state_refresh_due_us;
+
+static void note_local_command(control_id_t control)
+{
+    if (!s_connected || control < 0 || control >= CONTROL_COUNT) {
+        return;
+    }
+
+    int64_t now = esp_timer_get_time();
+    s_state_hold_until_us[control] = now + STATE_HOLDOFF_US;
+    s_state_refresh_due_us = now + STATE_REFRESH_DELAY_US;
+
+    ESP_LOGI(TAG,
+             "MQTT optimistic hold control=%d for %lld ms; refresh due in %lld ms",
+             (int)control,
+             STATE_HOLDOFF_US / 1000LL,
+             STATE_REFRESH_DELAY_US / 1000LL);
+}
+
+static bool state_update_is_held(control_id_t control, const char *topic)
+{
+    if (control < 0 || control >= CONTROL_COUNT) {
+        return false;
+    }
+
+    int64_t now = esp_timer_get_time();
+    if (now >= s_state_hold_until_us[control]) {
+        return false;
+    }
+
+    ESP_LOGI(TAG,
+             "MQTT state deferred during optimistic hold control=%d topic=%s remaining=%lld ms",
+             (int)control,
+             topic ? topic : "(unknown)",
+             (s_state_hold_until_us[control] - now) / 1000LL);
+    return true;
+}
+
 static uint8_t clamp_pct(int value)
 {
     if (value < 0) return 0;
@@ -242,6 +292,10 @@ static void handle_state_message(esp_mqtt_event_handle_t event)
     }
 
     if (topic_equals(event, s_topic_state_tapo)) {
+        if (state_update_is_held(CONTROL_TAPO, s_topic_state_tapo)) {
+            cJSON_Delete(root);
+            return;
+        }
         bool on = json_bool(root, "on", false);
         uint8_t brightness = clamp_pct(json_int(root, "brightness", 0));
         uint8_t r = clamp_u8(json_int(root, "r", 255));
@@ -251,15 +305,27 @@ static void handle_state_message(esp_mqtt_event_handle_t event)
                  on, brightness, r, g, b);
         ui_apply_tapo_state(on, brightness, r, g, b);
     } else if (topic_equals(event, s_topic_state_overhead)) {
+        if (state_update_is_held(CONTROL_OVERHEAD, s_topic_state_overhead)) {
+            cJSON_Delete(root);
+            return;
+        }
         bool on = json_bool(root, "on", false);
         uint8_t brightness = clamp_pct(json_int(root, "brightness", 0));
         ESP_LOGI(TAG, "MQTT APPLY overhead on=%d brightness=%u", on, brightness);
         ui_apply_overhead_state(on, brightness);
     } else if (topic_equals(event, s_topic_state_fan)) {
+        if (state_update_is_held(CONTROL_FAN, s_topic_state_fan)) {
+            cJSON_Delete(root);
+            return;
+        }
         bool on = json_bool(root, "on", false);
         ESP_LOGI(TAG, "MQTT APPLY fan on=%d", on);
         ui_apply_fan_state(on);
     } else if (topic_equals(event, s_topic_state_echo)) {
+        if (state_update_is_held(CONTROL_ALEXA, s_topic_state_echo)) {
+            cJSON_Delete(root);
+            return;
+        }
         uint8_t volume = clamp_pct(json_int(root, "volume", 0));
         bool muted = json_bool(root, "muted", false);
         bool playing = json_bool(root, "playing", false);
@@ -696,6 +762,16 @@ void mqtt_bridge_poll(void)
     }
 
     const int64_t now = esp_timer_get_time();
+
+    if (s_state_refresh_due_us > 0) {
+        if (now >= s_state_refresh_due_us) {
+            ESP_LOGI(TAG, "MQTT requesting post-command state reconciliation");
+            s_state_refresh_due_us = 0;
+            publish_state_request();
+        }
+        return;
+    }
+
     if (s_last_state_request_us == 0 ||
         now - s_last_state_request_us >= 10LL * 1000LL * 1000LL) {
         publish_state_request();
@@ -704,6 +780,7 @@ void mqtt_bridge_poll(void)
 
 void mqtt_bridge_tapo_power(bool on)
 {
+    note_local_command(CONTROL_TAPO);
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_tapo,
                           settings ? settings->ha_tapo_entity : NULL,
@@ -714,6 +791,7 @@ void mqtt_bridge_tapo_power(bool on)
 
 void mqtt_bridge_tapo_brightness(uint8_t percent)
 {
+    note_local_command(CONTROL_TAPO);
     char payload[72];
     snprintf(payload, sizeof(payload),
              "{\"event_type\":\"brightness\",\"brightness\":%u}",
@@ -727,6 +805,7 @@ void mqtt_bridge_tapo_brightness(uint8_t percent)
 
 void mqtt_bridge_tapo_rgb(uint8_t r, uint8_t g, uint8_t b)
 {
+    note_local_command(CONTROL_TAPO);
     char payload[112];
     snprintf(payload, sizeof(payload),
              "{\"event_type\":\"color\",\"r\":%u,\"g\":%u,\"b\":%u}",
@@ -740,6 +819,7 @@ void mqtt_bridge_tapo_rgb(uint8_t r, uint8_t g, uint8_t b)
 
 void mqtt_bridge_overhead_power(bool on)
 {
+    note_local_command(CONTROL_OVERHEAD);
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_overhead,
                           settings ? settings->ha_overhead_entity : NULL,
@@ -750,6 +830,7 @@ void mqtt_bridge_overhead_power(bool on)
 
 void mqtt_bridge_overhead_brightness(uint8_t percent)
 {
+    note_local_command(CONTROL_OVERHEAD);
     char payload[72];
     snprintf(payload, sizeof(payload),
              "{\"event_type\":\"brightness\",\"brightness\":%u}",
@@ -763,6 +844,7 @@ void mqtt_bridge_overhead_brightness(uint8_t percent)
 
 void mqtt_bridge_fan_power(bool on)
 {
+    note_local_command(CONTROL_FAN);
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_fan,
                           settings ? settings->ha_fan_entity : NULL,
@@ -773,6 +855,7 @@ void mqtt_bridge_fan_power(bool on)
 
 void mqtt_bridge_echo_volume(uint8_t percent)
 {
+    note_local_command(CONTROL_ALEXA);
     char payload[64];
     snprintf(payload, sizeof(payload),
              "{\"event_type\":\"volume\",\"volume\":%u}",
@@ -784,28 +867,47 @@ void mqtt_bridge_echo_volume(uint8_t percent)
                           payload);
 }
 
-void mqtt_bridge_echo_mute(bool muted)
+void mqtt_bridge_echo_mute(bool muted, uint8_t target_volume)
 {
+    note_local_command(CONTROL_ALEXA);
+
+    char payload[112];
+    snprintf(payload, sizeof(payload),
+             "{\"event_type\":\"mute\",\"muted\":%s,\"volume\":%u}",
+             muted ? "true" : "false",
+             clamp_pct(target_volume));
+
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_echo,
                           settings ? settings->ha_echo_entity : NULL,
                           NULL,
-                          muted ? "{\"event_type\":\"mute\",\"muted\":true}"
-                                : "{\"event_type\":\"mute\",\"muted\":false}");
+                          payload);
 }
 
-void mqtt_bridge_echo_play_pause(void)
+void mqtt_bridge_echo_play_pause(bool playing)
 {
+    note_local_command(CONTROL_ALEXA);
+
     const panel_settings_t *settings = settings_get();
-    publish_targeted_json(s_topic_cmd_echo,
-                          settings ? settings->ha_echo_entity : NULL,
-                          NULL,
-                          "{\"event_type\":\"play_pause\",\"action\":\"play_pause\"}");
+    publish_targeted_json(
+        s_topic_cmd_echo,
+        settings ? settings->ha_echo_entity : NULL,
+        NULL,
+        playing
+            ? "{\"event_type\":\"play_pause\",\"playing\":true}"
+            : "{\"event_type\":\"play_pause\",\"playing\":false}");
 }
 
 void mqtt_bridge_echo_announce(void)
 {
+    note_local_command(CONTROL_ALEXA);
     const panel_settings_t *settings = settings_get();
+
+    if (!settings || settings->ha_echo_announce_script[0] == '\0') {
+        ESP_LOGW(TAG,
+                 "Alexa announce pressed but no Home Assistant announcement script is configured");
+    }
+
     publish_targeted_json(s_topic_cmd_echo,
                           settings ? settings->ha_echo_entity : NULL,
                           settings ? settings->ha_echo_announce_script : NULL,
