@@ -167,7 +167,7 @@ static void publish_state_request(void)
     }
 
     esp_mqtt_client_publish(s_client, s_topic_request_state, payload, 0, 1, 0);
-    cJSON_free(payload);
+    free(payload);
     s_last_state_request_us = esp_timer_get_time();
 }
 
@@ -251,7 +251,7 @@ static void publish_targeted_json(const char *topic,
     }
 
     publish_json(topic, payload);
-    cJSON_free(payload);
+    free(payload);
 }
 
 esp_err_t mqtt_bridge_start(void)
