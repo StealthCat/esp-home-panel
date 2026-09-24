@@ -4,9 +4,11 @@
 # config/packages/esp_home_panel.yaml), or merge the script and automation
 # sections into your existing configuration.
 #
-# If the panel's MQTT base topic is not "home/7c-panel", replace that prefix
-# in the two MQTT trigger topics below. Response topics are derived
-# automatically from the incoming topic.
+# All panels share an MQTT base prefix and use one unique panel ID segment:
+#   <base>/<panel-id>/...
+# If the base prefix is not "home/7c-panel", replace that prefix in the two
+# wildcard MQTT trigger topics below. One copy of this package serves all
+# panels below that prefix.
 #
 # The panel includes the configured Home Assistant entity_id in every command.
 # This bridge performs the Home Assistant action and publishes normalized state
@@ -18,7 +20,7 @@ script:
     alias: ESP Home Panel - publish entity state
     description: Publish normalized Home Assistant state back to the ESP panel.
     mode: parallel
-    max: 16
+    max: 64
     fields:
       kind:
         description: Panel control name (tapo, overhead, fan, or echo)
@@ -98,14 +100,14 @@ automation:
   - id: esp_home_panel_mqtt_bridge
     alias: ESP Home Panel - MQTT bridge
     description: Route ESP Home Panel MQTT commands to configured Home Assistant entities.
-    mode: queued
-    max: 20
+    mode: parallel
+    max: 64
     triggers:
       - trigger: mqtt
-        topic: "home/7c-panel/cmd/+"
+        topic: "home/7c-panel/+/cmd/+"
         id: command
       - trigger: mqtt
-        topic: "home/7c-panel/request_state"
+        topic: "home/7c-panel/+/request_state"
         id: request_state
 
     variables:
