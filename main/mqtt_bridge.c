@@ -28,6 +28,7 @@ static char *s_topic_cmd_overhead;
 static char *s_topic_cmd_fan;
 static char *s_topic_cmd_echo;
 
+static char *s_topic_root;
 static char *s_topic_availability;
 static char *s_topic_request_state;
 
@@ -60,10 +61,21 @@ static char *make_topic(const char *base, const char *suffix)
     return topic;
 }
 
-static esp_err_t build_topics(const char *base)
+static esp_err_t build_topics(const char *base, const char *panel_id)
 {
+    size_t root_len = strlen(base) + 1 + strlen(panel_id) + 1;
+    s_topic_root = heap_caps_malloc(root_len, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    if (!s_topic_root) {
+        s_topic_root = malloc(root_len);
+    }
+    if (!s_topic_root) {
+        return ESP_ERR_NO_MEM;
+    }
+
+    snprintf(s_topic_root, root_len, "%s/%s", base, panel_id);
+
 #define MAKE_TOPIC(dst, suffix) do { \
-        dst = make_topic(base, suffix); \
+        dst = make_topic(s_topic_root, suffix); \
         if (!dst) return ESP_ERR_NO_MEM; \
     } while (0)
 
@@ -154,6 +166,7 @@ static void publish_state_request(void)
     }
 
     cJSON_AddNumberToObject(root, "request", 1);
+    cJSON_AddStringToObject(root, "panel_id", settings->panel_id);
     cJSON_AddStringToObject(root, "tapo", settings->ha_tapo_entity);
     cJSON_AddStringToObject(root, "overhead", settings->ha_overhead_entity);
     cJSON_AddStringToObject(root, "fan", settings->ha_fan_entity);
@@ -263,10 +276,17 @@ esp_err_t mqtt_bridge_start(void)
         return ESP_ERR_INVALID_STATE;
     }
 
-    esp_err_t err = build_topics(settings->mqtt_base_topic);
+    if (settings->panel_id[0] == '\0') {
+        ESP_LOGE(TAG, "Panel ID is empty; MQTT disabled");
+        return ESP_ERR_INVALID_STATE;
+    }
+
+    esp_err_t err = build_topics(settings->mqtt_base_topic, settings->panel_id);
     if (err != ESP_OK) {
         return err;
     }
+
+    ESP_LOGI(TAG, "MQTT panel namespace: %s", s_topic_root);
 
     const esp_mqtt_client_config_t cfg = {
         .broker.address.uri = settings->mqtt_uri,
