@@ -1,5 +1,43 @@
 # Home Assistant MQTT bridge
 
+## Topic namespaces and auto-discovery
+
+The panel now uses two separate MQTT namespaces, matching Home Assistant's
+MQTT model:
+
+- **Runtime base topic:** `home/7c-panel` by default. Panel commands, state,
+  availability, and state requests live below
+  `home/7c-panel/<panel-id>/...`.
+- **Home Assistant discovery prefix:** `homeassistant` by default. Discovery
+  configuration is published as retained messages below
+  `homeassistant/<component>/.../config`.
+
+Do not change the panel runtime base topic to `homeassistant`. They serve
+different purposes.
+
+On MQTT connection the panel publishes retained discovery for:
+
+- a connectivity binary sensor,
+- a **Refresh Home Assistant State** button,
+- Tapo control events,
+- overhead-light control events,
+- fan control events,
+- Echo control events.
+
+The panel also subscribes to `homeassistant/status`. When Home Assistant
+publishes its `online` birth message after an MQTT integration restart, the
+panel republishes discovery and immediately requests current target states.
+
+The web configuration page exposes **Home Assistant discovery prefix**. Leave
+it set to `homeassistant` unless you explicitly changed the Discovery Prefix
+in Home Assistant's MQTT integration options.
+
+The auto-discovered device makes the panel visible in Home Assistant and
+exposes its MQTT interactions. The bridge package below is still required for
+panel touches to perform actions against pre-existing Home Assistant entities
+such as `light.office` or `fan.bedroom`; MQTT discovery by itself does not
+map one entity to another.
+
 The ESP Home Panel uses Mosquitto as an MQTT transport, while Home Assistant
 performs the actual actions against existing Home Assistant entities.
 
