@@ -21,8 +21,12 @@ config PANEL_MQTT_PASSWORD
     default ""
 
 config PANEL_MQTT_BASE_TOPIC
-    string "MQTT base topic"
+    string "MQTT runtime base topic"
     default "home/7c-panel"
+
+config PANEL_MQTT_DISCOVERY_PREFIX
+    string "Home Assistant MQTT discovery prefix"
+    default "homeassistant"
 
 config PANEL_TIMEZONE
     string "POSIX timezone"
