@@ -139,14 +139,26 @@ def data_href(node: ET.Element) -> str | None:
     return None
 
 
-def decode_tile(ffmpeg: str, raw: bytes, width: int, height: int) -> bytes:
+def decode_tile(ffmpeg: str, raw: bytes, mime: str, width: int, height: int) -> bytes:
     """Decode one embedded raster image to exactly width*height RGBA bytes."""
+
+    demuxers = {
+        "webp": "webp_pipe",
+        "png": "png_pipe",
+        "jpeg": "jpeg_pipe",
+        "jpg": "jpeg_pipe",
+    }
+    demuxer = demuxers.get(mime.lower())
+    if not demuxer:
+        raise ValueError(f"Unsupported embedded artwork MIME type: image/{mime}")
 
     cmd = [
         ffmpeg,
         "-hide_banner",
         "-loglevel",
         "error",
+        "-f",
+        demuxer,
         "-i",
         "pipe:0",
         "-frames:v",
@@ -245,9 +257,11 @@ def render_svg_tiles(path: Path, ffmpeg: str) -> bytearray:
                 f"{path} contains an image element that is not an embedded data URI"
             )
 
-        match = re.match(r"^data:image/[^;]+;base64,(.*)$", href, re.DOTALL)
+        match = re.match(r"^data:image/([^;]+);base64,(.*)$", href, re.DOTALL)
         if not match:
             raise ValueError(f"Unsupported embedded image URI in {path}")
+
+        mime = match.group(1).lower()
 
         x = numeric_attr(node, "x", 0)
         y = numeric_attr(node, "y", 0)
@@ -262,8 +276,8 @@ def render_svg_tiles(path: Path, ffmpeg: str) -> bytearray:
                 f"Embedded image at {x},{y} size {w}x{h} exceeds {WIDTH}x{HEIGHT}"
             )
 
-        raw = base64.b64decode(match.group(1), validate=False)
-        tile = decode_tile(ffmpeg, raw, w, h)
+        raw = base64.b64decode(match.group(2), validate=False)
+        tile = decode_tile(ffmpeg, raw, mime, w, h)
         alpha_composite(canvas, tile, x, y, w, h)
         tile_count += 1
 
