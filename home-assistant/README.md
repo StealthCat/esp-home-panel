@@ -173,7 +173,7 @@ Under **Home Assistant targets**, choose the entities for that particular panel.
 | Overhead light | `light.*` |
 | Ceiling fan | `fan.*` or `switch.*` |
 | Echo | `media_player.*` |
-| Echo announcement | optional `script.*` |
+| Echo announcement | `script.*` when using the Announce button |
 
 Examples for an office panel:
 
@@ -192,6 +192,17 @@ The announcement button invokes the configured script. This is intentionally a
 script target because announcement/TTS support differs between media-player
 integrations. Put whatever TTS or Alexa-specific action you need in that Home
 Assistant script.
+
+Alexa mute is implemented as volume 0 / restore-volume instead of
+`media_player.volume_mute`, because Alexa media-player entities do not
+consistently expose a working mute service. Play/pause is sent as explicit
+`media_player.media_play` or `media_player.media_pause` actions.
+
+The panel updates controls optimistically when touched. MQTT state messages
+received during the short Home Assistant round trip are temporarily ignored,
+then the panel requests a fresh state snapshot to reconcile with the real
+entity state. This prevents an old retained/state response from visually
+snapping a control back immediately after it is pressed.
 
 ## MQTT protocol
 
