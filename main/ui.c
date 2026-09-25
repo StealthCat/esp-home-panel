@@ -889,12 +889,16 @@ static void create_fan_card(lv_obj_t *root)
 
     /* Every theme uses the same 142x116 transparent sprite footprint so the
      * fan illustration stays aligned independently of theme artwork. */
-    add_theme_sprite(card, fan_art, 30, 68, true);
+    if (T->magic) {
+        add_theme_sprite(card, THEME_ART_MAGIC_WINDOW, 8, 66, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_WINDOW, 300, 66, true);
+        add_theme_sprite(card, fan_art, 104, 66, true);
+    } else {
+        add_theme_sprite(card, fan_art, 30, 68, true);
+    }
 
-    /* Preserve the original kittens mockup composition: the sleeping cat sits
-     * to the right of the fan artwork behind the live status text. */
     if (T->kittens) {
-        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 246, 54, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 210, 54, true);
     }
 
     if (T->magic) {
