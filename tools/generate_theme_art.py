@@ -33,7 +33,7 @@ except NameError:
 OUT = ROOT / "main" / "theme_art_generated.inc"
 WIDTH = 800
 HEIGHT = 480
-GENERATOR_VERSION = "theme-art-v6-photo-refine"
+GENERATOR_VERSION = "theme-art-v7-no-settings-gear"
 
 THEMES = {
     "kittens": ROOT / "assets" / "kittens-pink" / "screen.svg",
@@ -51,10 +51,8 @@ SPRITES = [
     ("KITTEN_PAWS", "kittens", 18, 398, 60, 68, 12, 45),
     ("KITTEN_FAN", "kittens", 54, 338, 118, 126, 10, 42),
 
-    # The soccer header ball in the source mockup overlaps the old settings
-    # gear. It remains generated for compatibility but is no longer rendered
-    # by the UI; the live header is intentionally clean.
-    ("SOCCER_BALL", "soccer", 744, 0, 56, 70, 12, 44),
+    # Do not crop the source mockups' top-right settings/gear area. Header
+    # decoration in that region is rendered natively instead.
     ("SOCCER_GOAL", "soccer", 672, 150, 108, 68, 7, 30),
     ("SOCCER_FAN", "soccer", 54, 338, 118, 126, 8, 34),
 
@@ -323,6 +321,14 @@ def generate() -> None:
 
     images: dict[str, tuple[bytearray, int, int]] = {}
     for name, theme, x, y, w, h, low, high in SPRITES:
+        # The canonical mockups contain the obsolete configuration gear in the
+        # top-right header. Reject any generated sprite that would sample that
+        # region so it cannot accidentally reappear in a future theme edit.
+        if y < 80 and (x + w) > 700:
+            raise ValueError(
+                f"{name} overlaps the forbidden top-right settings-gear region"
+            )
+
         crop = crop_rgba(screens[theme], x, y, w, h)
         images[name] = (remove_background(crop, w, h, low, high), w, h)
         print(f"[theme-art] extracted {name} from {theme} at {x},{y} {w}x{h}")
@@ -334,7 +340,7 @@ def generate() -> None:
 
     order = [
         "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS", "KITTEN_FAN",
-        "SOCCER_BALL", "SOCCER_GOAL", "SOCCER_FAN",
+        "SOCCER_GOAL", "SOCCER_FAN",
         "MAGIC_CASTLE", "MAGIC_LANTERN", "MAGIC_FAN",
         "MAGIC_OWL", "MAGIC_QUILL",
         "MAGIC_CORNER_TL", "MAGIC_CORNER_TR",
