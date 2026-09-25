@@ -33,7 +33,7 @@ except NameError:
 OUT = ROOT / "main" / "theme_art_generated.inc"
 WIDTH = 800
 HEIGHT = 480
-GENERATOR_VERSION = "theme-art-v4"
+GENERATOR_VERSION = "theme-art-v5-align"
 
 THEMES = {
     "kittens": ROOT / "assets" / "kittens-pink" / "screen.svg",
@@ -43,21 +43,26 @@ THEMES = {
 
 # name, theme, x, y, width, height, bg-removal low/high thresholds
 SPRITES = [
-    ("KITTEN_PEEK", "kittens", 0, 45, 110, 75, 14, 52),
-    ("KITTEN_SLEEP", "kittens", 205, 300, 165, 95, 12, 48),
-    ("KITTEN_PAWS", "kittens", 0, 390, 85, 90, 12, 45),
-    ("KITTEN_FAN", "kittens", 18, 310, 155, 160, 10, 42),
+    # Crops deliberately contain decorative artwork only. The previous broad
+    # crops included source-mockup labels/controls which then appeared offset
+    # underneath the live LVGL controls.
+    ("KITTEN_PEEK", "kittens", 15, 55, 78, 62, 14, 52),
+    ("KITTEN_SLEEP", "kittens", 245, 315, 135, 82, 12, 48),
+    ("KITTEN_PAWS", "kittens", 18, 395, 62, 72, 12, 45),
+    ("KITTEN_FAN", "kittens", 52, 334, 124, 132, 10, 42),
 
-    ("SOCCER_BALL", "soccer", 710, 0, 90, 80, 12, 44),
-    ("SOCCER_GOAL", "soccer", 635, 120, 165, 115, 7, 30),
-    ("SOCCER_FAN", "soccer", 18, 310, 155, 160, 8, 34),
+    # The soccer header ball is partly covered by the original settings gear,
+    # so keep the clean fan/goal artwork and draw the header treatment natively.
+    ("SOCCER_BALL", "soccer", 744, 0, 56, 70, 12, 44),
+    ("SOCCER_GOAL", "soccer", 650, 140, 146, 88, 7, 30),
+    ("SOCCER_FAN", "soccer", 52, 334, 124, 132, 8, 34),
 
-    ("MAGIC_CASTLE", "magic", 385, 0, 245, 78, 9, 36),
-    ("MAGIC_LANTERN", "magic", 405, 82, 78, 100, 10, 38),
-    ("MAGIC_FAN", "magic", 5, 310, 215, 165, 8, 32),
-    ("MAGIC_OWL", "magic", 410, 300, 100, 100, 11, 42),
-    ("MAGIC_QUILL", "magic", 710, 315, 90, 125, 10, 38),
-    ("MAGIC_CORNER_TL", "magic", 5, 75, 42, 42, 8, 30),
+    ("MAGIC_CASTLE", "magic", 400, 0, 230, 78, 9, 36),
+    ("MAGIC_LANTERN", "magic", 424, 90, 60, 76, 10, 38),
+    ("MAGIC_FAN", "magic", 94, 320, 186, 150, 8, 32),
+    ("MAGIC_OWL", "magic", 435, 258, 72, 88, 11, 42),
+    ("MAGIC_QUILL", "magic", 752, 338, 48, 82, 10, 38),
+    ("MAGIC_CORNER_TL", "magic", 14, 80, 36, 36, 8, 30),
 ]
 
 
