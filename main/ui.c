@@ -1045,26 +1045,20 @@ static void create_header(lv_obj_t *root)
     const char *title =
         (settings && settings->display_title[0]) ? settings->display_title : "Home Control";
 
-    if (T->magic) {
-        lv_obj_t *home_frame = lv_obj_create(root);
-        lv_obj_set_pos(home_frame, 10, 8);
-        lv_obj_set_size(home_frame, 56, 56);
-        lv_obj_set_style_radius(home_frame, 8, 0);
-        lv_obj_set_style_bg_color(home_frame, c(0x0A2E5F), 0);
-        lv_obj_set_style_bg_opa(home_frame, 80, 0);
-        lv_obj_set_style_border_width(home_frame, 2, 0);
-        lv_obj_set_style_border_color(home_frame, c(T->accent_2), 0);
-        lv_obj_set_style_border_opa(home_frame, 210, 0);
-        lv_obj_set_style_pad_all(home_frame, 0, 0);
-        lv_obj_remove_flag(home_frame, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_remove_flag(home_frame, LV_OBJ_FLAG_CLICKABLE);
+    theme_art_id_t header_art = THEME_ART_HEADER_CLASSIC;
+    if (T->soccer) {
+        header_art = THEME_ART_HEADER_SOCCER;
+    } else if (T->kittens) {
+        header_art = THEME_ART_HEADER_KITTENS;
+    } else if (T->magic) {
+        header_art = THEME_ART_HEADER_MAGIC;
     }
 
-    make_label(root, LV_SYMBOL_HOME, 20, 19, &lv_font_montserrat_32, T->accent);
+    add_theme_sprite(root, header_art, 10, 8, false);
 
     lv_obj_t *title_label =
         make_label(root, title, 78, 17, &lv_font_montserrat_36, T->text);
-    lv_obj_set_width(title_label, T->magic ? 515 : 530);
+    lv_obj_set_width(title_label, T->magic ? 500 : 530);
     lv_obj_set_height(title_label, 44);
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_DOTS);
 
