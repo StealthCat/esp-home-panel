@@ -409,18 +409,18 @@ static void add_soccer_decor(lv_obj_t *screen)
     lv_obj_remove_flag(center, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(center, LV_OBJ_FLAG_CLICKABLE);
 
-    add_theme_sprite(screen, THEME_ART_SOCCER_BALL, 710, 0, false);
+    add_theme_sprite(screen, THEME_ART_SOCCER_BALL, 744, 0, true);
 }
 
 static void add_kittens_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_KITTEN_PEEK, 0, 45, false);
-    add_theme_sprite(screen, THEME_ART_KITTEN_PAWS, 0, 390, false);
+    add_theme_sprite(screen, THEME_ART_KITTEN_PEEK, 15, 55, false);
+    add_theme_sprite(screen, THEME_ART_KITTEN_PAWS, 18, 395, false);
 }
 
 static void add_magic_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 385, 0, true);
+    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 400, 0, true);
 }
 
 static void add_classic_decor(lv_obj_t *screen)
@@ -777,15 +777,15 @@ static void create_tapo_card(lv_obj_t *root)
 static void create_overhead_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 78, 382, 187);
-    make_label(card, "Overhead Light", 70, 15, &lv_font_montserrat_22, T->text);
-
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_LANTERN, 4, 0, false);
+        add_theme_sprite(card, THEME_ART_MAGIC_LANTERN, 20, 12, true);
+        make_label(card, "Overhead Light", 88, 15, &lv_font_montserrat_22, T->text);
+        make_status_dot(card, &s_overhead_status, 90, 48);
     } else {
+        make_label(card, "Overhead Light", 70, 15, &lv_font_montserrat_22, T->text);
         add_bulb_icon(card, 23, 13, T->warm);
+        make_status_dot(card, &s_overhead_status, 72, 48);
     }
-
-    make_status_dot(card, &s_overhead_status, 72, 48);
 
     s_overhead_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_overhead_switch, switch_overhead_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -808,7 +808,7 @@ static void create_overhead_card(lv_obj_t *root)
     }
 
     if (T->soccer) {
-        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 217, 55, true);
+        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 246, 62, true);
     } else if (T->kittens) {
         lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home <3", 238, 69,
                                        &lv_font_montserrat_14, T->accent_2);
@@ -871,11 +871,12 @@ static void create_fan_card(lv_obj_t *root)
     lv_obj_t *card = make_card(root, 14, 274, 382, 192);
 
     if (T->kittens) {
-        add_theme_sprite(card, THEME_ART_KITTEN_FAN, 4, 36, false);
+        add_theme_sprite(card, THEME_ART_KITTEN_FAN, 38, 60, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 224, 48, true);
     } else if (T->soccer) {
-        add_theme_sprite(card, THEME_ART_SOCCER_FAN, 4, 36, false);
+        add_theme_sprite(card, THEME_ART_SOCCER_FAN, 38, 60, true);
     } else if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 0, 36, false);
+        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 78, 48, true);
     }
 
     make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
@@ -891,9 +892,9 @@ static void create_fan_card(lv_obj_t *root)
     s_fan_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    s_fan_state_label = make_label(card, "Fan is Off", 226, 116,
+    s_fan_state_label = make_label(card, "Fan is Off", 258, 116,
                                    &lv_font_montserrat_18, T->text);
-    make_label(card, "Smart Switch", 226, 143,
+    make_label(card, "Smart Switch", 258, 143,
                &lv_font_montserrat_14, T->muted);
 }
 
@@ -922,8 +923,8 @@ static void create_echo_card(lv_obj_t *root)
     const int status_x = T->magic ? 106 : 72;
 
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 0, 5, false);
-        add_theme_sprite(card, THEME_ART_MAGIC_QUILL, 292, 38, false);
+        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 24, 4, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_QUILL, 330, 58, true);
     }
 
     make_label(card, "Alexa", title_x, 15, &lv_font_montserrat_22, T->text);
@@ -933,35 +934,35 @@ static void create_echo_card(lv_obj_t *root)
     }
     make_status_dot(card, &s_echo_status, status_x, 48);
 
-    s_alexa_now_playing = make_label(card, "Nothing playing", 96, 45,
+    s_alexa_now_playing = make_label(card, "Nothing playing", T->magic ? 126 : 96, 45,
                                      &lv_font_montserrat_14, T->text);
-    lv_obj_set_width(s_alexa_now_playing, 145);
+    lv_obj_set_width(s_alexa_now_playing, T->magic ? 112 : 145);
     lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-    s_alexa_artist = make_label(card, "", 96, 64,
+    s_alexa_artist = make_label(card, "", T->magic ? 126 : 96, 64,
                                 &lv_font_montserrat_14, T->muted);
-    lv_obj_set_width(s_alexa_artist, 145);
+    lv_obj_set_width(s_alexa_artist, T->magic ? 112 : 145);
     lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     create_echo_wave(card);
 
-    make_label(card, "Volume", 20, 87, &lv_font_montserrat_16, T->muted);
-    make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 114,
+    make_label(card, "Volume", 20, 92, &lv_font_montserrat_16, T->muted);
+    make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 119,
                &lv_font_montserrat_18, T->accent);
 
-    s_echo_slider = make_slider(card, 50, 117, 250, T->accent);
+    s_echo_slider = make_slider(card, 50, 122, 250, T->accent);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_RELEASED, NULL);
-    s_echo_pct = make_label(card, "--%", 314, 113, &lv_font_montserrat_16, T->text);
+    s_echo_pct = make_label(card, "--%", 314, 118, &lv_font_montserrat_16, T->text);
 
-    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 146, 94, 38);
+    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 148, 94, 36);
     lv_obj_add_event_cb(s_echo_mute, echo_mute_cb, LV_EVENT_CLICKED, NULL);
 
     s_echo_play = make_button(card, LV_SYMBOL_PLAY " " LV_SYMBOL_PAUSE,
-                              126, 146, 96, 38);
+                              126, 148, 96, 36);
     lv_obj_add_event_cb(s_echo_play, echo_play_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *announce = make_button(card, "Announce", 236, 146, 128, 38);
+    lv_obj_t *announce = make_button(card, "Announce", 236, 148, 128, 36);
     lv_obj_add_event_cb(announce, echo_announce_cb, LV_EVENT_CLICKED, NULL);
 }
 
