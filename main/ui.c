@@ -1,5 +1,6 @@
 #include "ui.h"
 
+#include <limits.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -39,7 +40,6 @@ static lv_obj_t *s_tapo_status;
 static lv_obj_t *s_colorwheel;
 static lv_obj_t *s_color_knob;
 static lv_obj_t *s_color_presets[6];
-static int s_selected_color_preset = -1;
 static void *s_colorwheel_buf;
 
 static const uint32_t s_color_preset_display[6] = {
@@ -518,10 +518,10 @@ static void echo_volume_cb(lv_event_t *e)
     }
 }
 
+static void colorwheel_position_knob(uint16_t hue, uint8_t sat);
+
 static void color_preset_set_selected(int selected)
 {
-    s_selected_color_preset = selected;
-
     for (int i = 0; i < 6; ++i) {
         lv_obj_t *btn = s_color_presets[i];
         if (!btn) continue;
