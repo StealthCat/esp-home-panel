@@ -1,0 +1,402 @@
+[
+  {
+    "file": "home_classic.png",
+    "source": "ChatGPT Image Sep 25, 2026, 05_23_59 PM-2.png",
+    "source_sha256": "80115c5c30f60731f1ff122da79799bbeeac35a8c639b4ba88d2779b4ac16add",
+    "crop": [
+      46,
+      824,
+      197,
+      961
+    ],
+    "display_size": [
+      56,
+      56
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "fan_classic.png",
+    "source": "ChatGPT Image Sep 25, 2026, 05_23_59 PM-2.png",
+    "source_sha256": "80115c5c30f60731f1ff122da79799bbeeac35a8c639b4ba88d2779b4ac16add",
+    "crop": [
+      232,
+      819,
+      395,
+      973
+    ],
+    "display_size": [
+      116,
+      116
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "home_soccer.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (1).png",
+    "source_sha256": "21d3941e88fa16cf621112d69b45a4dfa69578048d134129a9b4e63abacf02a9",
+    "crop": [
+      108,
+      121,
+      369,
+      376
+    ],
+    "display_size": [
+      56,
+      56
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "soccer_ball.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (1).png",
+    "source_sha256": "21d3941e88fa16cf621112d69b45a4dfa69578048d134129a9b4e63abacf02a9",
+    "crop": [
+      471,
+      66,
+      824,
+      404
+    ],
+    "display_size": [
+      76,
+      76
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "soccer_streak.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (1).png",
+    "source_sha256": "21d3941e88fa16cf621112d69b45a4dfa69578048d134129a9b4e63abacf02a9",
+    "crop": [
+      878,
+      101,
+      1390,
+      399
+    ],
+    "display_size": [
+      230,
+      70
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "soccer_field.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (1).png",
+    "source_sha256": "21d3941e88fa16cf621112d69b45a4dfa69578048d134129a9b4e63abacf02a9",
+    "crop": [
+      31,
+      480,
+      973,
+      1019
+    ],
+    "display_size": [
+      380,
+      190
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas; aspect-fill instead of fit"
+  },
+  {
+    "file": "soccer_goal.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (1).png",
+    "source_sha256": "21d3941e88fa16cf621112d69b45a4dfa69578048d134129a9b4e63abacf02a9",
+    "crop": [
+      997,
+      450,
+      1435,
+      710
+    ],
+    "display_size": [
+      98,
+      54
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "fan_soccer.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (1).png",
+    "source_sha256": "21d3941e88fa16cf621112d69b45a4dfa69578048d134129a9b4e63abacf02a9",
+    "crop": [
+      1034,
+      704,
+      1370,
+      1026
+    ],
+    "display_size": [
+      116,
+      116
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "home_kittens.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      82,
+      35,
+      435,
+      383
+    ],
+    "display_size": [
+      56,
+      56
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "kitten_peek.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      472,
+      101,
+      897,
+      380
+    ],
+    "display_size": [
+      62,
+      42
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "kitten_sleep.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      914,
+      67,
+      1434,
+      383
+    ],
+    "display_size": [
+      116,
+      70
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "kitten_sit.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      92,
+      385,
+      488,
+      793
+    ],
+    "display_size": [
+      62,
+      76
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "kitten_paws.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      562,
+      451,
+      924,
+      782
+    ],
+    "display_size": [
+      48,
+      48
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "fan_kittens.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      948,
+      382,
+      1396,
+      806
+    ],
+    "display_size": [
+      116,
+      116
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "kitten_caption_home.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      331,
+      758,
+      715,
+      1083
+    ],
+    "display_size": [
+      62,
+      54
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "kitten_caption_echo.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_18 AM (2).png",
+    "source_sha256": "408f981fe8be79e99148c6154a771e0fa08478b2e2df5990842bb8043a3b57d8",
+    "crop": [
+      786,
+      756,
+      1268,
+      1079
+    ],
+    "display_size": [
+      68,
+      60
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "home_magic.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      40,
+      55,
+      414,
+      402
+    ],
+    "display_size": [
+      56,
+      64
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "magic_castle.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      440,
+      55,
+      1424,
+      403
+    ],
+    "display_size": [
+      220,
+      78
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "magic_lantern.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      38,
+      439,
+      326,
+      809
+    ],
+    "display_size": [
+      48,
+      60
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "fan_magic.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      338,
+      459,
+      789,
+      827
+    ],
+    "display_size": [
+      124,
+      112
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "magic_window.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      797,
+      428,
+      1051,
+      828
+    ],
+    "display_size": [
+      66,
+      166
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "magic_owl.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      1067,
+      487,
+      1428,
+      797
+    ],
+    "display_size": [
+      58,
+      60
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "magic_wave.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      32,
+      820,
+      969,
+      1080
+    ],
+    "display_size": [
+      214,
+      60
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  },
+  {
+    "file": "magic_corner_tl.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      884,
+      841,
+      1084,
+      1049
+    ],
+    "display_size": [
+      18,
+      18
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas; mirror horizontally"
+  },
+  {
+    "file": "magic_spark.png",
+    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
+    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
+    "crop": [
+      1100,
+      791,
+      1401,
+      1064
+    ],
+    "display_size": [
+      48,
+      56
+    ],
+    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+  }
+]

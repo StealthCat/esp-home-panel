@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
 """Pack high-resolution transparent PNG theme artwork into LVGL ARGB8888 sprites.
 
-The source PNGs in assets/theme-sprites are freshly recreated artwork based on
-approved UI mockups. They are committed source assets, not crops taken from the
-mockup screenshots. This script decodes them with the Python standard library,
+The source PNGs in assets/theme-sprites are isolated from the user-supplied
+transparent sprite sheets, with aspect ratios preserved. See manifest.json
+for provenance. Live controls and text are rendered by LVGL, not baked in.
+This script decodes them with the Python standard library,
 downsamples with alpha-aware averaging, and writes the generated LVGL include.
 """
 
 from __future__ import annotations
 
 import hashlib
+import json
 import struct
 import zlib
 from pathlib import Path
@@ -22,49 +24,14 @@ except NameError:
 
 OUT = ROOT / "main" / "theme_art_generated.inc"
 ASSET_ROOT = ROOT / "assets" / "theme-sprites"
-GENERATOR_VERSION = "theme-art-v12-reference-sprite-assets"
+GENERATOR_VERSION = "theme-art-v13-approved-sheet-assets"
 
+MANIFEST = ASSET_ROOT / "manifest.json"
 ASSETS = {
-    "HEADER_CLASSIC": ("header_classic.png", 56, 56),
-    "HEADER_SOCCER": ("header_soccer.png", 56, 56),
-    "HEADER_KITTENS": ("header_kittens.png", 56, 56),
-    "HEADER_MAGIC": ("header_magic.png", 56, 56),
-    "SOCCER_FIELD": ("soccer_field.png", 800, 408),
-    "SOCCER_BALL": ("soccer_ball.png", 64, 64),
-    "SOCCER_STREAK": ("soccer_streak.png", 230, 58),
-    "KITTEN_PEEK": ("kitten_peek.png", 74, 56),
-    "KITTEN_SLEEP": ("kitten_sleep.png", 118, 74),
-    "KITTEN_PAWS": ("kitten_paws.png", 60, 68),
-    "KITTEN_SIT": ("kitten_sit.png", 72, 92),
-    "KITTEN_CAPTION_HOME": ("kitten_caption_home.png", 104, 82),
-    "KITTEN_CAPTION_ECHO": ("kitten_caption_echo.png", 118, 82),
-    "FAN_CLASSIC": ("fan_classic.png", 142, 116),
-    "FAN_SOCCER": ("fan_soccer.png", 142, 116),
-    "FAN_KITTENS": ("fan_kittens.png", 142, 116),
-    "FAN_MAGIC": ("fan_magic.png", 142, 116),
-    "SOCCER_GOAL": ("soccer_goal.png", 76, 44),
-    "MAGIC_CASTLE": ("magic_castle.png", 230, 78),
-    "MAGIC_LANTERN": ("magic_lantern.png", 56, 72),
-    "MAGIC_OWL": ("magic_owl.png", 62, 78),
-    "MAGIC_QUILL": ("magic_quill.png", 36, 70),
-    "MAGIC_WINDOW": ("magic_window.png", 72, 116),
-    "MAGIC_WAVE": ("magic_wave.png", 240, 58),
-    "MAGIC_SPARK": ("magic_spark.png", 54, 72),
-    "MAGIC_CORNER_TL": ("magic_corner_tl.png", 36, 36),
+    Path(item["file"]).stem.upper(): (item["file"], *item["display_size"])
+    for item in json.loads(MANIFEST.read_text())
 }
-
-ORDER = [
-    "HEADER_CLASSIC", "HEADER_SOCCER", "HEADER_KITTENS", "HEADER_MAGIC",
-    "SOCCER_FIELD", "SOCCER_BALL", "SOCCER_STREAK",
-    "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS",
-    "KITTEN_SIT", "KITTEN_CAPTION_HOME", "KITTEN_CAPTION_ECHO",
-    "FAN_CLASSIC", "FAN_SOCCER", "FAN_KITTENS", "FAN_MAGIC",
-    "SOCCER_GOAL",
-    "MAGIC_CASTLE", "MAGIC_LANTERN",
-    "MAGIC_OWL", "MAGIC_QUILL", "MAGIC_WINDOW", "MAGIC_WAVE", "MAGIC_SPARK",
-    "MAGIC_CORNER_TL", "MAGIC_CORNER_TR",
-    "MAGIC_CORNER_BL", "MAGIC_CORNER_BR",
-]
+ORDER = list(ASSETS) + ["MAGIC_CORNER_TR", "MAGIC_CORNER_BL", "MAGIC_CORNER_BR"]
 
 
 def _paeth(a: int, b: int, c: int) -> int:
@@ -289,6 +256,7 @@ static const lv_image_dsc_t {sym} = {{
 def signature() -> str:
     h = hashlib.sha256(GENERATOR_VERSION.encode())
     h.update((ROOT / "tools" / "generate_theme_art.py").read_bytes())
+    h.update(MANIFEST.read_bytes())
     for name in sorted(ASSETS):
         h.update(name.encode())
         h.update((ASSET_ROOT / ASSETS[name][0]).read_bytes())
@@ -335,11 +303,15 @@ def generate() -> None:
         )
     parts.append("    default: return NULL;\n    }\n}\n")
 
-    OUT.write_text("\n".join(parts), encoding="utf-8")
+    temporary = OUT.with_suffix(".inc.tmp")
+    temporary.write_text("\n".join(parts), encoding="utf-8")
+    temporary.replace(OUT)
     print(
         f"[theme-art] generated {OUT.relative_to(ROOT)} "
         f"with {len(ORDER)} transparent sprites"
     )
 
 
-generate()
+if __name__ == "__main__" or "env" in globals():
+    generate()
+

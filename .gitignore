@@ -3,3 +3,7 @@ main/theme_art_generated.inc
 /managed_components
 dependencies.lock
 sdkconfig.waveshare-7c-box
+
+/build/
+__pycache__/
+*.pyc

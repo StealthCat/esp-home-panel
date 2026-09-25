@@ -1,3 +1,14 @@
+# Reconfigure native ESP-IDF builds when an asset or its manifest changes.
+file(GLOB THEME_ART_PNGS CONFIGURE_DEPENDS
+    "${CMAKE_CURRENT_LIST_DIR}/../assets/theme-sprites/*.png")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    ${THEME_ART_PNGS}
+    "${CMAKE_CURRENT_LIST_DIR}/../assets/theme-sprites/manifest.json"
+    "${CMAKE_CURRENT_LIST_DIR}/../tools/generate_theme_art.py"
+    "${CMAKE_CURRENT_LIST_DIR}/../tools/check_theme_assets.py"
+    "${CMAKE_CURRENT_LIST_DIR}/ui.c"
+    "${CMAKE_CURRENT_LIST_DIR}/theme_art.h")
+
 # The theme sprites are generated source code. PlatformIO also runs the
 # generator as a pre-build step, but native ESP-IDF/idf.py builds do not run
 # PlatformIO extra_scripts. Generate them here as part of CMake configuration
@@ -11,7 +22,7 @@ else()
 endif()
 
 execute_process(
-    COMMAND "${THEME_ART_PYTHON}" "${CMAKE_CURRENT_LIST_DIR}/../tools/generate_theme_art.py"
+    COMMAND "${THEME_ART_PYTHON}" "${CMAKE_CURRENT_LIST_DIR}/../tools/check_theme_assets.py"
     WORKING_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/.."
     RESULT_VARIABLE THEME_ART_RESULT
     OUTPUT_VARIABLE THEME_ART_STDOUT
@@ -55,3 +66,4 @@ idf_component_register(
         esp_driver_i2c
         esp_driver_spi
 )
+

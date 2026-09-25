@@ -27,7 +27,6 @@ static const char *TAG = "ui";
 static const panel_theme_t *T;
 
 static lv_display_t *s_disp;
-static bool s_artwork_mode = false;
 
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_mqtt_dot;
@@ -56,7 +55,6 @@ static lv_obj_t *s_overhead_pct;
 static lv_obj_t *s_overhead_status;
 
 static lv_obj_t *s_fan_switch;
-static lv_obj_t *s_fan_icon;
 static lv_obj_t *s_fan_status;
 static lv_obj_t *s_fan_state_label;
 
@@ -73,7 +71,6 @@ static bool s_fan_on;
 static bool s_echo_playing;
 static bool s_echo_muted;
 static uint8_t s_echo_unmuted_volume = 50;
-static int s_fan_angle;
 
 enum {
     UI_PENDING_NETWORK  = 1u << 0,
@@ -144,7 +141,7 @@ static void init_styles(void)
     lv_style_set_bg_grad_color(&s_card_style, c(T->card_bg_2));
     lv_style_set_bg_grad_dir(&s_card_style, LV_GRAD_DIR_VER);
     const uint8_t card_opa =
-        T->magic ? 218 : (T->kittens ? 226 : (T->soccer ? 224 : 238));
+        T->magic ? 242 : (T->kittens ? 244 : (T->soccer ? 242 : 248));
     const uint8_t border_opa =
         T->magic ? 190 : (T->kittens ? 165 : (T->soccer ? 150 : 125));
     lv_style_set_bg_opa(&s_card_style, card_opa);
@@ -182,7 +179,7 @@ static lv_obj_t *add_theme_sprite(lv_obj_t *parent, theme_art_id_t id,
 
 static void add_magic_card_ornaments(lv_obj_t *card, int w, int h)
 {
-    const int s = 36;
+    const int s = 18;
     add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TL, 0, 0, false);
     add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TR, w - s, 0, false);
     add_theme_sprite(card, THEME_ART_MAGIC_CORNER_BL, 0, h - s, false);
@@ -216,9 +213,6 @@ static lv_obj_t *make_label(lv_obj_t *parent, const char *text, int x, int y,
     lv_obj_set_pos(label, x, y);
     lv_obj_set_style_text_font(label, font, 0);
     lv_obj_set_style_text_color(label, c(color), 0);
-    if (s_artwork_mode) {
-        lv_obj_set_style_text_opa(label, LV_OPA_TRANSP, 0);
-    }
     return label;
 }
 
@@ -230,7 +224,7 @@ static lv_obj_t *make_card(lv_obj_t *parent, int x, int y, int w, int h)
     lv_obj_add_style(card, &s_card_style, 0);
     lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
     if (T->magic) {
-        add_magic_card_ornaments(card, w, h);
+        add_magic_card_ornaments(card, w - 4, h - 4);
     }
     return card;
 }
@@ -286,9 +280,6 @@ static lv_obj_t *make_button(lv_obj_t *parent, const char *text, int x, int y, i
     lv_label_set_text(label, text);
     lv_obj_set_style_text_font(label, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(label, c(T->text), 0);
-    if (s_artwork_mode) {
-        lv_obj_set_style_text_opa(label, LV_OPA_TRANSP, 0);
-    }
     lv_obj_center(label);
     return btn;
 }
@@ -390,20 +381,18 @@ static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
 
 static void add_soccer_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_SOCCER_FIELD, 0, 72, true);
     add_theme_sprite(screen, THEME_ART_SOCCER_STREAK, 390, 6, true);
-    add_theme_sprite(screen, THEME_ART_SOCCER_BALL, 736, 5, true);
+    add_theme_sprite(screen, THEME_ART_SOCCER_BALL, 724, 0, true);
 }
 
 static void add_kittens_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_KITTEN_PEEK, 22, 64, false);
-    add_theme_sprite(screen, THEME_ART_KITTEN_PAWS, 18, 398, false);
+    add_theme_sprite(screen, THEME_ART_KITTEN_CAPTION_HOME, 732, 13, false);
 }
 
 static void add_magic_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 382, 0, true);
+    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 377, 0, true);
 }
 
 static void add_classic_decor(lv_obj_t *screen)
@@ -627,7 +616,7 @@ static lv_obj_t *create_colorwheel(lv_obj_t *parent)
     const int cy = h / 2;
     const float radius = 49.0f;
 
-    s_colorwheel_buf = heap_caps_malloc(w * h * 2, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+    s_colorwheel_buf = heap_caps_malloc(w * h * 4, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
     if (!s_colorwheel_buf) {
         ESP_LOGE(TAG, "Failed to allocate color wheel canvas");
         return NULL;
@@ -635,7 +624,7 @@ static lv_obj_t *create_colorwheel(lv_obj_t *parent)
 
     lv_obj_t *canvas = lv_canvas_create(parent);
     lv_obj_set_pos(canvas, 17, 70);
-    lv_canvas_set_buffer(canvas, s_colorwheel_buf, w, h, LV_COLOR_FORMAT_RGB565);
+    lv_canvas_set_buffer(canvas, s_colorwheel_buf, w, h, LV_COLOR_FORMAT_ARGB8888);
     lv_canvas_fill_bg(canvas, lv_color_hex(T->card_bg), LV_OPA_TRANSP);
     lv_obj_add_flag(canvas, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_remove_flag(canvas, LV_OBJ_FLAG_SCROLLABLE);
@@ -672,9 +661,6 @@ static lv_obj_t *create_colorwheel(lv_obj_t *parent)
     lv_obj_set_style_pad_all(s_color_knob, 0, 0);
     lv_obj_remove_flag(s_color_knob, LV_OBJ_FLAG_CLICKABLE);
     colorwheel_position_knob(210, 80);
-    if (s_artwork_mode) {
-        lv_obj_set_style_opa(canvas, LV_OPA_TRANSP, 0);
-    }
 
     return canvas;
 }
@@ -765,9 +751,9 @@ static void echo_announce_cb(lv_event_t *e)
 
 static void make_status_dot(lv_obj_t *card, lv_obj_t **status, int x, int y)
 {
-    add_circle(card, x, y + 3, 9, T->online, LV_OPA_COVER);
+    /* A received entity state, not a decorative green dot, confirms readiness. */
     if (status) {
-        *status = NULL;
+        *status = make_label(card, "Waiting", x, y, &lv_font_montserrat_14, T->muted);
     }
 }
 
@@ -775,7 +761,7 @@ static void create_tapo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 78, 382, 187);
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_SPARK, 12, 5, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_SPARK, 16, 6, true);
         make_label(card, "Tapo LED Strips", 78, 15, &lv_font_montserrat_22, T->text);
         make_status_dot(card, &s_tapo_status, 82, 48);
     } else {
@@ -819,10 +805,8 @@ static void create_tapo_card(lv_obj_t *root)
     s_tapo_pct = make_label(card, "--%", 332, 139, &lv_font_montserrat_16, T->text);
 
     if (T->kittens) {
-        add_paw(card, 330, 148, T->accent, 72);
-        lv_obj_t *heart = make_label(card, "<3", 8, 154,
-                                     &lv_font_montserrat_14, T->accent);
-        lv_obj_set_style_text_opa(heart, 120, 0);
+        add_theme_sprite(card, THEME_ART_KITTEN_PEEK, 4, 143, false);
+        add_paw(card, 346, 113, T->accent, 72);
     } else if (T->magic) {
         make_label(card, "*", 12, 48, &lv_font_montserrat_18, T->accent_2);
         make_label(card, "*", 350, 95, &lv_font_montserrat_18, T->accent_2);
@@ -836,7 +820,7 @@ static void create_overhead_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 78, 382, 187);
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_LANTERN, 20, 12, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_LANTERN, 18, 8, true);
         make_label(card, "Overhead Light", 88, 15, &lv_font_montserrat_22, T->text);
         make_status_dot(card, &s_overhead_status, 90, 48);
     } else {
@@ -866,9 +850,9 @@ static void create_overhead_card(lv_obj_t *root)
     }
 
     if (T->soccer) {
-        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 286, 58, true);
+        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 266, 50, true);
     } else if (T->kittens) {
-        lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home <3", 248, 62,
+        lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home", 235, 61,
                                        &lv_font_montserrat_14, T->accent_2);
         lv_obj_set_style_text_opa(caption, 185, 0);
     }
@@ -887,18 +871,21 @@ static void create_fan_card(lv_obj_t *root)
         fan_art = THEME_ART_FAN_MAGIC;
     }
 
-    /* Every theme uses the same 142x116 transparent sprite footprint so the
-     * fan illustration stays aligned independently of theme artwork. */
+    /* Decorative layers stay inside their own card and behind live controls. */
+    if (T->soccer) {
+        lv_obj_t *pitch = add_theme_sprite(card, THEME_ART_SOCCER_FIELD, 0, 0, true);
+        lv_obj_set_style_opa(pitch, 90, 0);
+    }
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_WINDOW, 8, 66, true);
-        add_theme_sprite(card, THEME_ART_MAGIC_WINDOW, 300, 66, true);
-        add_theme_sprite(card, fan_art, 104, 66, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_WINDOW, 4, 20, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_WINDOW, 312, 20, true);
+        add_theme_sprite(card, fan_art, 83, 71, false);
     } else {
-        add_theme_sprite(card, fan_art, 30, 68, true);
+        add_theme_sprite(card, fan_art, 49, 68, false);
     }
 
     if (T->kittens) {
-        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 210, 54, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 211, 57, true);
     }
 
     if (T->magic) {
@@ -911,15 +898,15 @@ static void create_fan_card(lv_obj_t *root)
         make_status_dot(card, &s_fan_status, 72, 48);
     }
 
-    /* Fan artwork is sprite-based for every theme; no native fallback. */
-    s_fan_icon = NULL;
-
-    s_fan_switch = make_switch(card, 309, 13);
+    if (T->kittens) {
+        add_theme_sprite(card, THEME_ART_KITTEN_PAWS, 10, 137, false);
+    }
+    s_fan_switch = make_switch(card, T->magic ? 236 : 309, T->magic ? 77 : 13);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    s_fan_state_label = make_label(card, "Fan is Off", 248, 116,
+    s_fan_state_label = make_label(card, "Fan is Off", T->magic ? 216 : 232, 131,
                                    &lv_font_montserrat_18, T->text);
-    make_label(card, "Smart Switch", 248, 143,
+    make_label(card, "Smart Switch", T->magic ? 216 : 232, 157,
                &lv_font_montserrat_14, T->muted);
 }
 
@@ -931,12 +918,11 @@ static void create_echo_card(lv_obj_t *root)
     const int status_x = T->magic ? 102 : 72;
 
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 22, 9, true);
-        add_theme_sprite(card, THEME_ART_MAGIC_WAVE, 112, 44, true);
-        add_theme_sprite(card, THEME_ART_MAGIC_SPARK, 326, 62, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 16, 5, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_WAVE, 147, 44, true);
     } else if (T->kittens) {
-        add_theme_sprite(card, THEME_ART_KITTEN_CAPTION_ECHO, 248, 48, true);
-        add_theme_sprite(card, THEME_ART_KITTEN_SIT, 302, 96, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_CAPTION_ECHO, 307, 62, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_SIT, 314, 114, true);
     }
 
     make_label(card, "Echo Dot", title_x, 15, &lv_font_montserrat_22, T->text);
@@ -951,14 +937,14 @@ static void create_echo_card(lv_obj_t *root)
     lv_obj_set_style_text_opa(alexa_mark, 220, 0);
 
     if (!T->soccer && !T->kittens && !T->magic) {
-        s_alexa_now_playing = make_label(card, "Nothing playing", 96, 45,
+        s_alexa_now_playing = make_label(card, "Nothing playing", 153, 47,
                                          &lv_font_montserrat_14, T->text);
-        lv_obj_set_width(s_alexa_now_playing, 255);
+        lv_obj_set_width(s_alexa_now_playing, 210);
         lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-        s_alexa_artist = make_label(card, "", 96, 64,
+        s_alexa_artist = make_label(card, "", 153, 67,
                                     &lv_font_montserrat_14, T->muted);
-        lv_obj_set_width(s_alexa_artist, 255);
+        lv_obj_set_width(s_alexa_artist, 210);
         lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
     } else {
         s_alexa_now_playing = NULL;
@@ -969,19 +955,19 @@ static void create_echo_card(lv_obj_t *root)
     make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 119,
                &lv_font_montserrat_18, T->accent);
 
-    s_echo_slider = make_slider(card, 50, 122, 250, T->accent);
+    s_echo_slider = make_slider(card, 50, 122, T->kittens ? 194 : 250, T->accent);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_RELEASED, NULL);
-    s_echo_pct = make_label(card, "--%", 314, 118, &lv_font_montserrat_16, T->text);
+    s_echo_pct = make_label(card, "--%", T->kittens ? 258 : 314, 118, &lv_font_montserrat_16, T->text);
 
-    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 148, 94, 36);
+    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 148, T->kittens ? 68 : 94, 36);
     lv_obj_add_event_cb(s_echo_mute, echo_mute_cb, LV_EVENT_CLICKED, NULL);
 
     s_echo_play = make_button(card, LV_SYMBOL_PLAY " " LV_SYMBOL_PAUSE,
-                              126, 148, 96, 36);
+                              T->kittens ? 96 : 126, 148, T->kittens ? 68 : 96, 36);
     lv_obj_add_event_cb(s_echo_play, echo_play_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *announce = make_button(card, "Announce", 236, 148, 128, 36);
+    lv_obj_t *announce = make_button(card, "Announce", T->kittens ? 174 : 236, 148, 128, 36);
     lv_obj_add_event_cb(announce, echo_announce_cb, LV_EVENT_CLICKED, NULL);
 }
 
@@ -991,33 +977,33 @@ static void create_header(lv_obj_t *root)
     const char *title =
         (settings && settings->display_title[0]) ? settings->display_title : "Home Control";
 
-    theme_art_id_t header_art = THEME_ART_HEADER_CLASSIC;
+    theme_art_id_t header_art = THEME_ART_HOME_CLASSIC;
     if (T->soccer) {
-        header_art = THEME_ART_HEADER_SOCCER;
+        header_art = THEME_ART_HOME_SOCCER;
     } else if (T->kittens) {
-        header_art = THEME_ART_HEADER_KITTENS;
+        header_art = THEME_ART_HOME_KITTENS;
     } else if (T->magic) {
-        header_art = THEME_ART_HEADER_MAGIC;
+        header_art = THEME_ART_HOME_MAGIC;
     }
 
     add_theme_sprite(root, header_art, 10, 8, false);
 
     lv_obj_t *title_label =
-        make_label(root, title, 78, 17, &lv_font_montserrat_36, T->text);
-    lv_obj_set_width(title_label, T->magic ? 500 : 530);
+        make_label(root, title, 78, 13, &lv_font_montserrat_32, T->text);
+    lv_obj_set_width(title_label, T->magic ? 330 : 440);
     lv_obj_set_height(title_label, 44);
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_DOTS);
 
-    if (T->soccer || T->kittens || T->magic) {
+    {
         lv_obj_t *tagline = make_label(root, T->tagline, 78, 52,
                                        &lv_font_montserrat_14, T->muted);
         lv_obj_set_style_text_opa(tagline, 220, 0);
     }
 
-    const int clock_x = T->magic ? 650 : 635;
-    const int date_x = T->magic ? 642 : 620;
-    const int wifi_x = T->magic ? 752 : 733;
-    const int mqtt_x = T->magic ? 738 : 720;
+    const int clock_x = 600;
+    const int date_x = 590;
+    const int wifi_x = 701;
+    const int mqtt_x = 710;
 
     s_clock = make_label(root, "--:--", clock_x, 8, &lv_font_montserrat_28, T->text);
     s_date = make_label(root, "---, --- --", date_x, 42, &lv_font_montserrat_14, T->muted);
@@ -1029,8 +1015,15 @@ static void create_header(lv_obj_t *root)
     lv_obj_set_size(s_mqtt_dot, 8, 8);
     lv_obj_set_style_radius(s_mqtt_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(s_mqtt_dot, c(T->muted), 0);
-    lv_obj_set_style_bg_opa(s_mqtt_dot, s_artwork_mode ? LV_OPA_TRANSP : LV_OPA_COVER, 0);
+    lv_obj_set_style_bg_opa(s_mqtt_dot, LV_OPA_COVER, 0);
     lv_obj_set_style_border_width(s_mqtt_dot, 0, 0);
+}
+
+static void set_entity_status(lv_obj_t *label, const char *text, bool online)
+{
+    if (!label) return;
+    lv_label_set_text(label, text);
+    lv_obj_set_style_text_color(label, c(online ? T->online : T->muted), 0);
 }
 
 static void pending_state_timer_cb(lv_timer_t *timer)
@@ -1063,6 +1056,18 @@ static void pending_state_timer_cb(lv_timer_t *timer)
             0);
     }
 
+    if (pending.dirty & UI_PENDING_MQTT) {
+        const char *status = pending.mqtt_online ? "Waiting" : "Offline";
+        set_entity_status(s_tapo_status, status, false);
+        set_entity_status(s_overhead_status, status, false);
+        set_entity_status(s_fan_status, status, false);
+        set_entity_status(s_echo_status, status, false);
+    }
+    if (pending.dirty & UI_PENDING_TAPO) set_entity_status(s_tapo_status, "Online", true);
+    if (pending.dirty & UI_PENDING_OVERHEAD) set_entity_status(s_overhead_status, "Online", true);
+    if (pending.dirty & UI_PENDING_FAN) set_entity_status(s_fan_status, "Online", true);
+    if (pending.dirty & UI_PENDING_ALEXA) set_entity_status(s_echo_status, "Online", true);
+
     if ((pending.dirty & UI_PENDING_TAPO) &&
         s_tapo_switch && s_tapo_slider && s_tapo_pct) {
         s_syncing = true;
@@ -1093,10 +1098,6 @@ static void pending_state_timer_cb(lv_timer_t *timer)
         lv_label_set_text(
             s_fan_state_label,
             pending.fan_on ? "Fan is On" : "Fan is Off");
-        if (s_fan_icon) {
-            lv_obj_set_style_shadow_opa(
-                s_fan_icon, pending.fan_on ? 100 : 20, 0);
-        }
         s_syncing = false;
     }
 
@@ -1140,6 +1141,7 @@ static void pending_state_timer_cb(lv_timer_t *timer)
 
 static void clock_timer_cb(lv_timer_t *timer)
 {
+    (void)timer;
     time_t now;
     struct tm tm_now;
     char time_buf[16];
@@ -1160,17 +1162,6 @@ static void clock_timer_cb(lv_timer_t *timer)
 
     lv_label_set_text(s_clock, time_buf);
     lv_label_set_text(s_date, date_buf);
-}
-
-static void animation_timer_cb(lv_timer_t *timer)
-{
-    (void)timer;
-
-    if (s_fan_on && s_fan_icon) {
-        s_fan_angle += 80;
-        if (s_fan_angle >= 3600) s_fan_angle -= 3600;
-        lv_obj_set_style_transform_rotation(s_fan_icon, s_fan_angle, 0);
-    }
 }
 
 esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
@@ -1250,7 +1241,6 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
      * duplicated switches, sliders, labels, and status graphics. Render the
      * entire interface natively so every visible control has one owner.
      */
-    s_artwork_mode = false;
     init_styles();
     add_theme_decor(root);
     create_header(root);
@@ -1258,10 +1248,10 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
     create_overhead_card(root);
     create_fan_card(root);
     create_echo_card(root);
+    if (T->kittens) add_theme_sprite(root, THEME_ART_KITTEN_PEEK, 18, 54, false);
 
     lv_timer_create(pending_state_timer_cb, 20, NULL);
     lv_timer_create(clock_timer_cb, 1000, NULL);
-    lv_timer_create(animation_timer_cb, 70, NULL);
     clock_timer_cb(NULL);
 
     lvgl_port_unlock();
@@ -1328,3 +1318,4 @@ void ui_apply_echo_state(uint8_t volume, bool muted, bool playing,
     s_pending_ui.dirty |= UI_PENDING_ALEXA;
     portEXIT_CRITICAL(&s_pending_ui_mux);
 }
+
