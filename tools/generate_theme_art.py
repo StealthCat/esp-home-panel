@@ -163,16 +163,24 @@ def _downsample_rgba(src: bytearray, sw: int, sh: int,
 
     for y in range(dh):
         for x in range(dw):
-            sums = [0, 0, 0, 0]
+            alpha_sum = 0
+            rgb_weighted = [0, 0, 0]
+
             for sy in range(factor):
                 for sx in range(factor):
                     p = (((y * factor + sy) * sw) + (x * factor + sx)) * 4
-                    for channel in range(4):
-                        sums[channel] += src[p + channel]
+                    alpha = src[p + 3]
+                    alpha_sum += alpha
+                    rgb_weighted[0] += src[p] * alpha
+                    rgb_weighted[1] += src[p + 1] * alpha
+                    rgb_weighted[2] += src[p + 2] * alpha
 
             d = (y * dw + x) * 4
-            for channel in range(4):
-                out[d + channel] = int(round(sums[channel] / samples))
+            if alpha_sum:
+                out[d] = int(round(rgb_weighted[0] / alpha_sum))
+                out[d + 1] = int(round(rgb_weighted[1] / alpha_sum))
+                out[d + 2] = int(round(rgb_weighted[2] / alpha_sum))
+            out[d + 3] = int(round(alpha_sum / samples))
 
     return out, dw, dh
 
