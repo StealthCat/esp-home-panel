@@ -15,6 +15,7 @@
 #include "board_7c.h"
 #include "lvgl.h"
 #include "mqtt_bridge.h"
+#include "settings.h"
 #include "ui_theme.h"
 #include "theme_art.h"
 #ifdef WOKWI_EMULATOR
