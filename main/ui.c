@@ -385,40 +385,8 @@ static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
 
 static void add_soccer_decor(lv_obj_t *screen)
 {
-    for (int i = 0; i < 10; ++i) {
-        lv_obj_t *stripe = add_decor_box(
-            screen, -40 + i * 95, 72, 48, 408,
-            (i % 2) ? 0x0A3A20 : 0x0D4727, 28, 0);
-        lv_obj_set_style_transform_rotation(stripe, 70, 0);
-    }
-
-    lv_obj_t *pitch = lv_obj_create(screen);
-    lv_obj_set_pos(pitch, 0, 72);
-    lv_obj_set_size(pitch, 800, 408);
-    lv_obj_set_style_bg_opa(pitch, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(pitch, 1, 0);
-    lv_obj_set_style_border_color(pitch, c(0x50C878), 0);
-    lv_obj_set_style_border_opa(pitch, 34, 0);
-    lv_obj_set_style_radius(pitch, 0, 0);
-    lv_obj_set_style_pad_all(pitch, 0, 0);
-    lv_obj_remove_flag(pitch, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(pitch, LV_OBJ_FLAG_CLICKABLE);
-
-    add_decor_box(pitch, 399, 0, 2, 408, 0x50C878, 28, 0);
-
-    lv_obj_t *center = lv_obj_create(pitch);
-    lv_obj_set_pos(center, 330, 130);
-    lv_obj_set_size(center, 140, 140);
-    lv_obj_set_style_radius(center, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(center, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(center, 2, 0);
-    lv_obj_set_style_border_color(center, c(0x50C878), 0);
-    lv_obj_set_style_border_opa(center, 28, 0);
-    lv_obj_remove_flag(center, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(center, LV_OBJ_FLAG_CLICKABLE);
-
-    /* The original soccer header ball overlaps the old settings gear in the
-     * source art, so do not render that crop. Keep the header clean. */
+    /* The soccer pitch is a clean ARGB sprite generated from scratch. */
+    add_theme_sprite(screen, THEME_ART_SOCCER_FIELD, 0, 72, true);
 }
 
 static void add_kittens_decor(lv_obj_t *screen)
