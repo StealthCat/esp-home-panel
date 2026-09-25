@@ -923,33 +923,43 @@ static void create_echo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 274, 382, 192);
 
-    const int title_x = T->magic ? 112 : 70;
-    const int status_x = T->magic ? 114 : 72;
+    const int title_x = T->magic ? 100 : 70;
+    const int status_x = T->magic ? 102 : 72;
 
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 30, 10, true);
-        add_theme_sprite(card, THEME_ART_MAGIC_QUILL, 344, 72, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 22, 9, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_WAVE, 112, 44, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_SPARK, 326, 62, true);
+    } else if (T->kittens) {
+        add_theme_sprite(card, THEME_ART_KITTEN_CAPTION_ECHO, 248, 48, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_SIT, 302, 96, true);
     }
 
-    make_label(card, "Alexa", title_x, 15, &lv_font_montserrat_22, T->text);
+    make_label(card, "Echo Dot", title_x, 15, &lv_font_montserrat_22, T->text);
     if (!T->magic) {
         make_label(card, LV_SYMBOL_VOLUME_MAX, 22, 18,
                    &lv_font_montserrat_22, T->accent);
     }
     make_status_dot(card, &s_echo_status, status_x, 48);
 
-    const int media_x = T->magic ? 132 : 96;
-    const int media_w = T->magic ? 195 : 255;
+    lv_obj_t *alexa_mark =
+        make_label(card, "alexa", 318, 18, &lv_font_montserrat_16, T->accent);
+    lv_obj_set_style_text_opa(alexa_mark, 220, 0);
 
-    s_alexa_now_playing = make_label(card, "Nothing playing", media_x, 45,
-                                     &lv_font_montserrat_14, T->text);
-    lv_obj_set_width(s_alexa_now_playing, media_w);
-    lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+    if (!T->soccer && !T->kittens && !T->magic) {
+        s_alexa_now_playing = make_label(card, "Nothing playing", 96, 45,
+                                         &lv_font_montserrat_14, T->text);
+        lv_obj_set_width(s_alexa_now_playing, 255);
+        lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-    s_alexa_artist = make_label(card, "", media_x, 64,
-                                &lv_font_montserrat_14, T->muted);
-    lv_obj_set_width(s_alexa_artist, media_w);
-    lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+        s_alexa_artist = make_label(card, "", 96, 64,
+                                    &lv_font_montserrat_14, T->muted);
+        lv_obj_set_width(s_alexa_artist, 255);
+        lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
+    } else {
+        s_alexa_now_playing = NULL;
+        s_alexa_artist = NULL;
+    }
 
     make_label(card, "Volume", 20, 92, &lv_font_montserrat_16, T->muted);
     make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 119,
