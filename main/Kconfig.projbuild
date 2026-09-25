@@ -28,6 +28,10 @@ config PANEL_MQTT_DISCOVERY_PREFIX
     string "Home Assistant MQTT discovery prefix"
     default "homeassistant"
 
+config PANEL_DISPLAY_TITLE
+    string "Display header title"
+    default "Home Control"
+
 config PANEL_TIMEZONE
     string "POSIX timezone"
     default "EST5EDT,M3.2.0/2,M11.1.0/2"
