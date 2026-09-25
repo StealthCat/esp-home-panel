@@ -28,6 +28,8 @@ jobs:
         run: |
           python tools/build_theme_png_assets.py
           python tools/build_reference_theme_extras.py
+      - name: Validate PNG to LVGL ARGB packing
+        run: python tools/generate_theme_art.py
       - name: Commit generated PNG assets
         run: |
           git config user.name "github-actions[bot]"
