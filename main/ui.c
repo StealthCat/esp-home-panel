@@ -409,18 +409,19 @@ static void add_soccer_decor(lv_obj_t *screen)
     lv_obj_remove_flag(center, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_remove_flag(center, LV_OBJ_FLAG_CLICKABLE);
 
-    add_theme_sprite(screen, THEME_ART_SOCCER_BALL, 744, 0, true);
+    /* The original soccer header ball overlaps the old settings gear in the
+     * source art, so do not render that crop. Keep the header clean. */
 }
 
 static void add_kittens_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_KITTEN_PEEK, 15, 55, false);
-    add_theme_sprite(screen, THEME_ART_KITTEN_PAWS, 18, 395, false);
+    add_theme_sprite(screen, THEME_ART_KITTEN_PEEK, 22, 64, false);
+    add_theme_sprite(screen, THEME_ART_KITTEN_PAWS, 18, 398, false);
 }
 
 static void add_magic_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 400, 0, true);
+    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 392, 0, true);
 }
 
 static void add_classic_decor(lv_obj_t *screen)
@@ -814,9 +815,9 @@ static void create_overhead_card(lv_obj_t *root)
     }
 
     if (T->soccer) {
-        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 246, 62, true);
+        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 268, 74, true);
     } else if (T->kittens) {
-        lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home <3", 238, 69,
+        lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home <3", 248, 62,
                                        &lv_font_montserrat_14, T->accent_2);
         lv_obj_set_style_text_opa(caption, 185, 0);
     }
@@ -877,12 +878,12 @@ static void create_fan_card(lv_obj_t *root)
     lv_obj_t *card = make_card(root, 14, 274, 382, 192);
 
     if (T->kittens) {
-        add_theme_sprite(card, THEME_ART_KITTEN_FAN, 38, 60, true);
-        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 231, 41, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_FAN, 40, 64, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 246, 54, true);
     } else if (T->soccer) {
-        add_theme_sprite(card, THEME_ART_SOCCER_FAN, 38, 60, true);
+        add_theme_sprite(card, THEME_ART_SOCCER_FAN, 40, 64, true);
     } else if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 80, 46, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 92, 54, true);
     }
 
     if (T->magic) {
@@ -904,9 +905,9 @@ static void create_fan_card(lv_obj_t *root)
     s_fan_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
-    s_fan_state_label = make_label(card, "Fan is Off", 258, 116,
+    s_fan_state_label = make_label(card, "Fan is Off", 248, 116,
                                    &lv_font_montserrat_18, T->text);
-    make_label(card, "Smart Switch", 258, 143,
+    make_label(card, "Smart Switch", 248, 143,
                &lv_font_montserrat_14, T->muted);
 }
 
@@ -931,12 +932,12 @@ static void create_echo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 274, 382, 192);
 
-    const int title_x = T->magic ? 104 : 70;
-    const int status_x = T->magic ? 106 : 72;
+    const int title_x = T->magic ? 112 : 70;
+    const int status_x = T->magic ? 114 : 72;
 
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 24, 4, true);
-        add_theme_sprite(card, THEME_ART_MAGIC_QUILL, 330, 58, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_OWL, 30, 10, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_QUILL, 344, 72, true);
     }
 
     make_label(card, "Alexa", title_x, 15, &lv_font_montserrat_22, T->text);
@@ -946,14 +947,14 @@ static void create_echo_card(lv_obj_t *root)
     }
     make_status_dot(card, &s_echo_status, status_x, 48);
 
-    s_alexa_now_playing = make_label(card, "Nothing playing", T->magic ? 126 : 96, 45,
+    s_alexa_now_playing = make_label(card, "Nothing playing", T->magic ? 132 : 96, 45,
                                      &lv_font_montserrat_14, T->text);
-    lv_obj_set_width(s_alexa_now_playing, T->magic ? 112 : 145);
+    lv_obj_set_width(s_alexa_now_playing, T->magic ? 106 : 145);
     lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-    s_alexa_artist = make_label(card, "", T->magic ? 126 : 96, 64,
+    s_alexa_artist = make_label(card, "", T->magic ? 132 : 96, 64,
                                 &lv_font_montserrat_14, T->muted);
-    lv_obj_set_width(s_alexa_artist, T->magic ? 112 : 145);
+    lv_obj_set_width(s_alexa_artist, T->magic ? 106 : 145);
     lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     create_echo_wave(card);
@@ -999,13 +1000,18 @@ static void create_header(lv_obj_t *root)
     make_label(root, T->name, 64, 10, &lv_font_montserrat_32, T->text);
     make_label(root, T->tagline, 64, 48, &lv_font_montserrat_14, T->muted);
 
-    s_clock = make_label(root, "--:--", 635, 8, &lv_font_montserrat_28, T->text);
-    s_date = make_label(root, "---, --- --", 620, 42, &lv_font_montserrat_14, T->muted);
+    const int clock_x = T->magic ? 650 : 635;
+    const int date_x = T->magic ? 642 : 620;
+    const int wifi_x = T->magic ? 752 : 733;
+    const int mqtt_x = T->magic ? 738 : 720;
 
-    s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, 733, 20, &lv_font_montserrat_22, T->muted);
+    s_clock = make_label(root, "--:--", clock_x, 8, &lv_font_montserrat_28, T->text);
+    s_date = make_label(root, "---, --- --", date_x, 42, &lv_font_montserrat_14, T->muted);
+
+    s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, wifi_x, 20, &lv_font_montserrat_22, T->muted);
 
     s_mqtt_dot = lv_obj_create(root);
-    lv_obj_set_pos(s_mqtt_dot, 720, 53);
+    lv_obj_set_pos(s_mqtt_dot, mqtt_x, 53);
     lv_obj_set_size(s_mqtt_dot, 8, 8);
     lv_obj_set_style_radius(s_mqtt_dot, LV_RADIUS_CIRCLE, 0);
     lv_obj_set_style_bg_color(s_mqtt_dot, c(T->muted), 0);
