@@ -994,6 +994,12 @@ static void create_header(lv_obj_t *root)
     lv_obj_set_height(title_label, 44);
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_DOTS);
 
+    if (T->soccer || T->kittens || T->magic) {
+        lv_obj_t *tagline = make_label(root, T->tagline, 78, 52,
+                                       &lv_font_montserrat_14, T->muted);
+        lv_obj_set_style_text_opa(tagline, 220, 0);
+    }
+
     const int clock_x = T->magic ? 650 : 635;
     const int date_x = T->magic ? 642 : 620;
     const int wifi_x = T->magic ? 752 : 733;
