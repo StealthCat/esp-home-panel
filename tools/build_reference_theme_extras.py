@@ -33,6 +33,32 @@ def star(d,x,y,r,color):
         pts.append((x+math.cos(a)*q,y+math.sin(a)*q))
     poly(d,pts,color)
 
+def header_kittens():
+    im=canvas(56,56); d=ImageDraw.Draw(im)
+    glow(im,lambda q:q.polygon([(P(7),P(29)),(P(28),P(9)),(P(49),P(29)),(P(45),P(49)),(P(11),P(49))],fill=255),
+         (255,101,169,105),2.5)
+    poly(d,[(7,29),(28,9),(49,29),(45,49),(11,49)],(255,184,213,255))
+    rr(d,(23,34,33,50),2,(120,42,74,255))
+    # paw hovering above the roof, matching the approved kitten mockup
+    ell(d,(22,1,34,11),(244,105,163,255))
+    for b in [(16,3,22,9),(25,-2,31,4),(34,3,40,9)]:
+        ell(d,b,(244,105,163,255))
+    save(im,"header_kittens.png")
+
+def header_magic():
+    im=canvas(56,56); d=ImageDraw.Draw(im)
+    glow(im,lambda q:q.rectangle(box(9,20,47,50),fill=255),(55,157,255,100),2.5)
+    # compact blue-and-gold castle silhouette from the reference header
+    rr(d,(12,25,44,50),1,(17,90,176,255),(226,181,85,255),1)
+    towers=[(9,22,18,50,13),(23,13,33,50,28),(38,22,47,50,42)]
+    for x0,y0,x1,y1,cx in towers:
+        rr(d,(x0,y0,x1,y1),1,(12,72,151,255),(226,181,85,255),.8)
+        poly(d,[(x0-2,y0),(cx,y0-10),(x1+2,y0)],(6,45,105,255))
+        rr(d,(cx-1.5,y0+10,cx+1.5,y0+18),.5,(255,213,84,255))
+    rr(d,(25,37,31,50),2,(255,203,71,255))
+    star(d,47,10,3,(248,204,83,230))
+    save(im,"header_magic.png")
+
 def soccer_ball():
     im=canvas(64,64); d=ImageDraw.Draw(im)
     glow(im,lambda q:q.ellipse(box(4,4,60,60),fill=255),(45,255,104,120),3)
@@ -135,7 +161,7 @@ def magic_spark():
     for x,y,r in [(31,8,2),(48,31,2),(28,30,1.4),(17,44,1.1)]: star(d,x,y,r,(249,202,82,230))
     save(im,"magic_spark.png")
 
-soccer_ball(); soccer_streak(); kitten_sit()
+header_kittens(); header_magic(); soccer_ball(); soccer_streak(); kitten_sit()
 caption("kitten_caption_home.png",["Good","Things","At Home"],104,82)
 caption("kitten_caption_echo.png",["Small","Voices","Big Joy"],118,82)
 magic_window(); magic_wave(); magic_spark()
