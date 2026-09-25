@@ -398,7 +398,7 @@ static void add_kittens_decor(lv_obj_t *screen)
 
 static void add_magic_decor(lv_obj_t *screen)
 {
-    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 392, 0, true);
+    add_theme_sprite(screen, THEME_ART_MAGIC_CASTLE, 382, 0, true);
 }
 
 static void add_classic_decor(lv_obj_t *screen)
