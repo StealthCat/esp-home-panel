@@ -143,14 +143,19 @@ static void init_styles(void)
     lv_style_set_bg_color(&s_card_style, c(T->card_bg));
     lv_style_set_bg_grad_color(&s_card_style, c(T->card_bg_2));
     lv_style_set_bg_grad_dir(&s_card_style, LV_GRAD_DIR_VER);
-    lv_style_set_bg_opa(&s_card_style, 238);
-    lv_style_set_border_width(&s_card_style, 1);
+    const uint8_t card_opa =
+        T->magic ? 218 : (T->kittens ? 226 : (T->soccer ? 224 : 238));
+    const uint8_t border_opa =
+        T->magic ? 190 : (T->kittens ? 165 : (T->soccer ? 150 : 125));
+    lv_style_set_bg_opa(&s_card_style, card_opa);
+    lv_style_set_border_width(&s_card_style, T->magic ? 2 : 1);
     lv_style_set_border_color(&s_card_style, c(T->card_border));
-    lv_style_set_border_opa(&s_card_style, T->magic ? 90 : 125);
-    lv_style_set_shadow_width(&s_card_style, 8);
+    lv_style_set_border_opa(&s_card_style, border_opa);
+    lv_style_set_shadow_width(&s_card_style, T->magic ? 12 : 8);
     lv_style_set_shadow_spread(&s_card_style, 0);
     lv_style_set_shadow_color(&s_card_style, c(T->accent));
-    lv_style_set_shadow_opa(&s_card_style, T->kittens ? 28 : 18);
+    lv_style_set_shadow_opa(&s_card_style,
+                            T->magic ? 30 : (T->kittens ? 32 : 20));
     lv_style_set_pad_all(&s_card_style, 0);
 
     lv_style_init(&s_button_style);
