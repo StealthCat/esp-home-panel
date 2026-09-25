@@ -1,222 +1,424 @@
 #!/usr/bin/env python3
-"""Build high-resolution transparent PNG source art for ESP Home Panel themes.
+"""Build warm, high-resolution transparent PNG art matching the approved mockups.
 
-These are source assets for the firmware ARGB packer. They are intentionally
-redrawn from the approved mockup compositions rather than cropped from the
-mockups. All assets are produced at 2x or 4x firmware resolution so the packer
-can alpha-aware downsample them for clean edges on the panel.
+Artwork is freshly recreated, not cropped from the mockups. It is painted at
+8x target resolution with soft gradients, glow, rounded organic silhouettes and
+subtle texture, then Lanczos-downsampled to 4x PNG source assets. The firmware
+ARGB packer performs the final alpha-aware downsample to display resolution.
 """
+
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 import math
+import random
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "assets" / "theme-sprites"
 OUT.mkdir(parents=True, exist_ok=True)
 
-CLASSIC_BLUE=(57,166,244,255)
-CLASSIC_LIGHT=(132,209,255,255)
-CLASSIC_DARK=(15,31,45,255)
-SOCCER_GREEN=(48,238,109,255)
-SOCCER_MINT=(123,246,188,255)
-SOCCER_DARK=(5,66,36,255)
-KITTEN_PINK=(244,111,169,255)
-KITTEN_LIGHT=(251,169,203,255)
-KITTEN_CREAM=(236,219,224,255)
-KITTEN_DARK=(95,51,67,255)
-MAGIC_BLUE=(31,151,231,255)
-MAGIC_DARK=(5,42,92,255)
-MAGIC_GOLD=(226,181,86,255)
-MAGIC_CREAM=(255,235,191,255)
-WHITE=(245,250,248,255)
+R = 8          # painting scale
+SOURCE = 4     # committed PNG scale
+
+CLASSIC_BLUE=(61,168,244,255)
+CLASSIC_LIGHT=(155,219,255,255)
+CLASSIC_DARK=(13,30,45,255)
+SOCCER_GREEN=(51,235,111,255)
+SOCCER_MINT=(133,247,190,255)
+SOCCER_DARK=(4,62,34,255)
+KITTEN_PINK=(239,108,162,255)
+KITTEN_LIGHT=(252,173,204,255)
+KITTEN_CREAM=(242,224,230,255)
+KITTEN_WARM=(226,202,211,255)
+KITTEN_DARK=(91,48,64,255)
+MAGIC_BLUE=(38,157,235,255)
+MAGIC_SKY=(121,205,255,255)
+MAGIC_DARK=(5,37,82,255)
+MAGIC_GOLD=(228,181,85,255)
+MAGIC_CREAM=(255,237,194,255)
+WHITE=(248,252,250,255)
 TRAN=(0,0,0,0)
 
-def img(w,h): return Image.new('RGBA',(w,h),TRAN)
-def poly(d,p,fill): d.polygon(p,fill=fill)
-def ellipse(d,box,fill,outline=None,width=1): d.ellipse(box,fill=fill,outline=outline,width=width)
-def line(d,p,fill,width): d.line(p,fill=fill,width=width,joint='curve')
-def rect(d,box,fill,outline=None,width=1): d.rectangle(box,fill=fill,outline=outline,width=width)
+def sc(v): return int(round(v*R))
+def box(x0,y0,x1,y1): return tuple(sc(v) for v in (x0,y0,x1,y1))
+def canvas(w,h): return Image.new("RGBA",(sc(w),sc(h)),TRAN)
 
-def clear_polygon(im, pts):
-    m=Image.new('L',im.size,0); md=ImageDraw.Draw(m); md.polygon(pts,fill=255); im.paste((0,0,0,0),mask=m)
+def rgba(hexv,a=255):
+    return ((hexv>>16)&255,(hexv>>8)&255,hexv&255,a)
 
-def save(im,name):
+def alpha_scale(mask, value):
+    return mask.point(lambda p: (p*value)//255)
+
+def soft_glow(base, mask, color, radius, alpha=150, offset=(0,0)):
+    blur=mask.filter(ImageFilter.GaussianBlur(sc(radius)))
+    blur=alpha_scale(blur,alpha)
+    layer=Image.new("RGBA",base.size,color[:3]+(0,))
+    layer.putalpha(blur)
+    if offset != (0,0):
+        shifted=Image.new("RGBA",base.size,TRAN)
+        shifted.alpha_composite(layer,(sc(offset[0]),sc(offset[1])))
+        base.alpha_composite(shifted)
+    else:
+        base.alpha_composite(layer)
+
+def masked_gradient(base, mask, top, bottom):
+    w,h=base.size
+    grad=Image.new("RGBA",(1,h))
+    px=grad.load()
+    for y in range(h):
+        t=y/max(1,h-1)
+        px[0,y]=tuple(int(top[i]*(1-t)+bottom[i]*t) for i in range(4))
+    grad=grad.resize((w,h))
+    grad.putalpha(mask)
+    base.alpha_composite(grad)
+
+def ellipse_mask(size,b):
+    m=Image.new("L",size,0); d=ImageDraw.Draw(m)
+    d.ellipse(tuple(sc(v) for v in b),fill=255)
+    return m
+
+def rounded_rect_mask(size,b,r):
+    m=Image.new("L",size,0); d=ImageDraw.Draw(m)
+    d.rounded_rectangle(tuple(sc(v) for v in b),radius=sc(r),fill=255)
+    return m
+
+def polygon_mask(size,pts):
+    m=Image.new("L",size,0); d=ImageDraw.Draw(m)
+    d.polygon([(sc(x),sc(y)) for x,y in pts],fill=255)
+    return m
+
+def draw_line(d,pts,fill,width):
+    d.line([(sc(x),sc(y)) for x,y in pts],fill=fill,width=max(1,sc(width)),joint="curve")
+
+def draw_ellipse(d,b,fill,outline=None,width=1):
+    d.ellipse(box(*b),fill=fill,outline=outline,width=max(1,sc(width)))
+
+def draw_poly(d,pts,fill):
+    d.polygon([(sc(x),sc(y)) for x,y in pts],fill=fill)
+
+def draw_rr(d,b,r,fill,outline=None,width=1):
+    d.rounded_rectangle(box(*b),radius=sc(r),fill=fill,outline=outline,width=max(1,sc(width)))
+
+def composite_mask(base,mask,color):
+    layer=Image.new("RGBA",base.size,color); layer.putalpha(mask)
+    base.alpha_composite(layer)
+
+def finish(im,name,w,h):
+    target=(w*SOURCE,h*SOURCE)
+    im=im.resize(target,Image.Resampling.LANCZOS)
     im.save(OUT/name,optimize=True,compress_level=9)
 
-def house(color, magic=False):
-    s=4; im=img(56*s,56*s); d=ImageDraw.Draw(im)
-    if magic:
-        poly(d,[(24*s,16*s),(28*s,8*s),(32*s,16*s),(47*s,29*s),(43*s,48*s),(13*s,48*s),(9*s,29*s)],MAGIC_GOLD)
-        poly(d,[(28*s,11*s),(44*s,30*s),(40*s,44*s),(16*s,44*s),(12*s,30*s)],MAGIC_DARK)
-        poly(d,[(28*s,16*s),(40*s,29*s),(38*s,42*s),(18*s,42*s),(16*s,29*s)],MAGIC_BLUE)
-        rect(d,(25*s,31*s,31*s,44*s),MAGIC_DARK)
-        ellipse(d,(26*s,12*s,30*s,16*s),MAGIC_CREAM)
+def star(d,cx,cy,r,color,points=4):
+    pts=[]
+    for i in range(points*2):
+        rr=r if i%2==0 else r*.24
+        a=-math.pi/2+i*math.pi/points
+        pts.append((cx+math.cos(a)*rr,cy+math.sin(a)*rr))
+    draw_poly(d,pts,color)
+
+def house(theme):
+    w=h=56; im=canvas(w,h)
+    if theme=="classic": main,light,dark=CLASSIC_BLUE,CLASSIC_LIGHT,CLASSIC_DARK
+    elif theme=="soccer": main,light,dark=SOCCER_GREEN,SOCCER_MINT,SOCCER_DARK
+    elif theme=="kittens": main,light,dark=KITTEN_PINK,KITTEN_LIGHT,KITTEN_DARK
+    else: main,light,dark=MAGIC_BLUE,MAGIC_SKY,MAGIC_DARK
+
+    if theme=="magic":
+        outer=polygon_mask(im.size,[(7,29),(28,7),(49,29),(45,49),(11,49)])
+        soft_glow(im,outer,MAGIC_GOLD,2.8,125)
+        composite_mask(im,outer,MAGIC_GOLD)
+        inner=polygon_mask(im.size,[(11,29),(28,12),(45,29),(41,45),(15,45)])
+        masked_gradient(im,inner,(27,130,225,255),(8,62,126,255))
+        d=ImageDraw.Draw(im)
+        draw_line(d,[(17,30),(28,19),(39,30)],MAGIC_CREAM,1.2)
+        draw_rr(d,(24,33,32,46),2,MAGIC_DARK)
+        star(d,47,11,5,MAGIC_GOLD,4)
     else:
-        poly(d,[(7*s,27*s),(28*s,8*s),(49*s,27*s),(44*s,31*s),(44*s,47*s),(12*s,47*s),(12*s,31*s)],color)
-        poly(d,[(11*s,27*s),(28*s,12*s),(45*s,27*s)],color)
-        clear_polygon(im,[(21*s,24*s),(28*s,17*s),(35*s,24*s)])
-        rect(d,(24*s,34*s,32*s,47*s),CLASSIC_DARK)
-    return im
+        roof=polygon_mask(im.size,[(6,28),(28,7),(50,28),(45,33),(28,17),(11,33)])
+        body=rounded_rect_mask(im.size,(12,27,44,48),4)
+        mask=Image.new("L",im.size,0)
+        mask=Image.frombytes("L",im.size,bytes(max(a,b) for a,b in zip(roof.tobytes(),body.tobytes())))
+        soft_glow(im,mask,main,2.5,115)
+        masked_gradient(im,mask,light,main)
+        d=ImageDraw.Draw(im)
+        draw_rr(d,(23,34,33,49),2,dark)
+        draw_line(d,[(15,28),(28,15),(41,28)],rgba(0xFFFFFF,110),1.2)
+        if theme=="kittens":
+            draw_ellipse(d,(8,11,13,16),KITTEN_LIGHT)
+            draw_ellipse(d,(43,8,48,13),KITTEN_LIGHT)
+        elif theme=="soccer":
+            draw_ellipse(d,(43,9,48,14),rgba(0xCFFFE1,170))
+    finish(im,f"header_{theme}.png",w,h)
 
-save(house(CLASSIC_BLUE),'header_classic.png')
-save(house(SOCCER_GREEN),'header_soccer.png')
-save(house(KITTEN_PINK),'header_kittens.png')
-save(house(MAGIC_BLUE,True),'header_magic.png')
+for theme in ("classic","soccer","kittens","magic"):
+    house(theme)
 
-def fan(kind):
-    s=4; im=img(142*s,116*s); d=ImageDraw.Draw(im)
-    cx,cy=58*s,58*s
-    if kind=='classic': ring,blade,hub=CLASSIC_BLUE,CLASSIC_LIGHT,CLASSIC_BLUE
-    elif kind=='soccer': ring,blade,hub=SOCCER_GREEN,SOCCER_MINT,(36,207,99,255)
-    elif kind=='kittens': ring,blade,hub=KITTEN_PINK,KITTEN_LIGHT,KITTEN_PINK
-    else: ring,blade,hub=MAGIC_GOLD,(143,210,252,255),MAGIC_GOLD
+def petal_layer(size,cx,cy,length,width,color,highlight,angle):
+    layer=Image.new("RGBA",size,TRAN)
+    mask=Image.new("L",size,0)
+    d=ImageDraw.Draw(mask)
+    # rounded teardrop, narrow at hub and broad at tip
+    pts=[(sc(cx-width*.28),sc(cy-7)),
+         (sc(cx-width*.55),sc(cy-length*.54)),
+         (sc(cx-width*.38),sc(cy-length*.92)),
+         (sc(cx),sc(cy-length)),
+         (sc(cx+width*.38),sc(cy-length*.92)),
+         (sc(cx+width*.55),sc(cy-length*.54)),
+         (sc(cx+width*.28),sc(cy-7))]
+    d.polygon(pts,fill=255)
+    d.ellipse(box(cx-width*.38,cy-length,cx+width*.38,cy-length+width*.75),fill=255)
+    soft_glow(layer,mask,color,1.2,70)
+    masked_gradient(layer,mask,highlight,color)
+    return layer.rotate(angle,resample=Image.Resampling.BICUBIC,center=(sc(cx),sc(cy)))
 
-    if kind=='magic':
-        poly(d,[(58*s,4*s),(108*s,27*s),(98*s,84*s),(58*s,112*s),(18*s,84*s),(8*s,27*s)],MAGIC_GOLD)
-        poly(d,[(58*s,10*s),(101*s,30*s),(91*s,80*s),(58*s,104*s),(25*s,80*s),(15*s,30*s)],MAGIC_DARK)
-        poly(d,[(58*s,18*s),(92*s,34*s),(84*s,75*s),(58*s,94*s),(32*s,75*s),(24*s,34*s)],(7,70,137,255))
-        radius=29*s
+def fan(theme):
+    w,h=142,116; im=canvas(w,h); cx,cy=58,58
+    if theme=="classic":
+        ring,blade,hi,hub=CLASSIC_BLUE,CLASSIC_LIGHT,rgba(0xD8F2FF),CLASSIC_BLUE
+        blades=4
+    elif theme=="soccer":
+        ring,blade,hi,hub=SOCCER_GREEN,SOCCER_MINT,rgba(0xE6FFF0),rgba(0x24CB63)
+        blades=4
+    elif theme=="kittens":
+        ring,blade,hi,hub=KITTEN_PINK,KITTEN_LIGHT,rgba(0xFFE5F0),KITTEN_PINK
+        blades=4
     else:
-        radius=48*s
-        ellipse(d,(cx-radius,cy-radius,cx+radius,cy+radius),TRAN,ring,4*s)
+        ring,blade,hi,hub=MAGIC_GOLD,MAGIC_SKY,rgba(0xE7F6FF),MAGIC_GOLD
+        blades=3
 
-    for a in [-90,-18,54,126,198]:
-        ar=math.radians(a)
-        r1=9*s; r2=39*s if kind!='magic' else 24*s
-        spread=.22
-        pts=[]
-        for rr,off in [(r1,-.55),(r2,-spread),(r2,.22),(r1,.55)]:
-            aa=ar+off
-            pts.append((cx+math.cos(aa)*rr,cy+math.sin(aa)*rr))
-        poly(d,pts,blade)
-    ellipse(d,(cx-8*s,cy-8*s,cx+8*s,cy+8*s),hub)
-    ellipse(d,(cx-4*s,cy-4*s,cx+4*s,cy+4*s),ring)
-
-    if kind=='magic':
+    d=ImageDraw.Draw(im)
+    if theme=="magic":
+        shield=polygon_mask(im.size,[(58,3),(109,27),(98,85),(58,113),(18,85),(7,27)])
+        soft_glow(im,shield,MAGIC_GOLD,3.2,115)
+        composite_mask(im,shield,MAGIC_GOLD)
+        inner=polygon_mask(im.size,[(58,10),(101,31),(90,80),(58,104),(26,80),(15,31)])
+        masked_gradient(im,inner,(10,83,158,255),(4,39,91,255))
+        radius=28
         for side in (-1,1):
-            base=58*s + side*50*s
             for i in range(6):
-                y=(35+i*9)*s
-                x=base + side*(i*1.7*s)
-                ellipse(d,(x-5*s,y-3*s,x+5*s,y+3*s),MAGIC_GOLD)
-    return im
+                y=32+i*10
+                x=58+side*(48+i*1.4)
+                leaf=ellipse_mask(im.size,(x-5,y-2.5,x+5,y+2.5))
+                leaf=leaf.rotate(side*(-25+i*2),resample=Image.Resampling.BICUBIC,
+                                 center=(sc(x),sc(y)))
+                composite_mask(im,leaf,MAGIC_GOLD)
+    else:
+        radius=49
+        ringmask=ellipse_mask(im.size,(cx-radius,cy-radius,cx+radius,cy+radius))
+        inner=ellipse_mask(im.size,(cx-radius+4,cy-radius+4,cx+radius-4,cy+radius-4))
+        ringmask=Image.frombytes("L",im.size,bytes(max(0,a-b) for a,b in zip(ringmask.tobytes(),inner.tobytes())))
+        soft_glow(im,ringmask,ring,2.6,90)
+        composite_mask(im,ringmask,ring)
 
-for k in ('classic','soccer','kittens','magic'):
-    save(fan(k),f'fan_{k}.png')
+    step=360/blades
+    for i in range(blades):
+        angle=i*step
+        p=petal_layer(im.size,cx,cy,37 if theme!="magic" else 24,
+                      25 if theme!="magic" else 19,blade,hi,angle)
+        im.alpha_composite(p)
 
-s=4; im=img(74*s,56*s); d=ImageDraw.Draw(im)
-poly(d,[(7*s,33*s),(14*s,4*s),(30*s,27*s)],KITTEN_CREAM)
-poly(d,[(44*s,27*s),(60*s,4*s),(67*s,33*s)],KITTEN_CREAM)
-poly(d,[(12*s,27*s),(16*s,11*s),(26*s,27*s)],KITTEN_LIGHT)
-poly(d,[(48*s,27*s),(58*s,11*s),(62*s,27*s)],KITTEN_LIGHT)
-ellipse(d,(8*s,20*s,66*s,72*s),KITTEN_CREAM)
-ellipse(d,(23*s,33*s,38*s,49*s),WHITE); ellipse(d,(36*s,33*s,51*s,49*s),WHITE)
-for x in (25,49):
-    line(d,[(x-6)*s,34*s,x*s,36*s,(x+6)*s,34*s],KITTEN_DARK,1*s)
-poly(d,[(37*s,39*s),(33*s,43*s),(41*s,43*s)],KITTEN_PINK)
-line(d,[(37*s,43*s),(37*s,48*s)],KITTEN_DARK,1*s)
-for yy in (40,46):
-    line(d,[(28*s,yy*s),(4*s,(yy-2)*s)],KITTEN_DARK,1*s)
-    line(d,[(46*s,yy*s),(70*s,(yy-2)*s)],KITTEN_DARK,1*s)
-save(im,'kitten_peek.png')
+    draw_ellipse(d,(cx-9,cy-9,cx+9,cy+9),hub)
+    draw_ellipse(d,(cx-5,cy-5,cx+5,cy+5),hi)
+    draw_ellipse(d,(cx-3,cy-3,cx+3,cy+3),hub)
+    finish(im,f"fan_{theme}.png",w,h)
 
-s=4; im=img(118*s,74*s); d=ImageDraw.Draw(im)
-body=(223,205,211,255)
-ellipse(d,(22*s,27*s,105*s,69*s),body)
-ellipse(d,(54*s,34*s,94*s,62*s),(250,244,246,255))
-ellipse(d,(14*s,20*s,55*s,57*s),body)
-poly(d,[(17*s,27*s),(20*s,8*s),(33*s,24*s)],body)
-poly(d,[(38*s,24*s),(48*s,8*s),(52*s,29*s)],body)
-poly(d,[(21*s,24*s),(23*s,14*s),(30*s,24*s)],KITTEN_LIGHT)
-poly(d,[(41*s,23*s),(47*s,14*s),(49*s,27*s)],KITTEN_LIGHT)
-line(d,[(24*s,38*s),(31*s,40*s)],KITTEN_DARK,1*s); line(d,[(38*s,40*s),(45*s,38*s)],KITTEN_DARK,1*s)
-poly(d,[(35*s,43*s),(31*s,46*s),(39*s,46*s)],KITTEN_PINK)
-line(d,[(94*s,54*s),(110*s,45*s),(113*s,30*s),(108*s,22*s)],body,7*s)
-poly(d,[(6*s,52*s),(3*s,47*s),(5*s,43*s),(9*s,45*s),(12*s,43*s),(14*s,47*s),(11*s,52*s)],KITTEN_PINK)
-for x,y,sz in [(76,18,5),(88,11,6),(101,3,7)]:
-    line(d,[(x-sz)*s,y*s,(x+sz)*s,y*s,(x-sz)*s,(y+sz)*s,(x+sz)*s,(y+sz)*s],KITTEN_DARK,1*s)
-save(im,'kitten_sleep.png')
+for theme in ("classic","soccer","kittens","magic"):
+    fan(theme)
 
-s=4; im=img(60*s,68*s); d=ImageDraw.Draw(im)
-def paw(cx,cy):
-    ellipse(d,((cx-7)*s,(cy-5)*s,(cx+7)*s,(cy+7)*s),(176,65,116,230))
-    for ox,oy in [(-9,-8),(-3,-12),(4,-12),(10,-8)]:
-        ellipse(d,((cx+ox-3)*s,(cy+oy-3)*s,(cx+ox+3)*s,(cy+oy+3)*s),(176,65,116,230))
-paw(18,23); paw(41,49); save(im,'kitten_paws.png')
+def kitten_peek():
+    w,h=74,56; im=canvas(w,h)
+    shadow=ellipse_mask(im.size,(7,21,67,65)); soft_glow(im,shadow,rgba(0x8E4966),2.5,65,(0,1))
+    ear1=polygon_mask(im.size,[(7,33),(14,3),(31,28)])
+    ear2=polygon_mask(im.size,[(43,28),(60,3),(68,33)])
+    composite_mask(im,ear1,KITTEN_CREAM); composite_mask(im,ear2,KITTEN_CREAM)
+    d=ImageDraw.Draw(im)
+    draw_poly(d,[(12,28),(16,10),(27,28)],KITTEN_LIGHT)
+    draw_poly(d,[(47,28),(58,10),(63,28)],KITTEN_LIGHT)
+    face=ellipse_mask(im.size,(8,18,67,72))
+    masked_gradient(im,face,(252,239,243,255),KITTEN_CREAM)
+    d=ImageDraw.Draw(im)
+    draw_ellipse(d,(20,36,31,47),rgba(0xFFF8FA))
+    draw_ellipse(d,(43,36,54,47),rgba(0xFFF8FA))
+    draw_line(d,[(22,39),(27,41),(32,39)],KITTEN_DARK,1.0)
+    draw_line(d,[(42,39),(47,41),(52,39)],KITTEN_DARK,1.0)
+    draw_ellipse(d,(18,43,25,48),rgba(0xF7A7C7,95))
+    draw_ellipse(d,(49,43,56,48),rgba(0xF7A7C7,95))
+    draw_poly(d,[(37,42),(33.5,45),(40.5,45)],KITTEN_PINK)
+    draw_line(d,[(37,45),(37,49),(34,51)],KITTEN_DARK,0.8)
+    draw_line(d,[(37,49),(40,51)],KITTEN_DARK,0.8)
+    for yy in (42,47):
+        draw_line(d,[(29,yy),(4,yy-2)],rgba(0x744052,220),.7)
+        draw_line(d,[(45,yy),(70,yy-2)],rgba(0x744052,220),.7)
+    finish(im,"kitten_peek.png",w,h)
 
-s=4; im=img(230*s,78*s); d=ImageDraw.Draw(im)
-ellipse(d,(88*s,-18*s,144*s,38*s),(217,237,255,230))
-for x,w,h in [(2,27,40),(31,24,57),(58,29,46),(91,31,66),(126,25,48),(154,28,59),(186,25,43),(213,16,35)]:
-    y=72-h
-    rect(d,(x*s,y*s,(x+w)*s,72*s),MAGIC_DARK)
-    poly(d,[(x*s,y*s),((x+w/2)*s,(y-15)*s),((x+w)*s,y*s)],MAGIC_DARK)
-    for wx in range(x+7,x+w-4,11):
-        rect(d,(wx*s,(y+14)*s,(wx+3)*s,(y+23)*s),(255,210,80,255))
-rect(d,(0,70*s,230*s,76*s),(3,25,58,255)); save(im,'magic_castle.png')
+def kitten_sleep():
+    w,h=118,74; im=canvas(w,h)
+    bodymask=ellipse_mask(im.size,(22,27,105,69)); soft_glow(im,bodymask,rgba(0x9A5770),3,55,(0,1.5))
+    masked_gradient(im,bodymask,(248,237,241,255),KITTEN_WARM)
+    belly=ellipse_mask(im.size,(53,35,94,62)); masked_gradient(im,belly,(255,250,251,255),(241,226,231,255))
+    head=ellipse_mask(im.size,(13,19,56,58)); masked_gradient(im,head,(248,235,240,255),KITTEN_WARM)
+    d=ImageDraw.Draw(im)
+    draw_poly(d,[(17,28),(20,7),(34,25)],KITTEN_WARM)
+    draw_poly(d,[(38,25),(49,7),(53,30)],KITTEN_WARM)
+    draw_poly(d,[(22,25),(24,14),(31,25)],KITTEN_LIGHT)
+    draw_poly(d,[(42,24),(48,14),(50,27)],KITTEN_LIGHT)
+    draw_line(d,[(24,38),(31,40)],KITTEN_DARK,.85)
+    draw_line(d,[(38,40),(45,38)],KITTEN_DARK,.85)
+    draw_poly(d,[(35,43),(31.5,46),(38.5,46)],KITTEN_PINK)
+    # soft curled tail
+    draw_line(d,[(91,55),(106,47),(112,34),(108,22)],KITTEN_WARM,7)
+    draw_line(d,[(92,54),(106,46)],rgba(0xFFFFFF,80),1.3)
+    # heart + z's
+    draw_ellipse(d,(2,46,8,53),KITTEN_PINK); draw_ellipse(d,(7,46,13,53),KITTEN_PINK)
+    draw_poly(d,[(2,49.5),(13,49.5),(7.5,57)],KITTEN_PINK)
+    for x,y,size in [(77,17,4),(89,10,5),(102,3,6)]:
+        draw_line(d,[(x-size,y),(x+size,y),(x-size,y+size),(x+size,y+size)],rgba(0x73384F,185),.65)
+    finish(im,"kitten_sleep.png",w,h)
 
-s=4; im=img(56*s,72*s); d=ImageDraw.Draw(im)
-line(d,[(18*s,14*s),(20*s,5*s),(28*s,1*s),(36*s,5*s),(38*s,14*s)],MAGIC_GOLD,3*s)
-poly(d,[(12*s,20*s),(44*s,20*s),(38*s,59*s),(18*s,59*s)],(177,109,18,255))
-poly(d,[(18*s,25*s),(38*s,25*s),(34*s,52*s),(22*s,52*s)],(241,186,66,255))
-line(d,[(19*s,27*s),(35*s,51*s)],MAGIC_CREAM,2*s); line(d,[(37*s,27*s),(21*s,51*s)],MAGIC_CREAM,2*s)
-rect(d,(17*s,58*s,39*s,65*s),MAGIC_GOLD); save(im,'magic_lantern.png')
+def kitten_paws():
+    w,h=60,68; im=canvas(w,h); d=ImageDraw.Draw(im)
+    def paw(cx,cy,rot=0):
+        layer=Image.new("RGBA",im.size,TRAN); ld=ImageDraw.Draw(layer)
+        col=rgba(0xB44476,205)
+        ld.ellipse(box(cx-7,cy-5,cx+7,cy+7),fill=col)
+        for ox,oy,r in [(-9,-8,3.3),(-3,-12,3.2),(4,-12,3.2),(10,-8,3.3)]:
+            ld.ellipse(box(cx+ox-r,cy+oy-r,cx+ox+r,cy+oy+r),fill=col)
+        return layer.rotate(rot,resample=Image.Resampling.BICUBIC,center=(sc(cx),sc(cy)))
+    im.alpha_composite(paw(18,23,-18)); im.alpha_composite(paw(41,49,16))
+    finish(im,"kitten_paws.png",w,h)
 
-s=4; im=img(62*s,78*s); d=ImageDraw.Draw(im)
-cream=(246,237,219,255); tan=(206,165,111,255); brown=(84,51,33,255)
-ellipse(d,(9*s,5*s,53*s,56*s),cream)
-poly(d,[(9*s,38*s),(0,62*s),(21*s,55*s)],tan); poly(d,[(53*s,38*s),(62*s,62*s),(41*s,55*s)],tan)
-ellipse(d,(12*s,12*s,31*s,34*s),tan); ellipse(d,(31*s,12*s,50*s,34*s),tan)
-ellipse(d,(18*s,18*s,26*s,28*s),brown); ellipse(d,(36*s,18*s,44*s,28*s),brown)
-ellipse(d,(20*s,20*s,23*s,23*s),WHITE); ellipse(d,(38*s,20*s,41*s,23*s),WHITE)
-poly(d,[(31*s,29*s),(27*s,35*s),(35*s,35*s)],(192,130,55,255))
-rect(d,(4*s,61*s,58*s,67*s),(87,57,42,255)); rect(d,(8*s,68*s,54*s,73*s),(194,143,68,255)); save(im,'magic_owl.png')
+kitten_peek(); kitten_sleep(); kitten_paws()
 
-s=4; im=img(36*s,70*s); d=ImageDraw.Draw(im)
-feather=(205,181,147,255); shaft=(138,103,72,255)
-poly(d,[(28*s,3*s),(35*s,12*s),(30*s,30*s),(23*s,45*s),(13*s,59*s),(7*s,61*s),(10*s,48*s),(9*s,34*s),(16*s,18*s)],feather)
-line(d,[(8*s,63*s),(29*s,7*s)],shaft,2*s)
-for y,x1,x2 in [(21,16,8),(29,18,7),(37,21,10),(46,18,8),(18,20,31),(27,22,32),(36,20,29)]:
-    line(d,[(x1*s,y*s),(x2*s,(y+4)*s)],shaft,1*s)
-rect(d,(3*s,59*s,14*s,69*s),(110,66,30,255)); save(im,'magic_quill.png')
+def magic_castle():
+    w,h=230,78; im=canvas(w,h)
+    moon=ellipse_mask(im.size,(88,-18,144,38)); soft_glow(im,moon,rgba(0xD8ECFF),7,170)
+    masked_gradient(im,moon,(245,250,255,235),(177,214,248,215))
+    d=ImageDraw.Draw(im)
+    random.seed(7)
+    towers=[(2,27,40),(31,24,57),(58,29,46),(91,31,66),(126,25,48),(154,28,59),(186,25,43),(213,16,35)]
+    for x,tw,th in towers:
+        y=72-th
+        draw_rr(d,(x,y,x+tw,72),1.8,MAGIC_DARK)
+        draw_poly(d,[(x-2,y),(x+tw/2,y-15),(x+tw+2,y)],MAGIC_DARK)
+        if tw>22:
+            draw_line(d,[(x+tw/2,y-15),(x+tw/2,y-21)],MAGIC_GOLD,.7)
+        for wx in range(x+7,x+tw-4,11):
+            glow=ellipse_mask(im.size,(wx-1,y+13,wx+4,y+25)); soft_glow(im,glow,rgba(0xFFD55D),2,80)
+            draw_rr(d,(wx,y+14,wx+3,y+23),.6,rgba(0xFFD258))
+    draw_rr(d,(0,70,230,77),1,rgba(0x031D44))
+    for _ in range(18):
+        x=random.randint(4,225); y=random.randint(3,48); r=random.choice((.5,.7,1.0))
+        star(d,x,y,r,rgba(0xF9D476,170),4)
+    finish(im,"magic_castle.png",w,h)
 
-s=4; im=img(36*s,36*s); d=ImageDraw.Draw(im)
-line(d,[(2*s,33*s),(2*s,7*s),(31*s,7*s)],MAGIC_GOLD,3*s)
-line(d,[(7*s,31*s),(7*s,13*s),(28*s,13*s)],MAGIC_CREAM,1*s)
-ellipse(d,(0,4*s,6*s,10*s),MAGIC_GOLD); ellipse(d,(28*s,4*s,34*s,10*s),MAGIC_GOLD)
-line(d,[(8*s,25*s),(14*s,17*s),(22*s,18*s),(19*s,25*s),(13*s,26*s)],MAGIC_GOLD,2*s); save(im,'magic_corner_tl.png')
+def magic_lantern():
+    w,h=56,72; im=canvas(w,h)
+    glow=ellipse_mask(im.size,(13,18,43,61)); soft_glow(im,glow,rgba(0xFFD05A),6,175)
+    d=ImageDraw.Draw(im)
+    draw_line(d,[(18,15),(20,6),(28,2),(36,6),(38,15)],MAGIC_GOLD,2.2)
+    draw_rr(d,(12,18,44,61),3,rgba(0xA96D14),MAGIC_GOLD,1.5)
+    inner=rounded_rect_mask(im.size,(18,24,38,53),3)
+    masked_gradient(im,inner,(255,241,170,245),(235,151,26,230))
+    draw_line(d,[(19,26),(35,51)],rgba(0xFFF4C4,210),1.2)
+    draw_line(d,[(37,26),(21,51)],rgba(0xFFF4C4,210),1.2)
+    draw_rr(d,(17,58,39,65),2,MAGIC_GOLD)
+    finish(im,"magic_lantern.png",w,h)
 
-s=4; im=img(76*s,44*s); d=ImageDraw.Draw(im)
-frame=(230,247,239,235); net=(96,199,133,185)
-line(d,[(8*s,9*s),(55*s,9*s),(55*s,36*s),(8*s,36*s),(8*s,9*s)],frame,3*s)
-line(d,[(55*s,9*s),(70*s,3*s),(70*s,31*s),(55*s,36*s)],frame,2*s)
-line(d,[(8*s,9*s),(23*s,3*s),(70*s,3*s)],frame,2*s)
-for x in range(15,56,10): line(d,[(x*s,9*s),(x*s,36*s)],net,1*s)
-for y in range(15,37,7): line(d,[(8*s,y*s),(55*s,y*s)],net,1*s)
-for x in (58,63,68): line(d,[(x*s,8*s),(x*s,31*s)],net,1*s)
-for y in (10,17,24,31): line(d,[(55*s,y*s),(70*s,(y-4)*s)],net,1*s)
-save(im,'soccer_goal.png')
+def magic_owl():
+    w,h=62,78; im=canvas(w,h)
+    body=ellipse_mask(im.size,(9,5,53,57)); soft_glow(im,body,rgba(0x7A4A25),2.5,55,(0,1))
+    masked_gradient(im,body,(255,249,231,255),(227,211,179,255))
+    d=ImageDraw.Draw(im)
+    wing=rgba(0xC9A16D)
+    draw_poly(d,[(12,39),(0,63),(22,56)],wing); draw_poly(d,[(50,39),(62,63),(40,56)],wing)
+    draw_ellipse(d,(12,12,31,34),rgba(0xD5B37C)); draw_ellipse(d,(31,12,50,34),rgba(0xD5B37C))
+    for cx in (22,40):
+        eye=ellipse_mask(im.size,(cx-7,17,cx+7,31)); soft_glow(im,eye,rgba(0xA96832),1.6,70)
+        draw_ellipse(d,(cx-7,17,cx+7,31),rgba(0x7B4B2C))
+        draw_ellipse(d,(cx-3.5,20,cx+3.5,28),rgba(0x3C2418))
+        draw_ellipse(d,(cx-1.5,21,cx+.5,23),WHITE)
+    draw_poly(d,[(31,29),(27,36),(35,36)],rgba(0xC88935))
+    draw_rr(d,(4,61,58,67),1,rgba(0x5D3B2A))
+    draw_rr(d,(8,68,54,74),1,rgba(0xB77E3B))
+    finish(im,"magic_owl.png",w,h)
 
-s=2; im=img(800*s,408*s); d=ImageDraw.Draw(im)
-bands=[(5,61,34,255),(6,74,40,255)]
-for i,x in enumerate(range(0,800,80)):
-    rect(d,(x*s,0,min(800,x+80)*s,408*s),bands[i%2])
-for y in range(0,408,14):
-    for x in range((y//14)%2*18,800,36):
-        line(d,[(x*s,y*s),((x+18)*s,(y-6)*s)],(18,94,51,40),1*s)
-fieldline=(122,195,147,115)
-inset=18
-line(d,[(inset*s,inset*s),((800-inset)*s,inset*s),((800-inset)*s,(408-inset)*s),(inset*s,(408-inset)*s),(inset*s,inset*s)],fieldline,2*s)
-line(d,[(400*s,inset*s),(400*s,(408-inset)*s)],fieldline,2*s)
-ellipse(d,(340*s,144*s,460*s,264*s),TRAN,fieldline,2*s)
-ellipse(d,(397*s,201*s,403*s,207*s),fieldline)
-for left in (True,False):
-    gx=inset if left else 800-inset
-    px=132 if left else 668
-    sx=70 if left else 730
-    line(d,[(gx*s,102*s),(px*s,102*s),(px*s,306*s),(gx*s,306*s)],fieldline,2*s)
-    line(d,[(gx*s,148*s),(sx*s,148*s),(sx*s,260*s),(gx*s,260*s)],fieldline,2*s)
-    spot=92 if left else 708
-    ellipse(d,((spot-3)*s,201*s,(spot+3)*s,207*s),fieldline)
-save(im,'soccer_field.png')
+def magic_quill():
+    w,h=36,70; im=canvas(w,h)
+    d=ImageDraw.Draw(im)
+    feather=polygon_mask(im.size,[(28,3),(35,12),(31,27),(24,44),(14,58),(7,62),(10,47),(9,34),(16,18)])
+    soft_glow(im,feather,rgba(0x8B6242),2,50)
+    masked_gradient(im,feather,(236,219,190,255),(189,154,113,255))
+    draw_line(d,[(8,64),(29,7)],rgba(0x8C6243),1.8)
+    for y,x1,x2 in [(21,16,8),(29,18,7),(37,21,10),(46,18,8),(18,20,31),(27,22,32),(36,20,29)]:
+        draw_line(d,[(x1,y),(x2,y+4)],rgba(0x8C6243,220),.8)
+    draw_rr(d,(3,59,14,69),1.5,rgba(0x76431F))
+    finish(im,"magic_quill.png",w,h)
 
-print(f"Wrote 18 high-resolution transparent PNG assets to {OUT}")
+def magic_corner():
+    w=h=36; im=canvas(w,h); d=ImageDraw.Draw(im)
+    # curved filigree rather than blocky right angles
+    draw_line(d,[(2,33),(2,15),(5,9),(11,7),(31,7)],MAGIC_GOLD,1.5)
+    draw_line(d,[(7,31),(7,18),(10,13),(16,12),(29,12)],MAGIC_CREAM,.7)
+    draw_ellipse(d,(0,5,6,11),MAGIC_GOLD); draw_ellipse(d,(28,4,34,10),MAGIC_GOLD)
+    draw_line(d,[(8,27),(13,21),(18,20),(22,22),(18,26),(13,26),(10,29)],MAGIC_GOLD,1.2)
+    star(d,29,7,4,rgba(0xFFE39A),4)
+    finish(im,"magic_corner_tl.png",w,h)
+
+magic_castle(); magic_lantern(); magic_owl(); magic_quill(); magic_corner()
+
+def soccer_goal():
+    w,h=76,44; im=canvas(w,h)
+    d=ImageDraw.Draw(im)
+    frame=rgba(0xE8F8EF,235); net=rgba(0x87CFA1,155)
+    glow=polygon_mask(im.size,[(8,9),(55,9),(70,3),(70,31),(55,36),(8,36)])
+    soft_glow(im,glow,rgba(0x66D58A),2.2,55)
+    draw_line(d,[(8,9),(55,9),(55,36),(8,36),(8,9)],frame,1.7)
+    draw_line(d,[(55,9),(70,3),(70,31),(55,36)],frame,1.3)
+    draw_line(d,[(8,9),(23,3),(70,3)],frame,1.3)
+    for x in range(15,56,10): draw_line(d,[(x,9),(x,36)],net,.55)
+    for y in range(15,37,7): draw_line(d,[(8,y),(55,y)],net,.55)
+    for x in (59,64,69): draw_line(d,[(x,8),(x,31)],net,.45)
+    for y in (10,17,24,31): draw_line(d,[(55,y),(70,y-4)],net,.45)
+    finish(im,"soccer_goal.png",w,h)
+
+def soccer_field():
+    w,h=800,408; im=canvas(w,h)
+    px=im.load(); random.seed(30809)
+    # layered grass gradient + deterministic soft grain
+    for y in range(sc(h)):
+        ty=y/max(1,sc(h)-1)
+        base=(7+int(3*ty),55+int(15*ty),30+int(7*ty),255)
+        for x in range(sc(w)):
+            band=((x//sc(80))%2)
+            n=random.randint(-3,3)
+            px[x,y]=(max(0,base[0]+n),max(0,base[1]+band*8+n),max(0,base[2]+band*3+n),255)
+    d=ImageDraw.Draw(im)
+    # diagonal stadium-light streaks like the original green mockup
+    light=Image.new("RGBA",im.size,TRAN); ld=ImageDraw.Draw(light)
+    for off,a in [(-80,22),(80,16),(260,12)]:
+        ld.polygon([(sc(off),0),(sc(off+125),0),(sc(off+500),sc(h)),(sc(off+370),sc(h))],
+                   fill=(44,220,105,a))
+    light=light.filter(ImageFilter.GaussianBlur(sc(13)))
+    im.alpha_composite(light)
+    d=ImageDraw.Draw(im)
+    field=rgba(0x93CDA8,105); inset=18
+    draw_line(d,[(inset,inset),(w-inset,inset),(w-inset,h-inset),(inset,h-inset),(inset,inset)],field,1.2)
+    draw_line(d,[(400,inset),(400,h-inset)],field,1.1)
+    d.ellipse(box(340,144,460,264),outline=field,width=sc(1.1))
+    draw_ellipse(d,(397,201,403,207),field)
+    for left in (True,False):
+        gx=inset if left else w-inset; px_=132 if left else 668; sx=70 if left else 730
+        draw_line(d,[(gx,102),(px_,102),(px_,306),(gx,306)],field,1.0)
+        draw_line(d,[(gx,148),(sx,148),(sx,260),(gx,260)],field,1.0)
+        spot=92 if left else 708
+        draw_ellipse(d,(spot-2.5,201.5,spot+2.5,206.5),field)
+    # subtle vignette
+    vig=Image.new("L",im.size,0); vd=ImageDraw.Draw(vig)
+    vd.rectangle((0,0,*im.size),fill=110)
+    inner=rounded_rect_mask(im.size,(8,8,w-8,h-8),20).filter(ImageFilter.GaussianBlur(sc(28)))
+    vig=Image.frombytes("L",im.size,bytes(max(0,a-b//2) for a,b in zip(vig.tobytes(),inner.tobytes())))
+    layer=Image.new("RGBA",im.size,(0,19,10,0)); layer.putalpha(vig); im.alpha_composite(layer)
+    finish(im,"soccer_field.png",w,h)
+
+soccer_goal(); soccer_field()
+
+print(f"Wrote 18 warm high-resolution transparent PNG assets to {OUT}")
