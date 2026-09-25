@@ -33,7 +33,7 @@ except NameError:
 OUT = ROOT / "main" / "theme_art_generated.inc"
 WIDTH = 800
 HEIGHT = 480
-GENERATOR_VERSION = "theme-art-v8-theme-header-icons"
+GENERATOR_VERSION = "theme-art-v9-clean-fan-sprites"
 
 THEMES = {
     "kittens": ROOT / "assets" / "kittens-pink" / "screen.svg",
@@ -49,16 +49,12 @@ SPRITES = [
     ("KITTEN_PEEK", "kittens", 18, 60, 74, 56, 14, 52),
     ("KITTEN_SLEEP", "kittens", 255, 320, 118, 74, 12, 48),
     ("KITTEN_PAWS", "kittens", 18, 398, 60, 68, 12, 45),
-    ("KITTEN_FAN", "kittens", 54, 338, 118, 126, 10, 42),
 
     # Do not crop the source mockups' top-right settings/gear area. Header
     # decoration in that region is rendered natively instead.
-    ("SOCCER_GOAL", "soccer", 672, 150, 108, 68, 7, 30),
-    ("SOCCER_FAN", "soccer", 54, 338, 118, 126, 8, 34),
 
     ("MAGIC_CASTLE", "magic", 400, 0, 230, 78, 9, 36),
     ("MAGIC_LANTERN", "magic", 426, 92, 56, 72, 10, 38),
-    ("MAGIC_FAN", "magic", 108, 326, 162, 134, 8, 32),
     ("MAGIC_OWL", "magic", 442, 262, 62, 78, 11, 42),
     ("MAGIC_QUILL", "magic", 764, 344, 36, 70, 10, 38),
     ("MAGIC_CORNER_TL", "magic", 14, 80, 36, 36, 8, 30),
@@ -275,6 +271,160 @@ def make_header_icon(kind: str) -> tuple[bytearray, int, int]:
 
     else:
         raise ValueError(f"Unknown header icon kind: {kind}")
+
+    return _downsample_rgba(img, w, h, scale)
+
+
+
+def make_fan_icon(kind: str) -> tuple[bytearray, int, int]:
+    """Create a clean 142x116 transparent fan illustration for a theme."""
+    scale = 2
+    fw, fh = 142, 116
+    w, h = fw * scale, fh * scale
+    img = _canvas(w, h)
+
+    def C(hex_rgb: int, a: int = 255) -> tuple[int, int, int, int]:
+        return (
+            (hex_rgb >> 16) & 0xFF,
+            (hex_rgb >> 8) & 0xFF,
+            hex_rgb & 0xFF,
+            a,
+        )
+
+    if kind == "classic":
+        ring = C(0x21A7FF)
+        blade = C(0x8A5CFF)
+        blade2 = C(0x8ED5FF)
+        hub = C(0xF7FBFF)
+    elif kind == "soccer":
+        ring = C(0x39EB69)
+        blade = C(0xB2FF59)
+        blade2 = C(0xF4FFF7)
+        hub = C(0x06120B)
+    elif kind == "kittens":
+        ring = C(0xFF69AA)
+        blade = C(0xFFC0DA)
+        blade2 = C(0xFFF0F6)
+        hub = C(0x5A3041)
+    elif kind == "magic":
+        ring = C(0xE2B860)
+        blade = C(0x2FA8FF)
+        blade2 = C(0xF5C95A)
+        hub = C(0xFFF2C2)
+    else:
+        raise ValueError(f"Unknown fan icon kind: {kind}")
+
+    cx, cy = 58 * scale, 58 * scale
+    outer = 50 * scale
+    inner = 44 * scale
+
+    # Theme-specific backplate decoration, kept within the fan footprint.
+    if kind == "magic":
+        shield = [
+            (cx, 5 * scale),
+            (104 * scale, 24 * scale),
+            (96 * scale, 84 * scale),
+            (cx, 111 * scale),
+            (20 * scale, 84 * scale),
+            (12 * scale, 24 * scale),
+        ]
+        _fill_polygon(img, w, h, shield, C(0x0D3266, 185))
+        _draw_line(img, w, h, 58 * scale, 8 * scale, 102 * scale, 25 * scale,
+                   3 * scale, ring)
+        _draw_line(img, w, h, 102 * scale, 25 * scale, 94 * scale, 82 * scale,
+                   3 * scale, ring)
+        _draw_line(img, w, h, 94 * scale, 82 * scale, 58 * scale, 108 * scale,
+                   3 * scale, ring)
+        _draw_line(img, w, h, 58 * scale, 108 * scale, 22 * scale, 82 * scale,
+                   3 * scale, ring)
+        _draw_line(img, w, h, 22 * scale, 82 * scale, 14 * scale, 25 * scale,
+                   3 * scale, ring)
+        _draw_line(img, w, h, 14 * scale, 25 * scale, 58 * scale, 8 * scale,
+                   3 * scale, ring)
+    elif kind == "kittens":
+        _fill_polygon(img, w, h,
+                      [(20 * scale, 33 * scale), (30 * scale, 9 * scale),
+                       (45 * scale, 31 * scale)], C(0xFFB1CC, 220))
+        _fill_polygon(img, w, h,
+                      [(71 * scale, 31 * scale), (86 * scale, 9 * scale),
+                       (97 * scale, 33 * scale)], C(0xFFB1CC, 220))
+    elif kind == "soccer":
+        # Small ball badge to distinguish the soccer fan art.
+        bx, by = 121 * scale, 23 * scale
+        _fill_circle(img, w, h, bx, by, 16 * scale, C(0x39EB69))
+        _fill_circle(img, w, h, bx, by, 13 * scale, C(0xF4FFF7))
+        _fill_polygon(img, w, h,
+                      _star_points(bx, by, 6 * scale, 4.5 * scale, 5),
+                      C(0x06120B))
+
+    # Ring.
+    _fill_circle(img, w, h, cx, cy, outer, ring)
+    _fill_circle(img, w, h, cx, cy, inner, C(0x000000, 0))
+
+    # Four broad fan blades.
+    for angle_deg in (0, 90, 180, 270):
+        angle = math.radians(angle_deg)
+        ca = math.cos(angle)
+        sa = math.sin(angle)
+
+        local = [
+            (9, -12), (37, -18), (43, -7), (34, 9), (14, 13)
+        ]
+        pts = []
+        for lx, ly in local:
+            x = cx + (lx * ca - ly * sa) * scale
+            y = cy + (lx * sa + ly * ca) * scale
+            pts.append((x, y))
+        _fill_polygon(img, w, h, pts, blade if angle_deg in (0, 180) else blade2)
+
+    _fill_circle(img, w, h, cx, cy, 10 * scale, hub)
+    _fill_circle(img, w, h, cx, cy, 5 * scale, ring)
+
+    # Tiny theme accent that does not overlap live labels.
+    if kind == "classic":
+        for i, col in enumerate((0x34E66A, 0xFFD447, 0x8A5CFF)):
+            _fill_circle(img, w, h, (116 + i * 9) * scale, 96 * scale,
+                         3 * scale, C(col))
+    elif kind == "kittens":
+        # Paw at lower-right.
+        px, py = 122 * scale, 94 * scale
+        _fill_circle(img, w, h, px, py, 5 * scale, C(0xFF69AA))
+        for ox, oy in ((-7, -6), (0, -9), (7, -6)):
+            _fill_circle(img, w, h, px + ox * scale, py + oy * scale,
+                         3 * scale, C(0xFF69AA))
+    elif kind == "magic":
+        _fill_polygon(img, w, h,
+                      _star_points(122 * scale, 92 * scale,
+                                   7 * scale, 3 * scale, 5),
+                      C(0xF5C95A))
+
+    return _downsample_rgba(img, w, h, scale)
+
+
+def make_soccer_goal() -> tuple[bytearray, int, int]:
+    """Create a clean 76x44 transparent soccer goal with no baked UI pixels."""
+    scale = 2
+    gw, gh = 76, 44
+    w, h = gw * scale, gh * scale
+    img = _canvas(w, h)
+
+    green = (57, 235, 105, 220)
+    white = (244, 255, 247, 215)
+
+    x0, y0 = 4 * scale, 4 * scale
+    x1, y1 = 71 * scale, 39 * scale
+
+    _draw_line(img, w, h, x0, y0, x1, y0, 3 * scale, white)
+    _draw_line(img, w, h, x0, y0, x0, y1, 3 * scale, white)
+    _draw_line(img, w, h, x1, y0, x1, y1, 3 * scale, white)
+    _draw_line(img, w, h, x0, y1, x1, y1, 2 * scale, green)
+
+    for xx in range(14, 71, 12):
+        _draw_line(img, w, h, xx * scale, y0, xx * scale, y1,
+                   1.2 * scale, green)
+    for yy in range(13, 39, 9):
+        _draw_line(img, w, h, x0, yy * scale, x1, yy * scale,
+                   1.2 * scale, green)
 
     return _downsample_rgba(img, w, h, scale)
 
@@ -538,6 +688,11 @@ def generate() -> None:
         "HEADER_SOCCER": make_header_icon("soccer"),
         "HEADER_KITTENS": make_header_icon("kittens"),
         "HEADER_MAGIC": make_header_icon("magic"),
+        "FAN_CLASSIC": make_fan_icon("classic"),
+        "FAN_SOCCER": make_fan_icon("soccer"),
+        "FAN_KITTENS": make_fan_icon("kittens"),
+        "FAN_MAGIC": make_fan_icon("magic"),
+        "SOCCER_GOAL": make_soccer_goal(),
     }
     for name, theme, x, y, w, h, low, high in SPRITES:
         # The canonical mockups contain the obsolete configuration gear in the
@@ -559,9 +714,10 @@ def generate() -> None:
 
     order = [
         "HEADER_CLASSIC", "HEADER_SOCCER", "HEADER_KITTENS", "HEADER_MAGIC",
-        "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS", "KITTEN_FAN",
-        "SOCCER_GOAL", "SOCCER_FAN",
-        "MAGIC_CASTLE", "MAGIC_LANTERN", "MAGIC_FAN",
+        "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS",
+        "FAN_CLASSIC", "FAN_SOCCER", "FAN_KITTENS", "FAN_MAGIC",
+        "SOCCER_GOAL",
+        "MAGIC_CASTLE", "MAGIC_LANTERN",
         "MAGIC_OWL", "MAGIC_QUILL",
         "MAGIC_CORNER_TL", "MAGIC_CORNER_TR",
         "MAGIC_CORNER_BL", "MAGIC_CORNER_BR",
