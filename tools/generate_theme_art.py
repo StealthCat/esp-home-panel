@@ -12,16 +12,8 @@ not need an image decoder at runtime.
 
 from __future__ import annotations
 
-import base64
 import hashlib
 import math
-import os
-import re
-import shutil
-import subprocess
-import sys
-import tempfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 
 try:
@@ -43,7 +35,6 @@ THEMES = {
 
 # The canonical SVGs are visual references only. No emitted sprite is cropped
 # or sampled from them.
-SPRITES = []
 
 
 def _canvas(w: int, h: int) -> bytearray:
@@ -726,170 +717,6 @@ def make_soccer_field() -> tuple[bytearray, int, int]:
         _fill_circle(img, w, h, penalty_spot, h / 2, 2.5, spot)
 
     return img, w, h
-
-
-def ensure_ffmpeg() -> str:
-    system = shutil.which("ffmpeg")
-    if system:
-        print(f"[theme-art] using system FFmpeg: {system}")
-        return system
-
-    try:
-        import imageio_ffmpeg
-    except ImportError:
-        print("[theme-art] installing imageio-ffmpeg for embedded WebP decoding")
-        subprocess.check_call([
-            sys.executable, "-m", "pip", "install",
-            "--disable-pip-version-check", "imageio-ffmpeg==0.5.1",
-        ])
-        import imageio_ffmpeg
-
-    exe = imageio_ffmpeg.get_ffmpeg_exe()
-    if not exe or not Path(exe).is_file():
-        raise RuntimeError("Unable to locate a usable FFmpeg executable")
-    print(f"[theme-art] using bundled FFmpeg: {exe}")
-    return exe
-
-
-def numeric_attr(node: ET.Element, name: str, default: int) -> int:
-    raw = node.attrib.get(name)
-    if raw is None:
-        return default
-    match = re.match(r"\s*([-+]?[0-9]*\.?[0-9]+)", raw)
-    if not match:
-        raise ValueError(f"Unsupported SVG {name}: {raw!r}")
-    return int(round(float(match.group(1))))
-
-
-def data_href(node: ET.Element) -> str | None:
-    for key, value in node.attrib.items():
-        if key == "href" or key.endswith("}href"):
-            return value
-    return None
-
-
-def decode_tile(ffmpeg: str, raw: bytes, mime: str, width: int, height: int) -> bytes:
-    suffix = {
-        "webp": ".webp",
-        "png": ".png",
-        "jpeg": ".jpg",
-        "jpg": ".jpg",
-    }.get(mime.lower())
-    if not suffix:
-        raise ValueError(f"Unsupported embedded image type image/{mime}")
-
-    path = None
-    try:
-        with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-            tmp.write(raw)
-            path = tmp.name
-
-        proc = subprocess.run([
-            ffmpeg, "-hide_banner", "-loglevel", "error",
-            "-i", path,
-            "-frames:v", "1",
-            "-vf", f"scale={width}:{height}:flags=lanczos",
-            "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1",
-        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
-
-        expected = width * height * 4
-        if proc.returncode != 0 or len(proc.stdout) != expected:
-            detail = proc.stderr.decode("utf-8", errors="replace").strip()
-            raise RuntimeError(
-                f"FFmpeg failed to decode {width}x{height} artwork tile: {detail}"
-            )
-        return proc.stdout
-    finally:
-        if path:
-            try:
-                os.unlink(path)
-            except OSError:
-                pass
-
-
-def render_svg(path: Path, ffmpeg: str) -> bytearray:
-    root = ET.fromstring(path.read_text(encoding="utf-8"))
-    canvas = bytearray((0, 0, 0, 255)) * (WIDTH * HEIGHT)
-
-    for node in root.iter():
-        if node.tag.split("}")[-1] != "image":
-            continue
-        href = data_href(node)
-        if not href:
-            continue
-        m = re.match(r"^data:image/([^;]+);base64,(.*)$", href, re.DOTALL)
-        if not m:
-            continue
-
-        x = numeric_attr(node, "x", 0)
-        y = numeric_attr(node, "y", 0)
-        w = numeric_attr(node, "width", 0)
-        h = numeric_attr(node, "height", 0)
-        tile = decode_tile(ffmpeg, base64.b64decode(m.group(2)), m.group(1), w, h)
-
-        for row in range(h):
-            src = row * w * 4
-            dst = ((y + row) * WIDTH + x) * 4
-            canvas[dst:dst + w * 4] = tile[src:src + w * 4]
-
-    return canvas
-
-
-def crop_rgba(src: bytes, x0: int, y0: int, w: int, h: int) -> bytearray:
-    out = bytearray(w * h * 4)
-    for y in range(h):
-        src_i = ((y0 + y) * WIDTH + x0) * 4
-        dst_i = y * w * 4
-        out[dst_i:dst_i + w * 4] = src[src_i:src_i + w * 4]
-    return out
-
-
-def median(values: list[int]) -> int:
-    values = sorted(values)
-    return values[len(values) // 2]
-
-
-def remove_background(rgba: bytearray, w: int, h: int, low: int, high: int) -> bytearray:
-    """Turn the local mockup background transparent while retaining artwork.
-
-    The median perimeter color is a stable estimate for each crop's card/screen
-    background. Pixel distance from that color becomes a feathered alpha mask.
-    """
-    border = []
-    for x in range(w):
-        border.extend((x, (h - 1) * w + x))
-    for y in range(1, h - 1):
-        border.extend((y * w, y * w + w - 1))
-
-    rs = [rgba[i * 4] for i in border]
-    gs = [rgba[i * 4 + 1] for i in border]
-    bs = [rgba[i * 4 + 2] for i in border]
-    bg = (median(rs), median(gs), median(bs))
-
-    out = bytearray(len(rgba))
-    span = max(1, high - low)
-
-    for i in range(w * h):
-        p = i * 4
-        r, g, b = rgba[p], rgba[p + 1], rgba[p + 2]
-        d = math.sqrt(
-            (r - bg[0]) * (r - bg[0]) +
-            (g - bg[1]) * (g - bg[1]) +
-            (b - bg[2]) * (b - bg[2])
-        )
-
-        if d <= low:
-            a = 0
-        elif d >= high:
-            a = 255
-        else:
-            t = (d - low) / span
-            a = int(255 * t * t * (3.0 - 2.0 * t))
-
-        # Preserve RGB for straight-alpha blending.
-        out[p:p + 4] = bytes((r, g, b, a))
-
-    return out
 
 
 def rotate_rgba(src: bytes, w: int, h: int, turns: int) -> tuple[bytearray, int, int]:
