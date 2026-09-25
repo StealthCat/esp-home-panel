@@ -57,7 +57,6 @@ static lv_obj_t *s_echo_mute;
 static lv_obj_t *s_echo_play;
 static lv_obj_t *s_alexa_now_playing;
 static lv_obj_t *s_alexa_artist;
-static lv_obj_t *s_wave[14];
 
 static bool s_syncing;
 static bool s_fan_on;
@@ -65,7 +64,6 @@ static bool s_echo_playing;
 static bool s_echo_muted;
 static uint8_t s_echo_unmuted_volume = 50;
 static int s_fan_angle;
-static int s_wave_phase;
 
 enum {
     UI_PENDING_NETWORK  = 1u << 0,
@@ -911,23 +909,6 @@ static void create_fan_card(lv_obj_t *root)
                &lv_font_montserrat_14, T->muted);
 }
 
-static void create_echo_wave(lv_obj_t *card)
-{
-    for (int i = 0; i < 14; ++i) {
-        lv_obj_t *bar = lv_obj_create(card);
-        lv_obj_set_pos(bar, 246 + i * 8, 51);
-        lv_obj_set_size(bar, 4, 8 + ((i * 7) % 18));
-        lv_obj_set_style_bg_color(bar, c(T->accent), 0);
-        lv_obj_set_style_bg_opa(bar, 90, 0);
-        lv_obj_set_style_border_width(bar, 0, 0);
-        lv_obj_set_style_radius(bar, 2, 0);
-        lv_obj_set_style_pad_all(bar, 0, 0);
-        lv_obj_remove_flag(bar, LV_OBJ_FLAG_CLICKABLE);
-        lv_obj_remove_flag(bar, LV_OBJ_FLAG_SCROLLABLE);
-        s_wave[i] = bar;
-    }
-}
-
 static void create_echo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 404, 274, 382, 192);
@@ -947,17 +928,18 @@ static void create_echo_card(lv_obj_t *root)
     }
     make_status_dot(card, &s_echo_status, status_x, 48);
 
-    s_alexa_now_playing = make_label(card, "Nothing playing", T->magic ? 132 : 96, 45,
+    const int media_x = T->magic ? 132 : 96;
+    const int media_w = T->magic ? 195 : 255;
+
+    s_alexa_now_playing = make_label(card, "Nothing playing", media_x, 45,
                                      &lv_font_montserrat_14, T->text);
-    lv_obj_set_width(s_alexa_now_playing, T->magic ? 106 : 145);
+    lv_obj_set_width(s_alexa_now_playing, media_w);
     lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-    s_alexa_artist = make_label(card, "", T->magic ? 132 : 96, 64,
+    s_alexa_artist = make_label(card, "", media_x, 64,
                                 &lv_font_montserrat_14, T->muted);
-    lv_obj_set_width(s_alexa_artist, T->magic ? 106 : 145);
+    lv_obj_set_width(s_alexa_artist, media_w);
     lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
-
-    create_echo_wave(card);
 
     make_label(card, "Volume", 20, 92, &lv_font_montserrat_16, T->muted);
     make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 119,
@@ -1151,28 +1133,12 @@ static void clock_timer_cb(lv_timer_t *timer)
 
 static void animation_timer_cb(lv_timer_t *timer)
 {
+    (void)timer;
+
     if (s_fan_on && s_fan_icon) {
         s_fan_angle += 80;
         if (s_fan_angle >= 3600) s_fan_angle -= 3600;
         lv_obj_set_style_transform_rotation(s_fan_icon, s_fan_angle, 0);
-    }
-
-    if (s_artwork_mode) {
-        return;
-    }
-
-    if (s_echo_playing) {
-        ++s_wave_phase;
-        for (int i = 0; i < 14; ++i) {
-            int h = 8 + ((i * 17 + s_wave_phase * 11) % 34);
-            lv_obj_set_height(s_wave[i], h);
-            lv_obj_set_style_bg_opa(s_wave[i], 120 + ((i * 13 + s_wave_phase * 19) % 100), 0);
-        }
-    } else {
-        for (int i = 0; i < 14; ++i) {
-            lv_obj_set_height(s_wave[i], 8);
-            lv_obj_set_style_bg_opa(s_wave[i], 45, 0);
-        }
     }
 }
 
