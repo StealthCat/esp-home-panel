@@ -173,7 +173,7 @@ Under **Home Assistant targets**, choose the entities for that particular panel.
 | Overhead light | `light.*` |
 | Ceiling fan | `fan.*` or `switch.*` |
 | Echo | `media_player.*` |
-| Echo announcement | `script.*` when using the Announce button |
+| Echo announcement | `script.*` for legacy announcement events |
 
 Examples for an office panel:
 
@@ -188,7 +188,14 @@ script.office_echo_announce
 A kitchen panel can use an entirely different set of entity IDs while sharing
 the same broker, credentials, base topic, and Home Assistant bridge.
 
-The announcement button invokes the configured script. This is intentionally a
+The display provides Mute, Previous, Play, Pause and Next buttons. Play and Pause
+send explicit commands; Previous and Next call the media player track services.
+Track navigation depends on support from the selected media player and source.
+After updating firmware, replace/reload this Home Assistant package to enable
+the new track commands.
+
+The Announce button has been removed from the display. Legacy announcement
+events still invoke the configured script. This is intentionally a
 script target because announcement/TTS support differs between media-player
 integrations. Put whatever TTS or Alexa-specific action you need in that Home
 Assistant script.
@@ -255,3 +262,4 @@ connection.
 
 Keeping entity selection as entity-ID fields means each panel only needs its
 MQTT credentials and never needs a Home Assistant long-lived access token.
+

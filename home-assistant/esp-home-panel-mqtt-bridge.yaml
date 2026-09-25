@@ -256,6 +256,18 @@ automation:
                         target:
                           entity_id: "{{ entity }}"
 
+                  - conditions: "{{ event_type == 'previous_track' }}"
+                    sequence:
+                      - action: media_player.media_previous_track
+                        target:
+                          entity_id: "{{ entity }}"
+
+                  - conditions: "{{ event_type == 'next_track' }}"
+                    sequence:
+                      - action: media_player.media_next_track
+                        target:
+                          entity_id: "{{ entity }}"
+
                   - conditions: "{{ event_type == 'announce' and script_entity | length > 0 }}"
                     sequence:
                       - action: script.turn_on
@@ -292,3 +304,4 @@ automation:
                   kind: echo
                   entity: "{{ trigger.payload_json.echo | default('', true) }}"
                   base_topic: "{{ base_topic }}"
+

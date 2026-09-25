@@ -6,6 +6,7 @@
 static panel_settings_t config;
 static uint16_t framebuffer[800 * 480];
 static int tapo_commands, fan_commands, echo_commands;
+static bool last_playing, last_next;
 const panel_settings_t *settings_get(void) { return &config; }
 void mqtt_bridge_tapo_power(bool on) {(void)on;tapo_commands++;}
 void mqtt_bridge_tapo_brightness(uint8_t p) {(void)p;tapo_commands++;}
@@ -15,7 +16,8 @@ void mqtt_bridge_overhead_brightness(uint8_t p) {(void)p;}
 void mqtt_bridge_fan_power(bool on) {(void)on;fan_commands++;}
 void mqtt_bridge_echo_volume(uint8_t p) {(void)p;echo_commands++;}
 void mqtt_bridge_echo_mute(bool m,uint8_t p) {(void)m;(void)p;echo_commands++;}
-void mqtt_bridge_echo_play_pause(bool p) {(void)p;echo_commands++;}
+void mqtt_bridge_echo_play_pause(bool p) {last_playing=p;echo_commands++;}
+void mqtt_bridge_echo_track(bool next) {last_next=next;echo_commands++;}
 void mqtt_bridge_echo_announce(void) {echo_commands++;}
 
 static void flush(lv_display_t *d,const lv_area_t *area,uint8_t *pixels) {
@@ -62,7 +64,13 @@ int main(int argc,char **argv) {
     lv_obj_send_event(s_color_presets[3],LV_EVENT_CLICKED,NULL);
     lv_obj_send_event(s_fan_switch,LV_EVENT_VALUE_CHANGED,NULL);
     lv_obj_send_event(s_echo_play,LV_EVENT_CLICKED,NULL);
-    assert(tapo_commands==1 && fan_commands==1 && echo_commands==1);
+    assert(tapo_commands==1 && fan_commands==1 && echo_commands==1 && last_playing);
+    lv_obj_send_event(s_echo_play,LV_EVENT_CLICKED,NULL);assert(last_playing);
+    lv_obj_send_event(s_echo_pause,LV_EVENT_CLICKED,NULL);assert(!last_playing);
+    lv_obj_send_event(s_echo_pause,LV_EVENT_CLICKED,NULL);assert(!last_playing);
+    lv_obj_send_event(s_echo_previous,LV_EVENT_CLICKED,NULL);assert(!last_next);
+    lv_obj_send_event(s_echo_next,LV_EVENT_CLICKED,NULL);assert(last_next);
+    assert(echo_commands==6);
     ui_set_mqtt_online(false);pending_state_timer_cb(NULL);
     assert(strcmp(lv_label_get_text(s_echo_status),"Offline")==0);
     ui_set_mqtt_online(true);ui_apply_tapo_state(true,80,0,255,0);

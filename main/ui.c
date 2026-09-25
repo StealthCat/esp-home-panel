@@ -63,12 +63,14 @@ static lv_obj_t *s_echo_pct;
 static lv_obj_t *s_echo_status;
 static lv_obj_t *s_echo_mute;
 static lv_obj_t *s_echo_play;
+static lv_obj_t *s_echo_pause;
+static lv_obj_t *s_echo_previous;
+static lv_obj_t *s_echo_next;
 static lv_obj_t *s_alexa_now_playing;
 static lv_obj_t *s_alexa_artist;
 
 static bool s_syncing;
 static bool s_fan_on;
-static bool s_echo_playing;
 static bool s_echo_muted;
 static uint8_t s_echo_unmuted_volume = 50;
 
@@ -725,28 +727,27 @@ static void echo_mute_cb(lv_event_t *e)
     mqtt_bridge_echo_mute(muted, target_volume);
 }
 
-static void echo_play_cb(lv_event_t *e)
+static void set_echo_playing(bool playing)
 {
-    (void)e;
+    if (s_echo_play) lv_obj_set_style_bg_color(
+        s_echo_play, c(playing ? T->accent : T->card_bg_2), 0);
+    if (s_echo_pause) lv_obj_set_style_bg_color(
+        s_echo_pause, c(playing ? T->card_bg_2 : T->accent), 0);
+}
+
+static void echo_playback_cb(lv_event_t *e)
+{
     discard_pending_ui(UI_PENDING_ALEXA);
-
-    bool playing = !s_echo_playing;
-    s_echo_playing = playing;
-    if (s_echo_play) {
-        lv_obj_set_style_bg_color(
-            s_echo_play, c(playing ? T->accent : T->card_bg_2), 0);
-    }
-
-    ESP_LOGI(TAG, "UI CMD alexa playing=%d", playing);
+    /* Explicit commands: repeated Play clicks must never pause playback. */
+    bool playing = (uintptr_t)lv_event_get_user_data(e) != 0;
+    set_echo_playing(playing);
     mqtt_bridge_echo_play_pause(playing);
 }
 
-static void echo_announce_cb(lv_event_t *e)
+static void echo_track_cb(lv_event_t *e)
 {
-    (void)e;
-    discard_pending_ui(UI_PENDING_ALEXA);
-    ESP_LOGI(TAG, "UI CMD alexa announce");
-    mqtt_bridge_echo_announce();
+    bool next = (uintptr_t)lv_event_get_user_data(e) != 0;
+    mqtt_bridge_echo_track(next);
 }
 
 static void make_status_dot(lv_obj_t *card, lv_obj_t **status, int x, int y)
@@ -960,15 +961,19 @@ static void create_echo_card(lv_obj_t *root)
     lv_obj_add_event_cb(s_echo_slider, echo_volume_cb, LV_EVENT_RELEASED, NULL);
     s_echo_pct = make_label(card, "--%", T->kittens ? 258 : 314, 118, &lv_font_montserrat_16, T->text);
 
-    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 148, T->kittens ? 68 : 94, 36);
+    /* Leave room for the kitten at the right edge; all hit areas remain >=52px. */
+    const int width = T->kittens ? 52 : 66;
+    const int step = T->kittens ? 58 : 70;
+    s_echo_mute = make_button(card, LV_SYMBOL_MUTE, 18, 148, width, 36);
     lv_obj_add_event_cb(s_echo_mute, echo_mute_cb, LV_EVENT_CLICKED, NULL);
-
-    s_echo_play = make_button(card, LV_SYMBOL_PLAY " " LV_SYMBOL_PAUSE,
-                              T->kittens ? 96 : 126, 148, T->kittens ? 68 : 96, 36);
-    lv_obj_add_event_cb(s_echo_play, echo_play_cb, LV_EVENT_CLICKED, NULL);
-
-    lv_obj_t *announce = make_button(card, "Announce", T->kittens ? 174 : 236, 148, 128, 36);
-    lv_obj_add_event_cb(announce, echo_announce_cb, LV_EVENT_CLICKED, NULL);
+    s_echo_previous = make_button(card, LV_SYMBOL_PREV, 18 + step, 148, width, 36);
+    lv_obj_add_event_cb(s_echo_previous, echo_track_cb, LV_EVENT_CLICKED, NULL);
+    s_echo_play = make_button(card, LV_SYMBOL_PLAY, 18 + 2 * step, 148, width, 36);
+    lv_obj_add_event_cb(s_echo_play, echo_playback_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)1);
+    s_echo_pause = make_button(card, LV_SYMBOL_PAUSE, 18 + 3 * step, 148, width, 36);
+    lv_obj_add_event_cb(s_echo_pause, echo_playback_cb, LV_EVENT_CLICKED, NULL);
+    s_echo_next = make_button(card, LV_SYMBOL_NEXT, 18 + 4 * step, 148, width, 36);
+    lv_obj_add_event_cb(s_echo_next, echo_track_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)1);
 }
 
 static void create_header(lv_obj_t *root)
@@ -1105,7 +1110,6 @@ static void pending_state_timer_cb(lv_timer_t *timer)
         s_echo_slider && s_echo_pct && s_echo_mute) {
         s_syncing = true;
         s_echo_muted = pending.alexa_muted;
-        s_echo_playing = pending.alexa_playing;
         if (pending.alexa_volume > 0) {
             s_echo_unmuted_volume = pending.alexa_volume;
         }
@@ -1116,12 +1120,7 @@ static void pending_state_timer_cb(lv_timer_t *timer)
             s_echo_mute,
             c(pending.alexa_muted ? T->accent : T->card_bg_2),
             0);
-        if (s_echo_play) {
-            lv_obj_set_style_bg_color(
-                s_echo_play,
-                c(pending.alexa_playing ? T->accent : T->card_bg_2),
-                0);
-        }
+        set_echo_playing(pending.alexa_playing);
 
         if (s_alexa_now_playing) {
             lv_label_set_text(

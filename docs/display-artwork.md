@@ -8,6 +8,9 @@ sliders, buttons, titles, clock and state values. It is not a flattened mockup.
 - Magic: castle, lantern, owl, windows, wand, wave, gold corners and fan crest.
 - Classic: supplied blue home tile and fan badge.
 
+Echo controls are Mute, Previous, Play, Pause and Next. Update the Home Assistant
+MQTT package alongside firmware to enable track navigation.
+
 Each sprite is fitted without stretching. Decoration stays inside its parent
 bounds and cannot intercept touch events. The color wheel has an ARGB canvas,
 so its corners blend with the theme. Status starts at Waiting, changes to Online
@@ -49,7 +52,7 @@ done
 
 The harness checks image descriptors, bounds, non-clickable decorations,
 MQTT state application/disconnection, color preset commands, fan switching and
-Echo playback. It renders the same RGB565 target/ARGB8888 source combination as
+separate Echo Play/Pause commands and Previous/Next navigation. It renders the same RGB565 target/ARGB8888 source combination as
 the device. GitHub Actions runs these checks and uploads all four PPM renders.
 Desktop verification does not validate the ESP-IDF toolchain, LCD timing,
 physical touch calibration or behavior on the Waveshare hardware.

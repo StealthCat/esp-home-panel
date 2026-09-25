@@ -429,7 +429,7 @@ static void publish_home_assistant_discovery(void)
         const char *name;
         const char *suffix;
         const char *state_topic;
-        const char *types[4];
+        const char *types[6];
         size_t type_count;
     };
 
@@ -463,8 +463,8 @@ static void publish_home_assistant_discovery(void)
             .name = "Echo Control",
             .suffix = "echo",
             .state_topic = s_topic_cmd_echo,
-            .types = {"volume", "mute", "play_pause", "announce"},
-            .type_count = 4,
+            .types = {"volume", "mute", "play_pause", "previous_track", "next_track", "announce"},
+            .type_count = 6,
         },
     };
 
@@ -898,6 +898,18 @@ void mqtt_bridge_echo_play_pause(bool playing)
             : "{\"event_type\":\"play_pause\",\"playing\":false}");
 }
 
+void mqtt_bridge_echo_track(bool next)
+{
+    note_local_command(CONTROL_ALEXA);
+    const panel_settings_t *settings = settings_get();
+    publish_targeted_json(
+        s_topic_cmd_echo,
+        settings ? settings->ha_echo_entity : NULL,
+        NULL,
+        next ? "{\"event_type\":\"next_track\"}"
+             : "{\"event_type\":\"previous_track\"}");
+}
+
 void mqtt_bridge_echo_announce(void)
 {
     note_local_command(CONTROL_ALEXA);
@@ -913,3 +925,4 @@ void mqtt_bridge_echo_announce(void)
                           settings ? settings->ha_echo_announce_script : NULL,
                           "{\"event_type\":\"announce\",\"action\":\"announce\"}");
 }
+
