@@ -71,6 +71,23 @@ def masked_gradient(base, mask, top, bottom):
     grad.putalpha(mask)
     base.alpha_composite(grad)
 
+def soft_texture(base,mask,color,amount=18,blur=.22):
+    """Lay a faint organic texture inside an existing alpha mask."""
+    nw=max(8,base.size[0]//4); nh=max(8,base.size[1]//4)
+    noise=Image.effect_noise((nw,nh),10).convert("L")
+    noise=noise.resize(base.size,Image.Resampling.BICUBIC)
+    if blur:
+        noise=noise.filter(ImageFilter.GaussianBlur(sc(blur)))
+    tex=Image.new("RGBA",base.size,color[:3]+(0,))
+    combined=Image.new("L",base.size,0)
+    mp=mask.load(); np=noise.load(); cp=combined.load()
+    for y in range(base.size[1]):
+        for x in range(base.size[0]):
+            if mp[x,y]:
+                cp[x,y]=min(255,(mp[x,y]*max(0,np[x,y]-82)*amount)//(255*173))
+    tex.putalpha(combined)
+    base.alpha_composite(tex)
+
 def ellipse_mask(size,b):
     m=Image.new("L",size,0); d=ImageDraw.Draw(m)
     d.ellipse(tuple(sc(v) for v in b),fill=255)
@@ -103,6 +120,11 @@ def composite_mask(base,mask,color):
     base.alpha_composite(layer)
 
 def finish(im,name,w,h):
+    # A very small pre-downsample diffusion pass removes the hard digital edge
+    # that makes supersampled primitives still read like clip-art. Preserve the
+    # original detail by blending only a small amount of the softened image.
+    softened=im.filter(ImageFilter.GaussianBlur(max(0.5,sc(.10))))
+    im=Image.blend(im,softened,.10)
     target=(w*SOURCE,h*SOURCE)
     im=im.resize(target,Image.Resampling.LANCZOS)
     im.save(OUT/name,optimize=True,compress_level=9)
@@ -153,23 +175,37 @@ for theme in ("classic","soccer","kittens","magic"):
     house(theme)
 
 def petal_layer(size,cx,cy,length,width,color,highlight,angle):
+    """Paint a rounded, slightly asymmetric fan blade like the mockups."""
     layer=Image.new("RGBA",size,TRAN)
     mask=Image.new("L",size,0)
     d=ImageDraw.Draw(mask)
-    # rounded teardrop, narrow at hub and broad at tip
-    pts=[(sc(cx-width*.28),sc(cy-7)),
-         (sc(cx-width*.55),sc(cy-length*.54)),
-         (sc(cx-width*.38),sc(cy-length*.92)),
-         (sc(cx),sc(cy-length)),
-         (sc(cx+width*.38),sc(cy-length*.92)),
-         (sc(cx+width*.55),sc(cy-length*.54)),
-         (sc(cx+width*.28),sc(cy-7))]
-    d.polygon(pts,fill=255)
-    d.ellipse(box(cx-width*.38,cy-length,cx+width*.38,cy-length+width*.75),fill=255)
-    soft_glow(layer,mask,color,1.2,70)
-    masked_gradient(layer,mask,highlight,color)
-    return layer.rotate(angle,resample=Image.Resampling.BICUBIC,center=(sc(cx),sc(cy)))
 
+    # Broad rounded end + soft waist at the hub. The slight left/right
+    # imbalance keeps it from reading as a perfectly geometric icon.
+    d.ellipse(box(cx-width*.48,cy-length,
+                  cx+width*.43,cy-length+width*.78),fill=255)
+    d.rounded_rectangle(
+        box(cx-width*.37,cy-length*.73,cx+width*.34,cy-7),
+        radius=sc(width*.28),fill=255)
+    d.ellipse(box(cx-width*.31,cy-length*.48,
+                  cx+width*.28,cy+1),fill=255)
+    mask=mask.filter(ImageFilter.GaussianBlur(sc(.18)))
+
+    shadow=mask.filter(ImageFilter.GaussianBlur(sc(1.15)))
+    soft_glow(layer,shadow,color,1.0,46)
+    masked_gradient(layer,mask,highlight,color)
+
+    # Narrow translucent highlight along one side, matching the softly painted
+    # blade treatment in the approved mockups.
+    hi=Image.new("L",size,0); hd=ImageDraw.Draw(hi)
+    hd.ellipse(box(cx-width*.25,cy-length+2,
+                   cx+width*.03,cy-length+width*.58),fill=120)
+    hi=hi.filter(ImageFilter.GaussianBlur(sc(.9)))
+    hlayer=Image.new("RGBA",size,(255,255,255,0)); hlayer.putalpha(hi)
+    layer.alpha_composite(hlayer)
+
+    return layer.rotate(angle,resample=Image.Resampling.BICUBIC,
+                        center=(sc(cx),sc(cy)))
 def fan(theme):
     w,h=142,116; im=canvas(w,h); cx,cy=58,58
     if theme=="classic":
@@ -230,11 +266,14 @@ def kitten_peek():
     ear1=polygon_mask(im.size,[(7,33),(14,3),(31,28)])
     ear2=polygon_mask(im.size,[(43,28),(60,3),(68,33)])
     composite_mask(im,ear1,KITTEN_CREAM); composite_mask(im,ear2,KITTEN_CREAM)
+    soft_glow(im,ear1,rgba(0xD984A6),.9,32)
+    soft_glow(im,ear2,rgba(0xD984A6),.9,32)
     d=ImageDraw.Draw(im)
     draw_poly(d,[(12,28),(16,10),(27,28)],KITTEN_LIGHT)
     draw_poly(d,[(47,28),(58,10),(63,28)],KITTEN_LIGHT)
     face=ellipse_mask(im.size,(8,18,67,72))
-    masked_gradient(im,face,(252,239,243,255),KITTEN_CREAM)
+    masked_gradient(im,face,(253,240,244,255),KITTEN_CREAM)
+    soft_texture(im,face,rgba(0xC8849F,255),11,.28)
     d=ImageDraw.Draw(im)
     draw_ellipse(d,(20,36,31,47),rgba(0xFFF8FA))
     draw_ellipse(d,(43,36,54,47),rgba(0xFFF8FA))
@@ -253,9 +292,11 @@ def kitten_peek():
 def kitten_sleep():
     w,h=118,74; im=canvas(w,h)
     bodymask=ellipse_mask(im.size,(22,27,105,69)); soft_glow(im,bodymask,rgba(0x9A5770),3,55,(0,1.5))
-    masked_gradient(im,bodymask,(248,237,241,255),KITTEN_WARM)
+    masked_gradient(im,bodymask,(250,240,244,255),KITTEN_WARM)
+    soft_texture(im,bodymask,rgba(0xB86F8B,255),13,.32)
     belly=ellipse_mask(im.size,(53,35,94,62)); masked_gradient(im,belly,(255,250,251,255),(241,226,231,255))
-    head=ellipse_mask(im.size,(13,19,56,58)); masked_gradient(im,head,(248,235,240,255),KITTEN_WARM)
+    head=ellipse_mask(im.size,(13,19,56,58)); masked_gradient(im,head,(250,239,243,255),KITTEN_WARM)
+    soft_texture(im,head,rgba(0xB86F8B,255),12,.30)
     d=ImageDraw.Draw(im)
     draw_poly(d,[(17,28),(20,7),(34,25)],KITTEN_WARM)
     draw_poly(d,[(38,25),(49,7),(53,30)],KITTEN_WARM)
@@ -325,22 +366,44 @@ def magic_lantern():
 
 def magic_owl():
     w,h=62,78; im=canvas(w,h)
-    body=ellipse_mask(im.size,(9,5,53,57)); soft_glow(im,body,rgba(0x7A4A25),2.5,55,(0,1))
-    masked_gradient(im,body,(255,249,231,255),(227,211,179,255))
-    d=ImageDraw.Draw(im)
-    wing=rgba(0xC9A16D)
-    draw_poly(d,[(12,39),(0,63),(22,56)],wing); draw_poly(d,[(50,39),(62,63),(40,56)],wing)
-    draw_ellipse(d,(12,12,31,34),rgba(0xD5B37C)); draw_ellipse(d,(31,12,50,34),rgba(0xD5B37C))
-    for cx in (22,40):
-        eye=ellipse_mask(im.size,(cx-7,17,cx+7,31)); soft_glow(im,eye,rgba(0xA96832),1.6,70)
-        draw_ellipse(d,(cx-7,17,cx+7,31),rgba(0x7B4B2C))
-        draw_ellipse(d,(cx-3.5,20,cx+3.5,28),rgba(0x3C2418))
-        draw_ellipse(d,(cx-1.5,21,cx+.5,23),WHITE)
-    draw_poly(d,[(31,29),(27,36),(35,36)],rgba(0xC88935))
-    draw_rr(d,(4,61,58,67),1,rgba(0x5D3B2A))
-    draw_rr(d,(8,68,54,74),1,rgba(0xB77E3B))
-    finish(im,"magic_owl.png",w,h)
+    body=ellipse_mask(im.size,(9,5,53,58))
+    soft_glow(im,body,rgba(0x7A4A25),2.8,48,(0,1))
+    masked_gradient(im,body,(255,251,237,255),(226,211,181,255))
+    soft_texture(im,body,rgba(0xB79972,255),12,.32)
 
+    d=ImageDraw.Draw(im)
+
+    # Rounded feathered wings instead of triangular icon shapes.
+    for side in (-1,1):
+        cx=31+side*19
+        wing=ellipse_mask(im.size,(cx-13,34,cx+10,63))
+        wing=wing.rotate(side*14,resample=Image.Resampling.BICUBIC,
+                         center=(sc(cx),sc(48)))
+        masked_gradient(im,wing,(223,194,151,245),(177,133,90,245))
+        for j in range(4):
+            fx=cx-side*(2+j*2.5); fy=43+j*4
+            draw_ellipse(d,(fx-4,fy-2.5,fx+4,fy+2.5),
+                         rgba(0xF3E4C9,105))
+
+    # Warm facial discs with softly shaded eyes.
+    for cx in (22,40):
+        disc=ellipse_mask(im.size,(cx-9,12,cx+9,35))
+        masked_gradient(im,disc,(228,198,151,255),(198,156,103,255))
+        soft_glow(im,disc,rgba(0xD8B57B),1.2,36)
+        draw_ellipse(d,(cx-4.6,18,cx+4.6,30),rgba(0x4A2A1B))
+        draw_ellipse(d,(cx-2.6,20,cx+2.6,28),rgba(0x24140E))
+        draw_ellipse(d,(cx-1.5,20.5,cx+.3,22.4),WHITE)
+
+    draw_poly(d,[(31,29),(27.5,36),(34.5,36)],rgba(0xC88A36))
+    # A few soft chest feather marks make the owl feel illustrated.
+    for y in (39,44,49):
+        for x in range(20+(y%2)*3,45,8):
+            draw_line(d,[(x-2,y),(x,y+2),(x+2,y)],rgba(0xC7A77C,90),.55)
+
+    draw_rr(d,(4,61,58,67),1.5,rgba(0x5D3B2A))
+    draw_rr(d,(8,68,54,74),1.3,rgba(0xB77E3B))
+    draw_line(d,[(10,69),(52,69)],rgba(0xE7BE75,120),.7)
+    finish(im,"magic_owl.png",w,h)
 def magic_quill():
     w,h=36,70; im=canvas(w,h)
     d=ImageDraw.Draw(im)
