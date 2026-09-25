@@ -382,42 +382,66 @@ def soccer_goal():
 
 def soccer_field():
     w,h=800,408; im=canvas(w,h)
-    px=im.load(); random.seed(30809)
-    # layered grass gradient + deterministic soft grain
-    for y in range(sc(h)):
-        ty=y/max(1,sc(h)-1)
-        base=(7+int(3*ty),55+int(15*ty),30+int(7*ty),255)
-        for x in range(sc(w)):
-            band=((x//sc(80))%2)
-            n=random.randint(-3,3)
-            px[x,y]=(max(0,base[0]+n),max(0,base[1]+band*8+n),max(0,base[2]+band*3+n),255)
     d=ImageDraw.Draw(im)
-    # diagonal stadium-light streaks like the original green mockup
+
+    # Smooth vertical grass gradient and alternating mowing bands. This uses
+    # Pillow-native raster operations rather than Python per-pixel loops.
+    for y in range(sc(h)):
+        t=y/max(1,sc(h)-1)
+        col=(7+int(3*t),55+int(15*t),30+int(7*t),255)
+        d.line((0,y,sc(w),y),fill=col)
+    for i,x in enumerate(range(0,w,80)):
+        if i%2:
+            d.rectangle((sc(x),0,sc(min(w,x+80)),sc(h)),fill=(8,70,37,52))
+
+    # Fine organic grass grain generated at modest resolution and smoothly
+    # scaled up; avoids both blockiness and a very expensive Python loop.
+    noise=Image.effect_noise((w*2,h*2),11).convert("L")
+    noise=noise.resize(im.size,Image.Resampling.BICUBIC)
+    noise=noise.filter(ImageFilter.GaussianBlur(sc(.18)))
+    grain=Image.new("RGBA",im.size,(31,116,63,0))
+    grain.putalpha(noise.point(lambda p: max(0,min(24,int((p-96)*.17)))))
+    im.alpha_composite(grain)
+
+    # Diagonal stadium-light streaks like the approved green mockup.
     light=Image.new("RGBA",im.size,TRAN); ld=ImageDraw.Draw(light)
-    for off,a in [(-80,22),(80,16),(260,12)]:
-        ld.polygon([(sc(off),0),(sc(off+125),0),(sc(off+500),sc(h)),(sc(off+370),sc(h))],
-                   fill=(44,220,105,a))
+    for off,a in [(-80,24),(80,18),(260,13)]:
+        ld.polygon([(sc(off),0),(sc(off+125),0),
+                    (sc(off+500),sc(h)),(sc(off+370),sc(h))],
+                   fill=(50,225,112,a))
     light=light.filter(ImageFilter.GaussianBlur(sc(13)))
     im.alpha_composite(light)
+
     d=ImageDraw.Draw(im)
     field=rgba(0x93CDA8,105); inset=18
-    draw_line(d,[(inset,inset),(w-inset,inset),(w-inset,h-inset),(inset,h-inset),(inset,inset)],field,1.2)
+    draw_line(d,[(inset,inset),(w-inset,inset),(w-inset,h-inset),
+                 (inset,h-inset),(inset,inset)],field,1.2)
     draw_line(d,[(400,inset),(400,h-inset)],field,1.1)
     d.ellipse(box(340,144,460,264),outline=field,width=sc(1.1))
     draw_ellipse(d,(397,201,403,207),field)
     for left in (True,False):
-        gx=inset if left else w-inset; px_=132 if left else 668; sx=70 if left else 730
+        gx=inset if left else w-inset
+        px_=132 if left else 668
+        sx=70 if left else 730
         draw_line(d,[(gx,102),(px_,102),(px_,306),(gx,306)],field,1.0)
         draw_line(d,[(gx,148),(sx,148),(sx,260),(gx,260)],field,1.0)
         spot=92 if left else 708
         draw_ellipse(d,(spot-2.5,201.5,spot+2.5,206.5),field)
-    # subtle vignette
-    vig=Image.new("L",im.size,0); vd=ImageDraw.Draw(vig)
-    vd.rectangle((0,0,*im.size),fill=110)
-    inner=rounded_rect_mask(im.size,(8,8,w-8,h-8),20).filter(ImageFilter.GaussianBlur(sc(28)))
-    vig=Image.frombytes("L",im.size,bytes(max(0,a-b//2) for a,b in zip(vig.tobytes(),inner.tobytes())))
-    layer=Image.new("RGBA",im.size,(0,19,10,0)); layer.putalpha(vig); im.alpha_composite(layer)
+
+    # Soft edge vignette so the field sits behind the live cards rather than
+    # looking like a flat green diagram.
+    edge=Image.new("L",im.size,0)
+    ed=ImageDraw.Draw(edge)
+    ed.rectangle((0,0,*im.size),fill=120)
+    inner=rounded_rect_mask(im.size,(10,10,w-10,h-10),22)
+    inner=inner.filter(ImageFilter.GaussianBlur(sc(30)))
+    edge=Image.frombytes("L",im.size,
+        bytes(max(0,a-b//2) for a,b in zip(edge.tobytes(),inner.tobytes())))
+    shade=Image.new("RGBA",im.size,(0,16,9,0))
+    shade.putalpha(edge)
+    im.alpha_composite(shade)
     finish(im,"soccer_field.png",w,h)
+
 
 soccer_goal(); soccer_field()
 
