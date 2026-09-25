@@ -22,7 +22,7 @@ except NameError:
 
 OUT = ROOT / "main" / "theme_art_generated.inc"
 ASSET_ROOT = ROOT / "assets" / "theme-sprites"
-GENERATOR_VERSION = "theme-art-v11-hires-png-assets"
+GENERATOR_VERSION = "theme-art-v12-reference-sprite-assets"
 
 ASSETS = {
     "HEADER_CLASSIC": ("header_classic.png", 56, 56),
@@ -30,9 +30,14 @@ ASSETS = {
     "HEADER_KITTENS": ("header_kittens.png", 56, 56),
     "HEADER_MAGIC": ("header_magic.png", 56, 56),
     "SOCCER_FIELD": ("soccer_field.png", 800, 408),
+    "SOCCER_BALL": ("soccer_ball.png", 64, 64),
+    "SOCCER_STREAK": ("soccer_streak.png", 230, 58),
     "KITTEN_PEEK": ("kitten_peek.png", 74, 56),
     "KITTEN_SLEEP": ("kitten_sleep.png", 118, 74),
     "KITTEN_PAWS": ("kitten_paws.png", 60, 68),
+    "KITTEN_SIT": ("kitten_sit.png", 72, 92),
+    "KITTEN_CAPTION_HOME": ("kitten_caption_home.png", 104, 82),
+    "KITTEN_CAPTION_ECHO": ("kitten_caption_echo.png", 118, 82),
     "FAN_CLASSIC": ("fan_classic.png", 142, 116),
     "FAN_SOCCER": ("fan_soccer.png", 142, 116),
     "FAN_KITTENS": ("fan_kittens.png", 142, 116),
@@ -42,17 +47,21 @@ ASSETS = {
     "MAGIC_LANTERN": ("magic_lantern.png", 56, 72),
     "MAGIC_OWL": ("magic_owl.png", 62, 78),
     "MAGIC_QUILL": ("magic_quill.png", 36, 70),
+    "MAGIC_WINDOW": ("magic_window.png", 72, 116),
+    "MAGIC_WAVE": ("magic_wave.png", 240, 58),
+    "MAGIC_SPARK": ("magic_spark.png", 54, 72),
     "MAGIC_CORNER_TL": ("magic_corner_tl.png", 36, 36),
 }
 
 ORDER = [
     "HEADER_CLASSIC", "HEADER_SOCCER", "HEADER_KITTENS", "HEADER_MAGIC",
-    "SOCCER_FIELD",
+    "SOCCER_FIELD", "SOCCER_BALL", "SOCCER_STREAK",
     "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS",
+    "KITTEN_SIT", "KITTEN_CAPTION_HOME", "KITTEN_CAPTION_ECHO",
     "FAN_CLASSIC", "FAN_SOCCER", "FAN_KITTENS", "FAN_MAGIC",
     "SOCCER_GOAL",
     "MAGIC_CASTLE", "MAGIC_LANTERN",
-    "MAGIC_OWL", "MAGIC_QUILL",
+    "MAGIC_OWL", "MAGIC_QUILL", "MAGIC_WINDOW", "MAGIC_WAVE", "MAGIC_SPARK",
     "MAGIC_CORNER_TL", "MAGIC_CORNER_TR",
     "MAGIC_CORNER_BL", "MAGIC_CORNER_BR",
 ]
