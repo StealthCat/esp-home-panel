@@ -791,7 +791,9 @@ static const lv_image_dsc_t {sym} = {{
 
 def signature() -> str:
     h = hashlib.sha256(GENERATOR_VERSION.encode())
-    h.update(Path(__file__).read_bytes())
+    # PlatformIO executes pre-scripts through SCons, where __file__ is not
+    # guaranteed to exist. Hash the known project-relative script path instead.
+    h.update((ROOT / "tools" / "generate_theme_art.py").read_bytes())
     for path in THEMES.values():
         h.update(path.read_bytes())
     return h.hexdigest()
