@@ -892,7 +892,7 @@ static void create_overhead_card(lv_obj_t *root)
     }
 
     if (T->soccer) {
-        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 268, 74, true);
+        add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 286, 58, true);
     } else if (T->kittens) {
         lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home <3", 248, 62,
                                        &lv_font_montserrat_14, T->accent_2);
@@ -900,68 +900,22 @@ static void create_overhead_card(lv_obj_t *root)
     }
 }
 
-static lv_obj_t *create_fan_graphic(lv_obj_t *card, int x, int y)
-{
-    /* Fixed outer bezel. The rotor itself is a separate object so animation
-     * rotates only the blades, not the ring. */
-    lv_obj_t *ring = lv_obj_create(card);
-    lv_obj_set_pos(ring, x, y);
-    lv_obj_set_size(ring, 112, 112);
-    lv_obj_set_style_radius(ring, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_opa(ring, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(ring, 4, 0);
-    lv_obj_set_style_border_color(ring, c(T->magic ? T->accent_2 : T->accent), 0);
-    lv_obj_set_style_border_opa(ring, 195, 0);
-    lv_obj_set_style_pad_all(ring, 0, 0);
-    lv_obj_remove_flag(ring, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(ring, LV_OBJ_FLAG_CLICKABLE);
-
-    lv_obj_t *rotor = lv_obj_create(card);
-    lv_obj_set_pos(rotor, x + 13, y + 13);
-    lv_obj_set_size(rotor, 86, 86);
-    lv_obj_set_style_bg_opa(rotor, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(rotor, 0, 0);
-    lv_obj_set_style_pad_all(rotor, 0, 0);
-    lv_obj_remove_flag(rotor, LV_OBJ_FLAG_SCROLLABLE);
-    lv_obj_remove_flag(rotor, LV_OBJ_FLAG_CLICKABLE);
-
-    /* Four broad rounded blades, matching the original mockup proportions. */
-    const int bx[4] = {34, 50, 34, 6};
-    const int by[4] = {5, 34, 50, 34};
-    const int bw[4] = {18, 30, 18, 30};
-    const int bh[4] = {30, 18, 30, 18};
-
-    for (int i = 0; i < 4; ++i) {
-        lv_obj_t *blade = lv_obj_create(rotor);
-        lv_obj_set_pos(blade, bx[i], by[i]);
-        lv_obj_set_size(blade, bw[i], bh[i]);
-        lv_obj_set_style_radius(blade, 12, 0);
-        lv_obj_set_style_bg_color(blade, c(T->accent), 0);
-        lv_obj_set_style_bg_grad_color(blade, c(T->accent_2), 0);
-        lv_obj_set_style_bg_grad_dir(blade, LV_GRAD_DIR_VER, 0);
-        lv_obj_set_style_bg_opa(blade, 235, 0);
-        lv_obj_set_style_border_width(blade, 0, 0);
-        lv_obj_set_style_pad_all(blade, 0, 0);
-        lv_obj_remove_flag(blade, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_remove_flag(blade, LV_OBJ_FLAG_CLICKABLE);
-    }
-
-    add_circle(rotor, 34, 34, 18, T->accent_2, LV_OPA_COVER);
-    return rotor;
-}
-
 static void create_fan_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 274, 382, 192);
 
-    if (T->kittens) {
-        add_theme_sprite(card, THEME_ART_KITTEN_FAN, 40, 64, true);
-        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 246, 54, true);
-    } else if (T->soccer) {
-        add_theme_sprite(card, THEME_ART_SOCCER_FAN, 40, 64, true);
+    theme_art_id_t fan_art = THEME_ART_FAN_CLASSIC;
+    if (T->soccer) {
+        fan_art = THEME_ART_FAN_SOCCER;
+    } else if (T->kittens) {
+        fan_art = THEME_ART_FAN_KITTENS;
     } else if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 92, 54, true);
+        fan_art = THEME_ART_FAN_MAGIC;
     }
+
+    /* Every theme uses the same 142x116 transparent sprite footprint so the
+     * fan illustration stays aligned independently of theme artwork. */
+    add_theme_sprite(card, fan_art, 30, 68, true);
 
     if (T->magic) {
         add_mini_fan_icon(card, 42, 14, T->accent);
@@ -973,11 +927,8 @@ static void create_fan_card(lv_obj_t *root)
         make_status_dot(card, &s_fan_status, 72, 48);
     }
 
-    if (!T->kittens && !T->soccer && !T->magic) {
-        s_fan_icon = create_fan_graphic(card, 25, 65);
-    } else {
-        s_fan_icon = NULL;
-    }
+    /* Fan artwork is sprite-based for every theme; no native fallback. */
+    s_fan_icon = NULL;
 
     s_fan_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_fan_switch, switch_fan_cb, LV_EVENT_VALUE_CHANGED, NULL);
