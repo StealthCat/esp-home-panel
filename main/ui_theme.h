@@ -13,7 +13,6 @@ typedef enum {
 typedef struct {
     panel_theme_id_t id;
     const char *name;
-    const char *tagline;
 
     uint32_t screen_bg;
     uint32_t screen_bg_2;
@@ -33,3 +32,4 @@ typedef struct {
 } panel_theme_t;
 
 const panel_theme_t *panel_theme_get(void);
+

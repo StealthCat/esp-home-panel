@@ -980,17 +980,14 @@ static void create_header(lv_obj_t *root)
 
     add_theme_sprite(root, header_art, 10, 8, false);
 
+    /* Use the former title/subtitle area, up to the clock and status block. */
     lv_obj_t *title_label =
-        make_label(root, title, 78, 13, &lv_font_montserrat_32, T->text);
-    lv_obj_set_width(title_label, T->magic ? 330 : 440);
-    lv_obj_set_height(title_label, 44);
-    lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_DOTS);
-
-    {
-        lv_obj_t *tagline = make_label(root, T->tagline, 78, 52,
-                                       &lv_font_montserrat_14, T->muted);
-        lv_obj_set_style_text_opa(tagline, 220, 0);
-    }
+        make_label(root, title, 78, 8, &lv_font_montserrat_48, T->text);
+    lv_obj_set_width(title_label, 500);
+    lv_obj_set_height(title_label, 62);
+    lv_obj_set_style_pad_top(title_label,
+                            (62 - lv_font_get_line_height(&lv_font_montserrat_48)) / 2, 0);
+    lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     const int clock_x = 600;
     const int date_x = 590;

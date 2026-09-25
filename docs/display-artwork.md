@@ -20,6 +20,10 @@ so its corners blend with the theme. Status starts at Waiting, changes to Online
 when an entity state arrives, and changes to Offline on MQTT disconnection.
 Online indicates a received state, not an independently polled device heartbeat.
 
+The configurable header title fills the former title/subtitle area in every
+theme, using larger text. Long titles scroll within that space. Header subtitles
+are removed.
+
 ## Custom color circles
 
 Open the panel's IP address in a browser and use **Tapo color circles** to choose

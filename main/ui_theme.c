@@ -4,7 +4,6 @@
 static const panel_theme_t __attribute__((unused)) THEME_CLASSIC = {
     .id = PANEL_THEME_CLASSIC_DARK,
     .name = "Home Control",
-    .tagline = "Smart Home  •  Powered by ESP-IDF + LVGL",
     .screen_bg = 0x07111C,
     .screen_bg_2 = 0x0B1D31,
     .card_bg = 0x101D2A,
@@ -21,7 +20,6 @@ static const panel_theme_t __attribute__((unused)) THEME_CLASSIC = {
 static const panel_theme_t __attribute__((unused)) THEME_SOCCER = {
     .id = PANEL_THEME_SOCCER_GREEN,
     .name = "Home Control",
-    .tagline = "Smart Home  •  Powered by ESPHome",
     .screen_bg = 0x03150D,
     .screen_bg_2 = 0x08301C,
     .card_bg = 0x082517,
@@ -39,7 +37,6 @@ static const panel_theme_t __attribute__((unused)) THEME_SOCCER = {
 static const panel_theme_t __attribute__((unused)) THEME_KITTENS = {
     .id = PANEL_THEME_KITTENS_PINK,
     .name = "Home Control",
-    .tagline = "Smart Home  •  Powered by ESPHome",
     .screen_bg = 0x1B1017,
     .screen_bg_2 = 0x3A1F2C,
     .card_bg = 0x35202B,
@@ -57,7 +54,6 @@ static const panel_theme_t __attribute__((unused)) THEME_KITTENS = {
 static const panel_theme_t __attribute__((unused)) THEME_MAGIC = {
     .id = PANEL_THEME_MAGIC_BLUE,
     .name = "Home Control",
-    .tagline = "A Smarter Home  •  More Magical Living",
     .screen_bg = 0x04132B,
     .screen_bg_2 = 0x082A55,
     .card_bg = 0x071D3E,
@@ -86,3 +82,4 @@ const panel_theme_t *panel_theme_get(void)
         return &THEME_CLASSIC;
     }
 }
+

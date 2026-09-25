@@ -31,6 +31,7 @@ REQUIRED = {
     "CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED": "y",
     "CONFIG_COMPILER_OPTIMIZATION_SIZE": "y",
     "CONFIG_LV_FONT_MONTSERRAT_36": "y",
+    "CONFIG_LV_FONT_MONTSERRAT_48": "y",
 }
 
 DISABLED = {
@@ -94,3 +95,4 @@ def update_sdkconfig() -> None:
 
 
 update_sdkconfig()
+
