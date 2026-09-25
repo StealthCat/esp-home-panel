@@ -136,9 +136,9 @@ static void init_styles(void)
     lv_style_set_bg_grad_color(&s_card_style, c(T->card_bg_2));
     lv_style_set_bg_grad_dir(&s_card_style, LV_GRAD_DIR_VER);
     lv_style_set_bg_opa(&s_card_style, 238);
-    lv_style_set_border_width(&s_card_style, T->magic ? 2 : 1);
+    lv_style_set_border_width(&s_card_style, 1);
     lv_style_set_border_color(&s_card_style, c(T->card_border));
-    lv_style_set_border_opa(&s_card_style, T->magic ? 185 : 125);
+    lv_style_set_border_opa(&s_card_style, T->magic ? 90 : 125);
     lv_style_set_shadow_width(&s_card_style, 8);
     lv_style_set_shadow_spread(&s_card_style, 0);
     lv_style_set_shadow_color(&s_card_style, c(T->accent));
@@ -169,7 +169,7 @@ static lv_obj_t *add_theme_sprite(lv_obj_t *parent, theme_art_id_t id,
 
 static void add_magic_card_ornaments(lv_obj_t *card, int w, int h)
 {
-    const int s = 42;
+    const int s = 36;
     add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TL, 0, 0, false);
     add_theme_sprite(card, THEME_ART_MAGIC_CORNER_TR, w - s, 0, false);
     add_theme_sprite(card, THEME_ART_MAGIC_CORNER_BL, 0, h - s, false);
@@ -722,9 +722,15 @@ static void make_status_dot(lv_obj_t *card, lv_obj_t **status, int x, int y)
 static void create_tapo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 78, 382, 187);
-    make_label(card, "Tapo LED Strips", 70, 15, &lv_font_montserrat_22, T->text);
-    add_chain_icon(card, 20, 20, T->accent_2);
-    make_status_dot(card, &s_tapo_status, 72, 48);
+    if (T->magic) {
+        add_chain_icon(card, 42, 20, T->accent_2);
+        make_label(card, "Tapo LED Strips", 96, 15, &lv_font_montserrat_22, T->text);
+        make_status_dot(card, &s_tapo_status, 100, 48);
+    } else {
+        make_label(card, "Tapo LED Strips", 70, 15, &lv_font_montserrat_22, T->text);
+        add_chain_icon(card, 20, 20, T->accent_2);
+        make_status_dot(card, &s_tapo_status, 72, 48);
+    }
 
     s_tapo_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_tapo_switch, switch_tapo_cb, LV_EVENT_VALUE_CHANGED, NULL);
@@ -872,16 +878,22 @@ static void create_fan_card(lv_obj_t *root)
 
     if (T->kittens) {
         add_theme_sprite(card, THEME_ART_KITTEN_FAN, 38, 60, true);
-        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 224, 48, true);
+        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 231, 41, true);
     } else if (T->soccer) {
         add_theme_sprite(card, THEME_ART_SOCCER_FAN, 38, 60, true);
     } else if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 78, 48, true);
+        add_theme_sprite(card, THEME_ART_MAGIC_FAN, 80, 46, true);
     }
 
-    make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
-    add_mini_fan_icon(card, 20, 14, T->accent);
-    make_status_dot(card, &s_fan_status, 72, 48);
+    if (T->magic) {
+        add_mini_fan_icon(card, 42, 14, T->accent);
+        make_label(card, "Ceiling Fan", 96, 15, &lv_font_montserrat_22, T->text);
+        make_status_dot(card, &s_fan_status, 100, 48);
+    } else {
+        make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
+        add_mini_fan_icon(card, 20, 14, T->accent);
+        make_status_dot(card, &s_fan_status, 72, 48);
+    }
 
     if (!T->kittens && !T->soccer && !T->magic) {
         s_fan_icon = create_fan_graphic(card, 25, 65);
