@@ -152,6 +152,26 @@ static bool valid_panel_id(const char *value)
     return true;
 }
 
+static bool valid_display_title(const char *value)
+{
+    if (!value || value[0] == '\0') {
+        return false;
+    }
+
+    size_t len = strlen(value);
+    if (len > PANEL_DISPLAY_TITLE_MAX) {
+        return false;
+    }
+
+    for (const unsigned char *p = (const unsigned char *)value; *p; ++p) {
+        if (*p < 0x20 || *p == 0x7F) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static bool valid_mqtt_prefix(const char *value)
 {
     if (!value || value[0] == '\0') {
@@ -242,6 +262,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     const panel_settings_t *cfg = settings_get();
 
     char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], mqtt_discovery[160], panel_id[96], timezone[224];
+    char display_title[128];
     char ha_tapo[160], ha_overhead[160], ha_fan[160], ha_echo[160], ha_announce[160];
     html_escape(cfg->wifi_ssid, ssid, sizeof(ssid));
     html_escape(cfg->mqtt_uri, mqtt_uri, sizeof(mqtt_uri));
@@ -249,6 +270,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     html_escape(cfg->mqtt_base_topic, mqtt_topic, sizeof(mqtt_topic));
     html_escape(cfg->mqtt_discovery_prefix, mqtt_discovery, sizeof(mqtt_discovery));
     html_escape(cfg->panel_id, panel_id, sizeof(panel_id));
+    html_escape(cfg->display_title, display_title, sizeof(display_title));
     html_escape(cfg->ha_tapo_entity, ha_tapo, sizeof(ha_tapo));
     html_escape(cfg->ha_overhead_entity, ha_overhead, sizeof(ha_overhead));
     html_escape(cfg->ha_fan_entity, ha_fan, sizeof(ha_fan));
@@ -293,6 +315,8 @@ static esp_err_t root_handler(httpd_req_t *req)
 
     snprintf(buf, sizeof(buf),
              "<section class='card'><h2>Display &amp; Theme</h2>"
+             "<label>Display title</label><input name='display_title' maxlength='31' value=\"%s\" placeholder='Home Control'>"
+             "<div class='hint'>Shown as the large title in the upper-left of the panel.</div>"
              "<label>Theme</label><select name='theme'>"
              "<option value='0'%s>Classic dark</option>"
              "<option value='1'%s>Soccer green</option>"
@@ -304,6 +328,7 @@ static esp_err_t root_handler(httpd_req_t *req)
              "<div class='hint'>The ESP32-S3-Touch-LCD-7 hardware has switch-only backlight control; non-zero values are treated as on. 7C-BOX supports PWM brightness.</div>"
              "<label>POSIX timezone</label><input name='timezone' maxlength='95' value=\"%s\">"
              "</section>",
+             display_title,
              cfg->theme == 0 ? " selected" : "",
              cfg->theme == 1 ? " selected" : "",
              cfg->theme == 2 ? " selected" : "",
@@ -451,6 +476,7 @@ static esp_err_t save_handler(httpd_req_t *req)
     form_get(body, "mqtt_discovery_prefix", updated.mqtt_discovery_prefix,
              sizeof(updated.mqtt_discovery_prefix));
     form_get(body, "panel_id", updated.panel_id, sizeof(updated.panel_id));
+    form_get(body, "display_title", updated.display_title, sizeof(updated.display_title));
     form_get(body, "ha_tapo_entity", updated.ha_tapo_entity, sizeof(updated.ha_tapo_entity));
     form_get(body, "ha_overhead_entity", updated.ha_overhead_entity, sizeof(updated.ha_overhead_entity));
     form_get(body, "ha_fan_entity", updated.ha_fan_entity, sizeof(updated.ha_fan_entity));
@@ -485,6 +511,15 @@ static esp_err_t save_handler(httpd_req_t *req)
             req,
             HTTPD_400_BAD_REQUEST,
             "Invalid panel ID. Use 1-31 lowercase letters, digits, '-' or '_'.");
+        return ESP_OK;
+    }
+
+    if (!valid_display_title(updated.display_title)) {
+        free(body);
+        httpd_resp_send_err(
+            req,
+            HTTPD_400_BAD_REQUEST,
+            "Invalid display title. Use 1-31 printable characters.");
         return ESP_OK;
     }
 
