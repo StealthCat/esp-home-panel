@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - "tools/build_theme_png_assets.py"
+      - "tools/build_reference_theme_extras.py"
       - ".github/workflows/build-theme-png-assets.yml"
   workflow_dispatch:
 
@@ -24,7 +25,9 @@ jobs:
       - name: Install Pillow
         run: python -m pip install --disable-pip-version-check Pillow==11.3.0
       - name: Generate high-resolution transparent PNG source assets
-        run: python tools/build_theme_png_assets.py
+        run: |
+          python tools/build_theme_png_assets.py
+          python tools/build_reference_theme_extras.py
       - name: Commit generated PNG assets
         run: |
           git config user.name "github-actions[bot]"
