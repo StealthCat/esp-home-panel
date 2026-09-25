@@ -16,6 +16,7 @@ extern "C" {
 #define PANEL_MQTT_BASE_TOPIC_MAX       127
 #define PANEL_MQTT_DISCOVERY_PREFIX_MAX 63
 #define PANEL_ID_MAX                    31
+#define PANEL_DISPLAY_TITLE_MAX          31
 #define PANEL_HA_ENTITY_ID_MAX    127
 #define PANEL_TIMEZONE_MAX        95
 
@@ -34,6 +35,9 @@ typedef struct {
      * stable value derived from the Wi-Fi STA MAC address.
      */
     char panel_id[PANEL_ID_MAX + 1];
+
+    /* User-configurable title shown in the display header. */
+    char display_title[PANEL_DISPLAY_TITLE_MAX + 1];
 
     /*
      * Existing Home Assistant entities controlled through the MQTT bridge.
