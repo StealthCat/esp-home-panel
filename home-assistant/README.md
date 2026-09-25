@@ -188,6 +188,11 @@ script.office_echo_announce
 A kitchen panel can use an entirely different set of entity IDs while sharing
 the same broker, credentials, base topic, and Home Assistant bridge.
 
+The Alexa card shows the current title and artist/author on two lines. Metadata
+comes from `media_title` and `media_artist`, falling back to `media_album_artist`
+or `media_author` for the second line. Direct MQTT state publishers may also use
+`author` when `artist` is empty. Missing titles display “Nothing playing.”
+
 The display provides Mute, Previous, Play, Pause and Next buttons. Play and Pause
 send explicit commands; Previous and Next call the media player track services.
 Track navigation depends on support from the selected media player and source.

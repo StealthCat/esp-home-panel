@@ -96,7 +96,7 @@ script:
                       ),
                       "playing": is_state(entity, "playing"),
                       "title": (state_attr(entity, "media_title") or "") | string,
-                      "artist": (state_attr(entity, "media_artist") or "") | string
+                      "artist": (state_attr(entity, "media_artist") or state_attr(entity, "media_album_artist") or state_attr(entity, "media_author") or "") | string
                     } | to_json }}
                   qos: 1
                   retain: true

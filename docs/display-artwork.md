@@ -8,7 +8,10 @@ sliders, buttons, titles, clock and state values. It is not a flattened mockup.
 - Magic: castle, lantern, owl, windows, wand, wave, gold corners and fan crest.
 - Classic: supplied blue home tile and fan badge.
 
-Echo controls are Mute, Previous, Play, Pause and Next. Update the Home Assistant
+The Alexa card displays the current media title and artist/author on two separate
+scrolling lines in all themes. Its redundant corner wordmark is removed.
+
+Alexa controls are Mute, Previous, Play, Pause and Next. Update the Home Assistant
 MQTT package alongside firmware to enable track navigation.
 
 Each sprite is fitted without stretching. Decoration stays inside its parent

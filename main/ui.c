@@ -916,41 +916,35 @@ static void create_echo_card(lv_obj_t *root)
     lv_obj_t *card = make_card(root, 404, 274, 382, 192);
 
     const int title_x = T->magic ? 100 : 70;
-    const int status_x = T->magic ? 102 : 72;
+    const int status_x = 284;
 
     if (T->magic) {
         add_theme_sprite(card, THEME_ART_MAGIC_OWL, 16, 5, true);
-        add_theme_sprite(card, THEME_ART_MAGIC_WAVE, 147, 44, true);
+        lv_obj_t *wave = add_theme_sprite(card, THEME_ART_MAGIC_WAVE, 147, 44, true);
+        lv_obj_set_style_opa(wave, 45, 0);
     } else if (T->kittens) {
         add_theme_sprite(card, THEME_ART_KITTEN_CAPTION_ECHO, 307, 62, true);
         add_theme_sprite(card, THEME_ART_KITTEN_SIT, 314, 114, true);
     }
 
-    make_label(card, "Echo Dot", title_x, 15, &lv_font_montserrat_22, T->text);
+    make_label(card, "Alexa", title_x, 15, &lv_font_montserrat_22, T->text);
     if (!T->magic) {
         make_label(card, LV_SYMBOL_VOLUME_MAX, 22, 18,
                    &lv_font_montserrat_22, T->accent);
     }
-    make_status_dot(card, &s_echo_status, status_x, 48);
+    make_status_dot(card, &s_echo_status, status_x, 19);
 
-    lv_obj_t *alexa_mark =
-        make_label(card, "alexa", 318, 18, &lv_font_montserrat_16, T->accent);
-    lv_obj_set_style_text_opa(alexa_mark, 220, 0);
+    /* Two independent marquee lines keep long titles/authors inside the card. */
+    const int metadata_width = (T->kittens ? 302 : 364) - title_x;
+    s_alexa_now_playing = make_label(card, "Nothing playing", title_x, 48,
+                                     &lv_font_montserrat_16, T->text);
+    lv_obj_set_size(s_alexa_now_playing, metadata_width, 20);
+    lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-    if (!T->soccer && !T->kittens && !T->magic) {
-        s_alexa_now_playing = make_label(card, "Nothing playing", 153, 47,
-                                         &lv_font_montserrat_14, T->text);
-        lv_obj_set_width(s_alexa_now_playing, 210);
-        lv_label_set_long_mode(s_alexa_now_playing, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
-
-        s_alexa_artist = make_label(card, "", 153, 67,
-                                    &lv_font_montserrat_14, T->muted);
-        lv_obj_set_width(s_alexa_artist, 210);
-        lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
-    } else {
-        s_alexa_now_playing = NULL;
-        s_alexa_artist = NULL;
-    }
+    s_alexa_artist = make_label(card, "", title_x, 71,
+                                &lv_font_montserrat_14, T->muted);
+    lv_obj_set_size(s_alexa_artist, metadata_width, 18);
+    lv_label_set_long_mode(s_alexa_artist, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     make_label(card, "Volume", 20, 92, &lv_font_montserrat_16, T->muted);
     make_label(card, LV_SYMBOL_VOLUME_MAX, 20, 119,

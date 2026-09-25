@@ -331,6 +331,7 @@ static void handle_state_message(esp_mqtt_event_handle_t event)
         bool playing = json_bool(root, "playing", false);
         const char *title = json_string(root, "title");
         const char *artist = json_string(root, "artist");
+        if (!artist[0]) artist = json_string(root, "author");
         ESP_LOGI(TAG,
                  "MQTT APPLY alexa volume=%u muted=%d playing=%d title=\"%s\" artist=\"%s\"",
                  volume, muted, playing, title, artist);
