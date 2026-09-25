@@ -885,6 +885,12 @@ static void create_fan_card(lv_obj_t *root)
      * fan illustration stays aligned independently of theme artwork. */
     add_theme_sprite(card, fan_art, 30, 68, true);
 
+    /* Preserve the original kittens mockup composition: the sleeping cat sits
+     * to the right of the fan artwork behind the live status text. */
+    if (T->kittens) {
+        add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 246, 54, true);
+    }
+
     if (T->magic) {
         add_mini_fan_icon(card, 42, 14, T->accent);
         make_label(card, "Ceiling Fan", 96, 15, &lv_font_montserrat_22, T->text);
