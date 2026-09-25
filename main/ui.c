@@ -38,7 +38,16 @@ static lv_obj_t *s_tapo_pct;
 static lv_obj_t *s_tapo_status;
 static lv_obj_t *s_colorwheel;
 static lv_obj_t *s_color_knob;
+static lv_obj_t *s_color_presets[6];
+static int s_selected_color_preset = -1;
 static void *s_colorwheel_buf;
+
+static const uint32_t s_color_preset_display[6] = {
+    0xFF3B30, 0xFF9500, 0xFFD60A, 0x30D158, 0x0A84FF, 0xBF5AF2
+};
+static const uint32_t s_color_preset_rgb[6] = {
+    0xFF0000, 0xFF8000, 0xFFFF00, 0x00FF00, 0x0066FF, 0xA020F0
+};
 
 static lv_obj_t *s_overhead_switch;
 static lv_obj_t *s_overhead_slider;
@@ -509,11 +518,79 @@ static void echo_volume_cb(lv_event_t *e)
     }
 }
 
+static void color_preset_set_selected(int selected)
+{
+    s_selected_color_preset = selected;
+
+    for (int i = 0; i < 6; ++i) {
+        lv_obj_t *btn = s_color_presets[i];
+        if (!btn) continue;
+
+        if (i == selected) {
+            lv_obj_set_style_border_width(btn, 3, 0);
+            lv_obj_set_style_border_color(btn, lv_color_white(), 0);
+            lv_obj_set_style_border_opa(btn, LV_OPA_COVER, 0);
+            lv_obj_set_style_outline_width(btn, 2, 0);
+            lv_obj_set_style_outline_color(btn, c(T->accent), 0);
+            lv_obj_set_style_outline_opa(btn, LV_OPA_COVER, 0);
+            lv_obj_set_style_outline_pad(btn, 2, 0);
+        } else {
+            lv_obj_set_style_border_width(btn, 0, 0);
+            lv_obj_set_style_outline_width(btn, 0, 0);
+        }
+    }
+}
+
+static int color_preset_match(uint8_t r, uint8_t g, uint8_t b)
+{
+    int best = -1;
+    unsigned best_dist = UINT_MAX;
+
+    for (int i = 0; i < 6; ++i) {
+        uint32_t rgb = s_color_preset_rgb[i];
+        int pr = (rgb >> 16) & 0xFF;
+        int pg = (rgb >> 8) & 0xFF;
+        int pb = rgb & 0xFF;
+
+        int dr = (int)r - pr;
+        int dg = (int)g - pg;
+        int db = (int)b - pb;
+        unsigned dist = (unsigned)(dr * dr + dg * dg + db * db);
+
+        if (dist < best_dist) {
+            best_dist = dist;
+            best = i;
+        }
+    }
+
+    /* Allow small HA/device color round-trip differences but don't claim a
+     * preset for a clearly custom color. */
+    return best_dist <= (18u * 18u * 3u) ? best : -1;
+}
+
+static void color_ui_apply_rgb(uint8_t r, uint8_t g, uint8_t b)
+{
+    lv_color_hsv_t hsv = lv_color_rgb_to_hsv(r, g, b);
+    colorwheel_position_knob(hsv.h, hsv.s);
+    color_preset_set_selected(color_preset_match(r, g, b));
+}
+
 static void preset_color_cb(lv_event_t *e)
 {
     discard_pending_ui(UI_PENDING_TAPO);
-    uintptr_t rgb = (uintptr_t)lv_event_get_user_data(e);
-    mqtt_bridge_tapo_rgb((rgb >> 16) & 0xFF, (rgb >> 8) & 0xFF, rgb & 0xFF);
+
+    uintptr_t packed = (uintptr_t)lv_event_get_user_data(e);
+    int preset = (int)packed;
+    if (preset < 0 || preset >= 6) return;
+
+    uint32_t rgb = s_color_preset_rgb[preset];
+    uint8_t r = (rgb >> 16) & 0xFF;
+    uint8_t g = (rgb >> 8) & 0xFF;
+    uint8_t b = rgb & 0xFF;
+
+    color_ui_apply_rgb(r, g, b);
+    ESP_LOGI(TAG, "UI CMD tapo preset=%d rgb=%u,%u,%u", preset, r, g, b);
+    mqtt_bridge_tapo_rgb(r, g, b);
 }
 
 static void overhead_preset_cb(lv_event_t *e)
@@ -561,7 +638,7 @@ static void colorwheel_position_knob(uint16_t hue, uint8_t sat)
     if (!s_color_knob) return;
 
     const float angle = ((float)hue) * ((float)M_PI / 180.0f);
-    const float radius = 45.0f * ((float)sat / 100.0f);
+    const float radius = 49.0f * ((float)sat / 100.0f);
     int x = 17 + 52 + (int)lroundf(cosf(angle) * radius) - 7;
     int y = 70 + 52 + (int)lroundf(sinf(angle) * radius) - 7;
     lv_obj_set_pos(s_color_knob, x, y);
@@ -653,6 +730,7 @@ static void colorwheel_cb(lv_event_t *e)
     hsv_to_rgb((uint16_t)deg, sat, 100, &rr, &gg, &bb);
 
     colorwheel_position_knob((uint16_t)deg, sat);
+    color_preset_set_selected(color_preset_match(rr, gg, bb));
     mqtt_bridge_tapo_rgb(rr, gg, bb);
 }
 
@@ -741,19 +819,19 @@ static void create_tapo_card(lv_obj_t *root)
         lv_obj_add_event_cb(s_colorwheel, colorwheel_cb, LV_EVENT_RELEASED, NULL);
     }
 
-    const uint32_t colors[6] = {0xFF3B30, 0xFF9500, 0xFFD60A, 0x30D158, 0x0A84FF, 0xBF5AF2};
-    const uint32_t payloads[6] = {0xFF0000, 0xFF8000, 0xFFFF00, 0x00FF00, 0x0066FF, 0xA020F0};
     for (int i = 0; i < 6; ++i) {
         lv_obj_t *btn = lv_button_create(card);
+        s_color_presets[i] = btn;
         lv_obj_set_pos(btn, 145 + i * 36, 75);
         lv_obj_set_size(btn, 28, 28);
         lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(btn, c(colors[i]), 0);
+        lv_obj_set_style_bg_color(btn, c(s_color_preset_display[i]), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(btn, 0, 0);
         lv_obj_set_style_shadow_width(btn, 3, 0);
         lv_obj_set_style_shadow_opa(btn, 55, 0);
-        lv_obj_add_event_cb(btn, preset_color_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)payloads[i]);
+        lv_obj_add_event_cb(btn, preset_color_cb, LV_EVENT_CLICKED,
+                            (void *)(uintptr_t)i);
     }
 
     make_label(card, "Brightness", 145, 113, &lv_font_montserrat_16, T->muted);
@@ -1038,9 +1116,8 @@ static void pending_state_timer_cb(lv_timer_t *timer)
         lv_slider_set_value(
             s_tapo_slider, pending.tapo_brightness, LV_ANIM_OFF);
         set_percent_label(s_tapo_pct, pending.tapo_brightness);
-        lv_color_hsv_t hsv = lv_color_rgb_to_hsv(
+        color_ui_apply_rgb(
             pending.tapo_r, pending.tapo_g, pending.tapo_b);
-        colorwheel_position_knob(hsv.h, hsv.s);
         s_syncing = false;
     }
 
