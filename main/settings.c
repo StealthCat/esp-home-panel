@@ -76,6 +76,11 @@ static void load_defaults(panel_settings_t *cfg)
 
     strlcpy(cfg->timezone, CONFIG_PANEL_TIMEZONE, sizeof(cfg->timezone));
 
+    const uint32_t colors[PANEL_COLOR_PRESET_COUNT] = {
+        0xFF0000, 0xFF8000, 0xFFFF00, 0x00FF00, 0x0066FF, 0xA020F0
+    };
+    memcpy(cfg->color_presets, colors, sizeof(colors));
+
     cfg->theme = default_theme();
     cfg->backlight_percent = CONFIG_PANEL_BACKLIGHT;
 }
@@ -128,6 +133,15 @@ esp_err_t settings_init(void)
     load_string(nvs, "ha_announce", s_settings->ha_echo_announce_script, sizeof(s_settings->ha_echo_announce_script));
     load_string(nvs, "timezone", s_settings->timezone, sizeof(s_settings->timezone));
 
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
+        char key[16];
+        uint32_t rgb;
+        snprintf(key, sizeof(key), "color_%d", i);
+        if (nvs_get_u32(nvs, key, &rgb) == ESP_OK && rgb <= 0xFFFFFF) {
+            s_settings->color_presets[i] = rgb;
+        }
+    }
+
     uint8_t value = 0;
     if (nvs_get_u8(nvs, "theme", &value) == ESP_OK && value <= 3) {
         s_settings->theme = value;
@@ -165,6 +179,10 @@ esp_err_t settings_save(const panel_settings_t *settings)
     esp_err_t err = ensure_storage();
     if (err != ESP_OK) {
         return err;
+    }
+
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
+        if (settings->color_presets[i] > 0xFFFFFF) return ESP_ERR_INVALID_ARG;
     }
 
     panel_settings_t clean = *settings;
@@ -226,6 +244,13 @@ esp_err_t settings_save(const panel_settings_t *settings)
     err = nvs_set_u8(nvs, "backlight", clean.backlight_percent);
     if (err != ESP_OK) goto out;
 
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
+        char key[16];
+        snprintf(key, sizeof(key), "color_%d", i);
+        err = nvs_set_u32(nvs, key, clean.color_presets[i]);
+        if (err != ESP_OK) goto out;
+    }
+
     err = nvs_commit(nvs);
     if (err == ESP_OK) {
         *s_settings = clean;
@@ -263,3 +288,4 @@ esp_err_t settings_reset(void)
 
     return err;
 }
+

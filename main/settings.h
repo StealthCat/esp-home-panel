@@ -19,6 +19,7 @@ extern "C" {
 #define PANEL_DISPLAY_TITLE_MAX          31
 #define PANEL_HA_ENTITY_ID_MAX    127
 #define PANEL_TIMEZONE_MAX        95
+#define PANEL_COLOR_PRESET_COUNT   6
 
 typedef struct {
     char wifi_ssid[PANEL_WIFI_SSID_MAX + 1];
@@ -52,6 +53,9 @@ typedef struct {
 
     char timezone[PANEL_TIMEZONE_MAX + 1];
 
+    /* RGB values for the six Tapo circles, ordered left to right. */
+    uint32_t color_presets[PANEL_COLOR_PRESET_COUNT];
+
     uint8_t theme;
     uint8_t backlight_percent;
 } panel_settings_t;
@@ -64,3 +68,4 @@ esp_err_t settings_reset(void);
 #ifdef __cplusplus
 }
 #endif
+

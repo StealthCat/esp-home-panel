@@ -28,6 +28,7 @@ static const char PAGE_HEAD[] =
 ".card{background:#101d2a;border:1px solid #35536d;border-radius:16px;padding:18px;box-shadow:0 10px 30px #0005}"
 "h2{font-size:18px;margin:0 0 15px;color:#8ed5ff}label{display:block;font-size:13px;color:#a7bcd0;margin:12px 0 6px}"
 "input,select{width:100%;padding:11px 12px;border-radius:9px;border:1px solid #35536d;background:#071722;color:#f7fbff;font-size:15px}"
+"input[type=color]{height:48px;padding:4px;cursor:pointer}.presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}"
 "input[type=range]{padding:0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}"
 ".check{display:flex;gap:8px;align-items:center;font-size:13px;color:#a7bcd0;margin-top:8px}.check input{width:auto}"
 ".hint{font-size:12px;color:#829bb0;margin-top:7px;line-height:1.4}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}"
@@ -75,6 +76,20 @@ static int hex_value(char c)
     c = (char)tolower((unsigned char)c);
     if (c >= 'a' && c <= 'f') return c - 'a' + 10;
     return -1;
+}
+
+/* Accept only a complete #RRGGBB value, including black (zero). */
+static bool parse_preset_color(const char *text, uint32_t *rgb)
+{
+    if (strlen(text) != 7 || text[0] != '#') return false;
+    uint32_t value = 0;
+    for (int i = 1; i < 7; ++i) {
+        int digit = hex_value(text[i]);
+        if (digit < 0) return false;
+        value = (value << 4) | (uint32_t)digit;
+    }
+    *rgb = value;
+    return true;
 }
 
 static void url_decode(char *dst, size_t dst_size, const char *src, size_t src_len)
@@ -338,6 +353,19 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<section class='card full'><h2>Tapo color circles</h2>"
+        "<div class='hint'>Choose the six preset colors, ordered left to right on the display. "
+        "These colors apply to every theme after Save &amp; reboot.</div><div class='presets'>"));
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
+        snprintf(buf, sizeof(buf),
+                 "<div><label for='color_%d'>Circle %d</label>"
+                 "<input id='color_%d' name='color_%d' type='color' value='#%06lx'></div>",
+                 i, i + 1, i, i, (unsigned long)cfg->color_presets[i]);
+        ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    }
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</div></section>"));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "<section class='card full'><h2>MQTT</h2>"));
 
     snprintf(buf, sizeof(buf),
@@ -505,6 +533,19 @@ static esp_err_t save_handler(httpd_req_t *req)
         }
     }
 
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
+        char key[16];
+        snprintf(key, sizeof(key), "color_%d", i);
+        /* Missing fields preserve saved colors for older clients. */
+        if (form_get(body, key, tmp, sizeof(tmp)) &&
+            !parse_preset_color(tmp, &updated.color_presets[i])) {
+            free(body);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                                "Invalid circle color. Use #RRGGBB.");
+            return ESP_OK;
+        }
+    }
+
     if (!valid_panel_id(updated.panel_id)) {
         free(body);
         httpd_resp_send_err(
@@ -644,3 +685,4 @@ esp_err_t web_config_start(void)
 
     return ESP_OK;
 }
+

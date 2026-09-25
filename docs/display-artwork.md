@@ -20,6 +20,15 @@ so its corners blend with the theme. Status starts at Waiting, changes to Online
 when an entity state arrives, and changes to Offline on MQTT disconnection.
 Online indicates a received state, not an independently polled device heartbeat.
 
+## Custom color circles
+
+Open the panel's IP address in a browser and use **Tapo color circles** to choose
+six colors, ordered left to right. Select **Save & reboot** to apply them. The
+circles show the configured RGB colors and send those same values when tapped,
+across all themes. Colors persist through power cycles and firmware upgrades
+that retain NVS. Existing installations keep the original preset command colors
+until edited; **Reset configuration** restores them along with all other settings.
+
 ## Actual LVGL renders
 
 These are produced by compiling the production `main/ui.c` and `theme_art.c`

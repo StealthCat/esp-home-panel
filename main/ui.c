@@ -39,15 +39,8 @@ static lv_obj_t *s_tapo_pct;
 static lv_obj_t *s_tapo_status;
 static lv_obj_t *s_colorwheel;
 static lv_obj_t *s_color_knob;
-static lv_obj_t *s_color_presets[6];
+static lv_obj_t *s_color_presets[PANEL_COLOR_PRESET_COUNT];
 static void *s_colorwheel_buf;
-
-static const uint32_t s_color_preset_display[6] = {
-    0xFF3B30, 0xFF9500, 0xFFD60A, 0x30D158, 0x0A84FF, 0xBF5AF2
-};
-static const uint32_t s_color_preset_rgb[6] = {
-    0xFF0000, 0xFF8000, 0xFFFF00, 0x00FF00, 0x0066FF, 0xA020F0
-};
 
 static lv_obj_t *s_overhead_switch;
 static lv_obj_t *s_overhead_slider;
@@ -399,7 +392,7 @@ static void add_magic_decor(lv_obj_t *screen)
 
 static void add_classic_decor(lv_obj_t *screen)
 {
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
         lv_obj_t *line = lv_obj_create(screen);
         lv_obj_set_pos(line, 420 + i * 55, 63);
         lv_obj_set_size(line, 42, 2);
@@ -488,7 +481,7 @@ static void colorwheel_position_knob(uint16_t hue, uint8_t sat);
 
 static void color_preset_set_selected(int selected)
 {
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
         lv_obj_t *btn = s_color_presets[i];
         if (!btn) continue;
 
@@ -512,8 +505,8 @@ static int color_preset_match(uint8_t r, uint8_t g, uint8_t b)
     int best = -1;
     unsigned best_dist = UINT_MAX;
 
-    for (int i = 0; i < 6; ++i) {
-        uint32_t rgb = s_color_preset_rgb[i];
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
+        uint32_t rgb = settings_get()->color_presets[i];
         int pr = (rgb >> 16) & 0xFF;
         int pg = (rgb >> 8) & 0xFF;
         int pb = rgb & 0xFF;
@@ -547,9 +540,9 @@ static void preset_color_cb(lv_event_t *e)
 
     uintptr_t packed = (uintptr_t)lv_event_get_user_data(e);
     int preset = (int)packed;
-    if (preset < 0 || preset >= 6) return;
+    if (preset < 0 || preset >= PANEL_COLOR_PRESET_COUNT) return;
 
-    uint32_t rgb = s_color_preset_rgb[preset];
+    uint32_t rgb = settings_get()->color_presets[preset];
     uint8_t r = (rgb >> 16) & 0xFF;
     uint8_t g = (rgb >> 8) & 0xFF;
     uint8_t b = rgb & 0xFF;
@@ -781,13 +774,13 @@ static void create_tapo_card(lv_obj_t *root)
         lv_obj_add_event_cb(s_colorwheel, colorwheel_cb, LV_EVENT_RELEASED, NULL);
     }
 
-    for (int i = 0; i < 6; ++i) {
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
         lv_obj_t *btn = lv_button_create(card);
         s_color_presets[i] = btn;
         lv_obj_set_pos(btn, 145 + i * 36, 75);
         lv_obj_set_size(btn, 28, 28);
         lv_obj_set_style_radius(btn, LV_RADIUS_CIRCLE, 0);
-        lv_obj_set_style_bg_color(btn, c(s_color_preset_display[i]), 0);
+        lv_obj_set_style_bg_color(btn, c(settings_get()->color_presets[i]), 0);
         lv_obj_set_style_bg_opa(btn, LV_OPA_COVER, 0);
         lv_obj_set_style_border_width(btn, 0, 0);
         lv_obj_set_style_shadow_width(btn, 3, 0);

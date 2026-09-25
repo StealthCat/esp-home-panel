@@ -7,10 +7,11 @@ static panel_settings_t config;
 static uint16_t framebuffer[800 * 480];
 static int tapo_commands, fan_commands, echo_commands;
 static bool last_playing, last_next;
+static uint32_t last_rgb;
 const panel_settings_t *settings_get(void) { return &config; }
 void mqtt_bridge_tapo_power(bool on) {(void)on;tapo_commands++;}
 void mqtt_bridge_tapo_brightness(uint8_t p) {(void)p;tapo_commands++;}
-void mqtt_bridge_tapo_rgb(uint8_t r,uint8_t g,uint8_t b) {(void)r;(void)g;(void)b;tapo_commands++;}
+void mqtt_bridge_tapo_rgb(uint8_t r,uint8_t g,uint8_t b) {last_rgb=((uint32_t)r<<16)|((uint32_t)g<<8)|b;tapo_commands++;}
 void mqtt_bridge_overhead_power(bool on) {(void)on;}
 void mqtt_bridge_overhead_brightness(uint8_t p) {(void)p;}
 void mqtt_bridge_fan_power(bool on) {(void)on;fan_commands++;}
@@ -48,9 +49,23 @@ static void assert_image_tree(lv_obj_t *parent) {
 }
 int main(int argc,char **argv) {
     if(argc!=3) {fprintf(stderr,"usage: panel_render THEME OUTPUT.ppm\n");return 2;}
+    const uint32_t custom_colors[PANEL_COLOR_PRESET_COUNT] = {
+        0x123456, 0xFFFFFF, 0x000000, 0x00FF00, 0xABCDEF, 0xE83691
+    };
+    memcpy(config.color_presets, custom_colors, sizeof(custom_colors));
     config.theme=(uint8_t)atoi(argv[1]);
     assert(ui_start(NULL,NULL)==ESP_OK);
     assert(strcmp(lv_label_get_text(s_tapo_status),"Waiting")==0);
+    for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
+        uint32_t rgb = custom_colors[i];
+        assert((lv_color_to_u32(lv_obj_get_style_bg_color(s_color_presets[i], 0)) & 0xFFFFFF) == rgb);
+        lv_obj_send_event(s_color_presets[i], LV_EVENT_CLICKED, NULL);
+        assert(last_rgb == rgb);
+        assert(color_preset_match(rgb >> 16, rgb >> 8, rgb) == i);
+        assert(lv_obj_get_style_border_width(s_color_presets[i], 0) == 3);
+    }
+    assert(tapo_commands == PANEL_COLOR_PRESET_COUNT);
+    tapo_commands = 0;
     ui_set_network_online(true);ui_set_mqtt_online(true);
     ui_apply_tapo_state(true,80,0,255,0);ui_apply_overhead_state(true,60);
     ui_apply_fan_state(true);ui_apply_echo_state(70,false,false,"Midnight City","M83");
