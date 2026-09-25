@@ -775,9 +775,9 @@ static void create_tapo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 78, 382, 187);
     if (T->magic) {
-        add_chain_icon(card, 42, 20, T->accent_2);
-        make_label(card, "Tapo LED Strips", 96, 15, &lv_font_montserrat_22, T->text);
-        make_status_dot(card, &s_tapo_status, 100, 48);
+        add_theme_sprite(card, THEME_ART_MAGIC_SPARK, 12, 5, true);
+        make_label(card, "Tapo LED Strips", 78, 15, &lv_font_montserrat_22, T->text);
+        make_status_dot(card, &s_tapo_status, 82, 48);
     } else {
         make_label(card, "Tapo LED Strips", 70, 15, &lv_font_montserrat_22, T->text);
         add_chain_icon(card, 20, 20, T->accent_2);
