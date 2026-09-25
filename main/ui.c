@@ -385,8 +385,9 @@ static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
 
 static void add_soccer_decor(lv_obj_t *screen)
 {
-    /* The soccer pitch is a clean ARGB sprite generated from scratch. */
     add_theme_sprite(screen, THEME_ART_SOCCER_FIELD, 0, 72, true);
+    add_theme_sprite(screen, THEME_ART_SOCCER_STREAK, 390, 6, true);
+    add_theme_sprite(screen, THEME_ART_SOCCER_BALL, 736, 5, true);
 }
 
 static void add_kittens_decor(lv_obj_t *screen)
