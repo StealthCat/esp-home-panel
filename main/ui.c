@@ -1041,11 +1041,15 @@ static void create_echo_card(lv_obj_t *root)
 
 static void create_header(lv_obj_t *root)
 {
+    const panel_settings_t *settings = settings_get();
+    const char *title =
+        (settings && settings->display_title[0]) ? settings->display_title : "Home Control";
+
     if (T->magic) {
         lv_obj_t *home_frame = lv_obj_create(root);
-        lv_obj_set_pos(home_frame, 12, 8);
-        lv_obj_set_size(home_frame, 46, 46);
-        lv_obj_set_style_radius(home_frame, 6, 0);
+        lv_obj_set_pos(home_frame, 10, 8);
+        lv_obj_set_size(home_frame, 56, 56);
+        lv_obj_set_style_radius(home_frame, 8, 0);
         lv_obj_set_style_bg_color(home_frame, c(0x0A2E5F), 0);
         lv_obj_set_style_bg_opa(home_frame, 80, 0);
         lv_obj_set_style_border_width(home_frame, 2, 0);
@@ -1056,9 +1060,13 @@ static void create_header(lv_obj_t *root)
         lv_obj_remove_flag(home_frame, LV_OBJ_FLAG_CLICKABLE);
     }
 
-    make_label(root, LV_SYMBOL_HOME, 20, 17, &lv_font_montserrat_28, T->accent);
-    make_label(root, T->name, 64, 10, &lv_font_montserrat_32, T->text);
-    make_label(root, T->tagline, 64, 48, &lv_font_montserrat_14, T->muted);
+    make_label(root, LV_SYMBOL_HOME, 20, 19, &lv_font_montserrat_32, T->accent);
+
+    lv_obj_t *title_label =
+        make_label(root, title, 78, 17, &lv_font_montserrat_36, T->text);
+    lv_obj_set_width(title_label, T->magic ? 515 : 530);
+    lv_obj_set_height(title_label, 44);
+    lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_DOTS);
 
     const int clock_x = T->magic ? 650 : 635;
     const int date_x = T->magic ? 642 : 620;
@@ -1222,7 +1230,9 @@ static void animation_timer_cb(lv_timer_t *timer)
 esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
 {
     T = panel_theme_get();
-    ESP_LOGI(TAG, "Starting LVGL theme: %s", T->tagline);
+    ESP_LOGI(TAG, "Starting LVGL theme id=%d title=\"%s\"",
+             (int)T->id,
+             settings_get()->display_title[0] ? settings_get()->display_title : "Home Control");
 
     const lvgl_port_cfg_t lvgl_cfg = {
         .task_priority = 4,
