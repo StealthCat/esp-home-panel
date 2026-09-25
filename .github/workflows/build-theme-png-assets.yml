@@ -19,6 +19,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Check ESP-IDF component discovery and asset regeneration
+        run: python tools/test_component_cmake.py
       - name: Audit committed artwork and pack LVGL sprites
         run: python tools/check_theme_assets.py
       - name: Fetch the firmware's LVGL version
