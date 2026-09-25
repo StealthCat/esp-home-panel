@@ -410,9 +410,9 @@ static esp_err_t root_handler(httpd_req_t *req)
         "Enter the entity IDs shown in Home Assistant. The included MQTT bridge automation translates panel commands into Home Assistant actions.</div>"));
 
     snprintf(buf, sizeof(buf),
-             "<div class='row'><div><label>Tapo LED strips</label>"
+             "<div class='row'><div><label>Light Strips</label>"
              "<input name='ha_tapo_entity' maxlength='127' value=\"%s\" placeholder='light.tapo_led_strips' autocapitalize='none' spellcheck='false'></div>"
-             "<div><label>Overhead light</label>"
+             "<div><label>Main Lights</label>"
              "<input name='ha_overhead_entity' maxlength='127' value=\"%s\" placeholder='light.office_overhead' autocapitalize='none' spellcheck='false'></div></div>",
              ha_tapo, ha_overhead);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));

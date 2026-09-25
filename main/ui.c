@@ -756,10 +756,10 @@ static void create_tapo_card(lv_obj_t *root)
     lv_obj_t *card = make_card(root, 14, 78, 382, 187);
     if (T->magic) {
         add_theme_sprite(card, THEME_ART_MAGIC_SPARK, 16, 6, true);
-        make_label(card, "Tapo LED Strips", 78, 15, &lv_font_montserrat_22, T->text);
+        make_label(card, "Light Strips", 78, 15, &lv_font_montserrat_22, T->text);
         make_status_dot(card, &s_tapo_status, 82, 48);
     } else {
-        make_label(card, "Tapo LED Strips", 70, 15, &lv_font_montserrat_22, T->text);
+        make_label(card, "Light Strips", 70, 15, &lv_font_montserrat_22, T->text);
         add_chain_icon(card, 20, 20, T->accent_2);
         make_status_dot(card, &s_tapo_status, 72, 48);
     }
@@ -815,10 +815,10 @@ static void create_overhead_card(lv_obj_t *root)
     lv_obj_t *card = make_card(root, 404, 78, 382, 187);
     if (T->magic) {
         add_theme_sprite(card, THEME_ART_MAGIC_LANTERN, 18, 8, true);
-        make_label(card, "Overhead Light", 88, 15, &lv_font_montserrat_22, T->text);
+        make_label(card, "Main Lights", 88, 15, &lv_font_montserrat_22, T->text);
         make_status_dot(card, &s_overhead_status, 90, 48);
     } else {
-        make_label(card, "Overhead Light", 70, 15, &lv_font_montserrat_22, T->text);
+        make_label(card, "Main Lights", 70, 15, &lv_font_montserrat_22, T->text);
         add_bulb_icon(card, 23, 13, T->warm);
         make_status_dot(card, &s_overhead_status, 72, 48);
     }
