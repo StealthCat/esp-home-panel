@@ -37,5 +37,6 @@ jobs:
             echo "Theme PNG assets are already current."
           else
             git commit -m "Add high-resolution theme PNG sprite assets"
+            git pull --rebase origin main
             git push origin HEAD:main
           fi
