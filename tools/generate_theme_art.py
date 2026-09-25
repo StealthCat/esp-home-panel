@@ -33,7 +33,7 @@ except NameError:
 OUT = ROOT / "main" / "theme_art_generated.inc"
 WIDTH = 800
 HEIGHT = 480
-GENERATOR_VERSION = "theme-art-v7-no-settings-gear"
+GENERATOR_VERSION = "theme-art-v8-theme-header-icons"
 
 THEMES = {
     "kittens": ROOT / "assets" / "kittens-pink" / "screen.svg",
@@ -63,6 +63,212 @@ SPRITES = [
     ("MAGIC_QUILL", "magic", 764, 344, 36, 70, 10, 38),
     ("MAGIC_CORNER_TL", "magic", 14, 80, 36, 36, 8, 30),
 ]
+
+
+
+def _canvas(w: int, h: int) -> bytearray:
+    return bytearray(w * h * 4)
+
+
+def _pixel(img: bytearray, w: int, h: int, x: int, y: int,
+           color: tuple[int, int, int, int]) -> None:
+    if x < 0 or y < 0 or x >= w or y >= h:
+        return
+    p = (y * w + x) * 4
+    img[p:p + 4] = bytes(color)
+
+
+def _fill_rect(img: bytearray, w: int, h: int,
+               x0: int, y0: int, x1: int, y1: int,
+               color: tuple[int, int, int, int]) -> None:
+    for y in range(max(0, y0), min(h, y1)):
+        for x in range(max(0, x0), min(w, x1)):
+            _pixel(img, w, h, x, y, color)
+
+
+def _fill_circle(img: bytearray, w: int, h: int,
+                 cx: float, cy: float, radius: float,
+                 color: tuple[int, int, int, int]) -> None:
+    r2 = radius * radius
+    x0 = max(0, int(math.floor(cx - radius)))
+    x1 = min(w - 1, int(math.ceil(cx + radius)))
+    y0 = max(0, int(math.floor(cy - radius)))
+    y1 = min(h - 1, int(math.ceil(cy + radius)))
+    for y in range(y0, y1 + 1):
+        dy = (y + 0.5) - cy
+        for x in range(x0, x1 + 1):
+            dx = (x + 0.5) - cx
+            if dx * dx + dy * dy <= r2:
+                _pixel(img, w, h, x, y, color)
+
+
+def _fill_polygon(img: bytearray, w: int, h: int,
+                  points: list[tuple[float, float]],
+                  color: tuple[int, int, int, int]) -> None:
+    min_y = max(0, int(math.floor(min(p[1] for p in points))))
+    max_y = min(h - 1, int(math.ceil(max(p[1] for p in points))))
+    n = len(points)
+
+    for y in range(min_y, max_y + 1):
+        scan_y = y + 0.5
+        xs: list[float] = []
+        for i in range(n):
+            x1, y1 = points[i]
+            x2, y2 = points[(i + 1) % n]
+            if y1 == y2:
+                continue
+            if scan_y < min(y1, y2) or scan_y >= max(y1, y2):
+                continue
+            t = (scan_y - y1) / (y2 - y1)
+            xs.append(x1 + t * (x2 - x1))
+
+        xs.sort()
+        for i in range(0, len(xs) - 1, 2):
+            xa = max(0, int(math.ceil(xs[i] - 0.5)))
+            xb = min(w - 1, int(math.floor(xs[i + 1] - 0.5)))
+            for x in range(xa, xb + 1):
+                _pixel(img, w, h, x, y, color)
+
+
+def _draw_line(img: bytearray, w: int, h: int,
+               x1: float, y1: float, x2: float, y2: float,
+               thickness: float,
+               color: tuple[int, int, int, int]) -> None:
+    dx = x2 - x1
+    dy = y2 - y1
+    steps = max(1, int(math.ceil(max(abs(dx), abs(dy)))))
+    radius = max(0.5, thickness / 2.0)
+    for i in range(steps + 1):
+        t = i / steps
+        _fill_circle(img, w, h, x1 + dx * t, y1 + dy * t, radius, color)
+
+
+def _star_points(cx: float, cy: float, outer: float, inner: float,
+                 points: int = 5, rotation_deg: float = -90.0) -> list[tuple[float, float]]:
+    out: list[tuple[float, float]] = []
+    for i in range(points * 2):
+        radius = outer if i % 2 == 0 else inner
+        angle = math.radians(rotation_deg + i * 180.0 / points)
+        out.append((cx + math.cos(angle) * radius,
+                    cy + math.sin(angle) * radius))
+    return out
+
+
+def _downsample_rgba(src: bytearray, sw: int, sh: int,
+                     factor: int) -> tuple[bytearray, int, int]:
+    dw = sw // factor
+    dh = sh // factor
+    out = bytearray(dw * dh * 4)
+    samples = factor * factor
+
+    for y in range(dh):
+        for x in range(dw):
+            sums = [0, 0, 0, 0]
+            for sy in range(factor):
+                for sx in range(factor):
+                    p = (((y * factor + sy) * sw) + (x * factor + sx)) * 4
+                    for channel in range(4):
+                        sums[channel] += src[p + channel]
+
+            d = (y * dw + x) * 4
+            for channel in range(4):
+                out[d + channel] = int(round(sums[channel] / samples))
+
+    return out, dw, dh
+
+
+def make_header_icon(kind: str) -> tuple[bytearray, int, int]:
+    """Create a 56x56 transparent theme emblem using the same ARGB sprite path.
+
+    Icons are drawn at 2x resolution and downsampled for smoother edges.
+    """
+    scale = 2
+    w = h = 56 * scale
+    img = _canvas(w, h)
+
+    def C(hex_rgb: int, a: int = 255) -> tuple[int, int, int, int]:
+        return (
+            (hex_rgb >> 16) & 0xFF,
+            (hex_rgb >> 8) & 0xFF,
+            hex_rgb & 0xFF,
+            a,
+        )
+
+    if kind == "classic":
+        # A compact smart-control panel / circuit badge.
+        cyan = C(0x21A7FF)
+        cyan_soft = C(0x8ED5FF)
+        navy = C(0x082033, 242)
+        _fill_rect(img, w, h, 24, 24, 88, 88, cyan)
+        _fill_rect(img, w, h, 30, 30, 82, 82, navy)
+        _fill_rect(img, w, h, 40, 39, 72, 58, cyan_soft)
+        _fill_rect(img, w, h, 43, 42, 69, 55, C(0x0B1D31))
+        for px in (30, 46, 62, 78):
+            _fill_rect(img, w, h, px, 14, px + 6, 24, cyan)
+            _fill_rect(img, w, h, px, 88, px + 6, 98, cyan)
+        for py in (30, 46, 62, 78):
+            _fill_rect(img, w, h, 14, py, 24, py + 6, cyan)
+            _fill_rect(img, w, h, 88, py, 98, py + 6, cyan)
+        _fill_circle(img, w, h, 44, 72, 5, C(0x34E66A))
+        _fill_circle(img, w, h, 60, 72, 5, C(0xFFD447))
+        _fill_circle(img, w, h, 76, 72, 5, C(0x8A5CFF))
+
+    elif kind == "soccer":
+        # Clean soccer ball emblem, independent of the old gear-bearing source crop.
+        black = C(0x06120B)
+        white = C(0xF4FFF7)
+        green = C(0x39EB69)
+        _fill_circle(img, w, h, 56, 56, 49, green)
+        _fill_circle(img, w, h, 56, 56, 45, black)
+        _fill_circle(img, w, h, 56, 56, 41, white)
+        center = _star_points(56, 56, 15, 12, points=5, rotation_deg=-90)
+        _fill_polygon(img, w, h, center, black)
+        patches = [
+            (56, 17), (92, 43), (78, 88), (34, 88), (20, 43)
+        ]
+        for px, py in patches:
+            patch = _star_points(px, py, 10, 8, points=5, rotation_deg=-90)
+            _fill_polygon(img, w, h, patch, black)
+            _draw_line(img, w, h, 56, 56, px, py, 3, black)
+
+    elif kind == "kittens":
+        # Friendly cat face using the theme's pink/cream palette.
+        outline = C(0xFF69AA)
+        fur = C(0xFFF0F6)
+        ear = C(0xFFB1CC)
+        dark = C(0x5A3041)
+        _fill_polygon(img, w, h, [(24, 45), (30, 12), (48, 34)], outline)
+        _fill_polygon(img, w, h, [(64, 34), (82, 12), (88, 45)], outline)
+        _fill_polygon(img, w, h, [(29, 41), (33, 20), (45, 36)], ear)
+        _fill_polygon(img, w, h, [(67, 36), (79, 20), (83, 41)], ear)
+        _fill_circle(img, w, h, 56, 59, 36, outline)
+        _fill_circle(img, w, h, 56, 59, 31, fur)
+        _fill_circle(img, w, h, 43, 53, 4, dark)
+        _fill_circle(img, w, h, 69, 53, 4, dark)
+        _fill_polygon(img, w, h, [(56, 61), (50, 67), (62, 67)], ear)
+        _draw_line(img, w, h, 56, 67, 56, 73, 2, dark)
+        _draw_line(img, w, h, 56, 73, 49, 78, 2, dark)
+        _draw_line(img, w, h, 56, 73, 63, 78, 2, dark)
+        for yy in (64, 72):
+            _draw_line(img, w, h, 46, yy, 20, yy - 4, 2, outline)
+            _draw_line(img, w, h, 66, yy, 92, yy - 4, 2, outline)
+
+    elif kind == "magic":
+        # Gold wand and stars matching the blue/gold magic theme.
+        gold = C(0xE2B860)
+        gold2 = C(0xF5C95A)
+        blue = C(0x2FA8FF)
+        _draw_line(img, w, h, 30, 84, 76, 38, 10, gold)
+        _draw_line(img, w, h, 29, 85, 75, 39, 4, C(0xFFF2C2))
+        _fill_polygon(img, w, h, _star_points(79, 31, 22, 9, 5), gold2)
+        _fill_polygon(img, w, h, _star_points(30, 29, 10, 4, 5), blue)
+        _fill_polygon(img, w, h, _star_points(86, 78, 8, 3, 5), blue)
+        _fill_circle(img, w, h, 22, 59, 4, gold2)
+
+    else:
+        raise ValueError(f"Unknown header icon kind: {kind}")
+
+    return _downsample_rgba(img, w, h, scale)
 
 
 def ensure_ffmpeg() -> str:
@@ -319,7 +525,12 @@ def generate() -> None:
     ffmpeg = ensure_ffmpeg()
     screens = {name: render_svg(path, ffmpeg) for name, path in THEMES.items()}
 
-    images: dict[str, tuple[bytearray, int, int]] = {}
+    images: dict[str, tuple[bytearray, int, int]] = {
+        "HEADER_CLASSIC": make_header_icon("classic"),
+        "HEADER_SOCCER": make_header_icon("soccer"),
+        "HEADER_KITTENS": make_header_icon("kittens"),
+        "HEADER_MAGIC": make_header_icon("magic"),
+    }
     for name, theme, x, y, w, h, low, high in SPRITES:
         # The canonical mockups contain the obsolete configuration gear in the
         # top-right header. Reject any generated sprite that would sample that
@@ -339,6 +550,7 @@ def generate() -> None:
     images["MAGIC_CORNER_BL"] = rotate_rgba(corner, cw, ch, 3)
 
     order = [
+        "HEADER_CLASSIC", "HEADER_SOCCER", "HEADER_KITTENS", "HEADER_MAGIC",
         "KITTEN_PEEK", "KITTEN_SLEEP", "KITTEN_PAWS", "KITTEN_FAN",
         "SOCCER_GOAL", "SOCCER_FAN",
         "MAGIC_CASTLE", "MAGIC_LANTERN", "MAGIC_FAN",
