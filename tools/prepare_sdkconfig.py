@@ -21,6 +21,14 @@ REQUIRED = {
     "CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY": "y",
     "CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP": "y",
     "CONFIG_LV_USE_CLIB_MALLOC": "y",
+    # Theme sprites are embedded as LV_COLOR_FORMAT_ARGB8888.  LVGL's
+    # ESP-IDF/Kconfig integration turns support for a source format off when
+    # the corresponding CONFIG_ symbol is absent (or stale sdkconfig files say
+    # it is disabled), even though the image descriptor itself is valid.
+    "CONFIG_LV_USE_DRAW_SW": "y",
+    "CONFIG_LV_DRAW_SW_SUPPORT_RGB565": "y",
+    "CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888": "y",
+    "CONFIG_LV_DRAW_SW_SUPPORT_ARGB8888_PREMULTIPLIED": "y",
     "CONFIG_COMPILER_OPTIMIZATION_SIZE": "y",
     "CONFIG_LV_FONT_MONTSERRAT_36": "y",
 }
