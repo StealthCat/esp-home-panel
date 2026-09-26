@@ -393,5 +393,38 @@
     ],
     "processing": "RGBA downsample to 2x runtime canvas, preserving transparency",
     "prompt_summary": "Coiled white Wi-Fi RGB LED ribbon resembling a Tapo L920, spaced multicolor chips and inline controller; softly shaded product icon on transparent background."
+  },
+  {
+    "file": "lights_classic.png",
+    "source": "Built-in image generation: exec-2ea0a7ee-79bc-4eab-825f-e7682556a03c.png",
+    "source_sha256": "7c6ce7236e76a1b6efa58dbfafbbaf7cf6623909a7a2e8832021c310c3444ec4",
+    "display_size": [
+      44,
+      44
+    ],
+    "processing": "RGBA aspect-fit downsample to 2x runtime canvas, preserving transparency",
+    "prompt": "Use case: stylized-concept. A single polished softly shaded 3D app sprite of a modern circular ceiling light, viewed three-quarter from below, silver-blue metallic rim and glowing pale cyan frosted diffuser. Compact bold silhouette readable at 44x44 pixels, fills square with 8 percent margin. Transparent background, no text, no floor or cast shadow, no surrounding objects."
+  },
+  {
+    "file": "lights_soccer.png",
+    "source": "Built-in image generation: exec-fc61f770-0c29-4c03-950d-f2520e48d355.png",
+    "source_sha256": "967b5b8ae6cad997cfc5ab3acc7dbf73b54d26ff64cb2da092fbc6c0055d6874",
+    "display_size": [
+      44,
+      44
+    ],
+    "processing": "RGBA aspect-fit downsample to 2x runtime canvas, preserving transparency",
+    "prompt": "Use case: stylized-concept. A single polished softly shaded 3D app sprite of a soccer stadium floodlight: compact rectangular bank of six bright white lamps arranged 3 by 2 on a short emerald green mounting bracket. Three-quarter front view, strong green metallic rim. Bold silhouette readable at 44x44 pixels, fills square with 8 percent margin. Transparent background, no text, no floor or cast shadow, no surrounding objects."
+  },
+  {
+    "file": "lights_kittens.png",
+    "source": "Built-in image generation: exec-f2c36307-8977-4976-87ae-211808aa44ea.png",
+    "source_sha256": "4e90c40713e5b1818d33e51b4f1b915174fbd441025f5fde798f8df33c624f24",
+    "display_size": [
+      44,
+      44
+    ],
+    "processing": "RGBA aspect-fit downsample to 2x runtime canvas, preserving transparency",
+    "prompt": "Use case: stylized-concept. A single polished softly shaded 3D app sprite of a cute cat-shaped glowing lamp: round frosted pink luminous body, two obvious pointed cat ears, small friendly face, tiny darker pink base. Front view, rich rose pink outline, warm pale pink light. Bold silhouette readable at 44x44 pixels, fills square with 8 percent margin. Transparent background, no text, no floor or cast shadow, no surrounding objects."
   }
 ]

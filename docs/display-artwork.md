@@ -34,6 +34,10 @@ across all themes. Colors persist through power cycles and firmware upgrades
 that retain NVS. Existing installations keep the original preset command colors
 until edited; **Reset configuration** restores them along with all other settings.
 
+Main Lights uses a blue ceiling light in Classic, green stadium floodlights in
+Soccer, a pink cat lamp in Kittens, and the existing golden lantern in Magic.
+The old procedural bulb icon has been removed.
+
 The small Light Strips title icon depicts a coiled RGB LED ribbon with controller.
 The Ceiling Fan title icon uses each theme’s own fan artwork, scaled proportionally
 to fit its header. The obsolete green header dot has been removed; device cards

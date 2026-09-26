@@ -339,13 +339,6 @@ static lv_obj_t *add_decor_box(lv_obj_t *parent, int x, int y, int w, int h,
     return obj;
 }
 
-static void add_bulb_icon(lv_obj_t *parent, int x, int y, uint32_t color)
-{
-    add_circle(parent, x + 2, y, 22, color, 235);
-    add_decor_box(parent, x + 8, y + 21, 11, 8, color, 230, 2);
-    add_decor_box(parent, x + 10, y + 31, 7, 3, color, 190, 1);
-}
-
 static void add_soccer_decor(lv_obj_t *screen)
 {
     add_theme_sprite(screen, THEME_ART_SOCCER_STREAK, 390, 6, true);
@@ -791,7 +784,10 @@ static void create_overhead_card(lv_obj_t *root)
         make_status_dot(card, &s_overhead_status, 90, 48);
     } else {
         make_label(card, "Main Lights", 70, 15, &lv_font_montserrat_22, T->text);
-        add_bulb_icon(card, 23, 13, T->warm);
+        theme_art_id_t lights_art = T->soccer ? THEME_ART_LIGHTS_SOCCER :
+                                    T->kittens ? THEME_ART_LIGHTS_KITTENS :
+                                                 THEME_ART_LIGHTS_CLASSIC;
+        add_theme_sprite(card, lights_art, 18, 9, false);
         make_status_dot(card, &s_overhead_status, 72, 48);
     }
 
