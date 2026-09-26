@@ -813,10 +813,6 @@ static void create_overhead_card(lv_obj_t *root)
 
     if (T->soccer) {
         add_theme_sprite(card, THEME_ART_SOCCER_GOAL, 266, 50, true);
-    } else if (T->kittens) {
-        lv_obj_t *caption = make_label(card, "A Brighter\nHappier Home", 235, 61,
-                                       &lv_font_montserrat_14, T->accent_2);
-        lv_obj_set_style_text_opa(caption, 185, 0);
     }
 }
 
@@ -1282,4 +1278,3 @@ void ui_apply_echo_state(uint8_t volume, bool muted, bool playing,
     s_pending_ui.dirty |= UI_PENDING_ALEXA;
     portEXIT_CRITICAL(&s_pending_ui_mux);
 }
-
