@@ -1,13 +1,13 @@
 /*******************************************************************************
  * Size: 48 px
  * Bpp: 4
- * Opts: --size 48 --bpp 4 --format lvgl --font assets/fonts/Outfit-SemiBold.ttf -r 0x20-0x7e,0xa0-0xff --symbols ‘’“”–—… --no-compress --lv-font-name font_outfit_semibold_48 -o main/font_outfit_semibold_48.c
+ * Opts: --size 48 --bpp 4 --format lvgl --font assets/fonts/Outfit-SemiBold.ttf -r 0x20-0x7e,0xa0-0xff --symbols ‘’“”–—… --no-compress --lv-include lvgl.h --lv-font-name font_outfit_semibold_48 -o main/font_outfit_semibold_48.c
  ******************************************************************************/
 
 #ifdef LV_LVGL_H_INCLUDE_SIMPLE
 #include "lvgl.h"
 #else
-#include "lvgl/lvgl.h"
+#include "lvgl.h"
 #endif
 
 #ifndef FONT_OUTFIT_SEMIBOLD_48

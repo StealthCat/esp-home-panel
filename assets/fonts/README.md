@@ -13,7 +13,7 @@ Regenerate from the repository root using lv_font_conv 1.5.3:
 ```sh
 npx lv_font_conv@1.5.3 --size 48 --bpp 4 --format lvgl \
   --font assets/fonts/Outfit-SemiBold.ttf -r 0x20-0x7e,0xa0-0xff \
-  --symbols '‘’“”–—…' --no-compress \
+  --symbols '‘’“”–—…' --no-compress --lv-include lvgl.h \
   --lv-font-name font_outfit_semibold_48 -o main/font_outfit_semibold_48.c
 ```
 
