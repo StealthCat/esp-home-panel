@@ -33,6 +33,7 @@ static lv_display_t *s_disp;
 static lv_obj_t *s_wifi_icon;
 static lv_obj_t *s_mqtt_dot;
 static lv_obj_t *s_clock;
+static lv_obj_t *s_clock_period;
 static lv_obj_t *s_date;
 
 static lv_obj_t *s_tapo_switch;
@@ -993,10 +994,11 @@ static void create_header(lv_obj_t *root)
 
     const int clock_x = 600;
     const int date_x = 590;
-    const int wifi_x = 701;
-    const int mqtt_x = 710;
+    const int wifi_x = 752;
+    const int mqtt_x = 761;
 
     s_clock = make_label(root, "--:--", clock_x, 8, &lv_font_montserrat_28, T->text);
+    s_clock_period = make_label(root, "", 690, 20, &lv_font_montserrat_16, T->text);
     s_date = make_label(root, "---, --- --", date_x, 42, &lv_font_montserrat_14, T->muted);
 
     s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, wifi_x, 20, &lv_font_montserrat_22, T->muted);
@@ -1146,6 +1148,7 @@ static void clock_timer_cb(lv_timer_t *timer)
     strftime(date_buf, sizeof(date_buf), "%a, %b %d", &tm_now);
 
     lv_label_set_text(s_clock, time_buf);
+    lv_label_set_text(s_clock_period, tm_now.tm_hour < 12 ? "am" : "pm");
     lv_label_set_text(s_date, date_buf);
 }
 
