@@ -34,9 +34,10 @@ across all themes. Colors persist through power cycles and firmware upgrades
 that retain NVS. Existing installations keep the original preset command colors
 until edited; **Reset configuration** restores them along with all other settings.
 
-The small Light Strips and Ceiling Fan title icons use transparent product-style
-artwork: a coiled RGB LED ribbon with controller and a softly shaded wood-bladed
-ceiling fan. The larger theme-specific fan decorations are unchanged.
+The small Light Strips title icon depicts a coiled RGB LED ribbon with controller.
+The Ceiling Fan title icon uses each theme’s own fan artwork, scaled proportionally
+to fit its header. The obsolete green header dot has been removed; device cards
+continue to report their connection status.
 
 ## Actual LVGL renders
 

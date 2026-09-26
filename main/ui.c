@@ -31,7 +31,6 @@ static const panel_theme_t *T;
 static lv_display_t *s_disp;
 
 static lv_obj_t *s_wifi_icon;
-static lv_obj_t *s_mqtt_dot;
 static lv_obj_t *s_clock;
 static lv_obj_t *s_clock_period;
 static lv_obj_t *s_date;
@@ -855,13 +854,17 @@ static void create_fan_card(lv_obj_t *root)
         add_theme_sprite(card, THEME_ART_KITTEN_SLEEP, 211, 57, true);
     }
 
+    lv_obj_t *header_fan = add_theme_sprite(card, fan_art, T->magic ? 42 : 18, 9, false);
+    if (header_fan) {
+        lv_obj_set_size(header_fan, 44, 44);
+        lv_image_set_inner_align(header_fan, LV_IMAGE_ALIGN_CONTAIN);
+    }
+
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_CEILING_FAN_ICON, 42, 9, false);
         make_label(card, "Ceiling Fan", 96, 15, &lv_font_montserrat_22, T->text);
         make_status_dot(card, &s_fan_status, 100, 48);
     } else {
         make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
-        add_theme_sprite(card, THEME_ART_CEILING_FAN_ICON, 18, 9, false);
         make_status_dot(card, &s_fan_status, 72, 48);
     }
 
@@ -980,7 +983,6 @@ static void create_header(lv_obj_t *root)
     const int clock_x = 590;
     const int date_x = 590;
     const int wifi_x = 702;
-    const int mqtt_x = 761;
 
     s_clock = make_label(root, "--:--", clock_x, 8, &lv_font_montserrat_28, T->text);
     s_clock_period = make_label(root, "", 673, 20, &lv_font_montserrat_14, T->text);
@@ -993,13 +995,7 @@ static void create_header(lv_obj_t *root)
                                   lv_font_get_line_height(&lv_font_montserrat_14)) / 2,
                              &lv_font_montserrat_14, T->muted);
 
-    s_mqtt_dot = lv_obj_create(root);
-    lv_obj_set_pos(s_mqtt_dot, mqtt_x, 53);
-    lv_obj_set_size(s_mqtt_dot, 8, 8);
-    lv_obj_set_style_radius(s_mqtt_dot, LV_RADIUS_CIRCLE, 0);
-    lv_obj_set_style_bg_color(s_mqtt_dot, c(T->muted), 0);
-    lv_obj_set_style_bg_opa(s_mqtt_dot, LV_OPA_COVER, 0);
-    lv_obj_set_style_border_width(s_mqtt_dot, 0, 0);
+
 }
 
 static void set_entity_status(lv_obj_t *label, const char *text, bool online)
@@ -1029,13 +1025,6 @@ static void pending_state_timer_cb(lv_timer_t *timer)
         lv_obj_set_style_text_color(
             s_wifi_icon,
             c(pending.network_online ? T->online : T->muted),
-            0);
-    }
-
-    if ((pending.dirty & UI_PENDING_MQTT) && s_mqtt_dot) {
-        lv_obj_set_style_bg_color(
-            s_mqtt_dot,
-            c(pending.mqtt_online ? T->online : T->muted),
             0);
     }
 

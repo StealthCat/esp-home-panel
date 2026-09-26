@@ -393,16 +393,5 @@
     ],
     "processing": "RGBA downsample to 2x runtime canvas, preserving transparency",
     "prompt_summary": "Coiled white Wi-Fi RGB LED ribbon resembling a Tapo L920, spaced multicolor chips and inline controller; softly shaded product icon on transparent background."
-  },
-  {
-    "file": "ceiling_fan_icon.png",
-    "source": "Built-in image generation: exec-ec51f3a4-3428-46cd-8935-8b127f129522.png",
-    "source_sha256": "85ab21c6702c8fd478d18ca26ee0bd9a270dd31696a1aa77ffbef4b077064aed",
-    "display_size": [
-      44,
-      44
-    ],
-    "processing": "RGBA downsample to 2x runtime canvas, preserving transparency",
-    "prompt_summary": "Three curved pale-oak ceiling fan blades with wood grain and brushed silver hub; natural dimensional shading on transparent background."
   }
 ]

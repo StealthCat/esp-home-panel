@@ -1,10 +1,10 @@
 # Display artwork
 
-These 26 RGBA PNGs include 24 sprites isolated from the supplied September 25
-sprite sheets and two generated product-style header icons. The Light Strips
-icon depicts a coiled RGB ribbon and controller; the Ceiling Fan icon has curved
-wood blades and natural shading. Their built-in image-generation prompt summaries
-and source hashes are recorded in the manifest.
+These 25 RGBA PNGs include 24 sprites isolated from the supplied September 25
+sprite sheets and one generated product-style Light Strips header icon depicting
+a coiled RGB ribbon and controller. Its image-generation prompt summary and
+source hash are recorded in the manifest. Each theme reuses its own fan artwork
+for the small Ceiling Fan title icon, scaled to fit a 44-by-44-pixel area.
 `manifest.json` records each source filename, SHA-256, crop rectangle, extraction
 steps and native display footprint. Images retain transparent edges and their
 original proportions. Source canvases are twice the runtime footprint; the
@@ -22,7 +22,7 @@ from `magic_corner_tl.png`; they do not require duplicate source files.
 `tools/check_theme_assets.py` rejects unused/missing PNGs and IDs, invisible
 images and invalid sizes. It also runs the packer.
 
-All 29 packed images are used by `main/ui.c`. The unused quill, old header
+All 28 packed images are used by `main/ui.c`. The unused quill, old header
 images, full-screen SVG mockups, obsolete raster fallback and procedural asset
 builders have been removed. CI validates and renders committed artwork; it has
 read-only permissions and cannot overwrite the source images.
