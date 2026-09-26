@@ -936,6 +936,21 @@ static void create_echo_card(lv_obj_t *root)
     lv_obj_add_event_cb(s_echo_next, echo_track_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)1);
 }
 
+static void align_clock_labels(void)
+{
+    const int center_x = 642;
+    lv_obj_update_layout(s_clock);
+    lv_obj_update_layout(s_clock_period);
+    lv_obj_update_layout(s_date);
+    int clock_width = lv_obj_get_width(s_clock);
+    int period_width = lv_obj_get_width(s_clock_period);
+    int gap = lv_label_get_text(s_clock_period)[0] ? 3 : 0;
+    int left = center_x - (clock_width + gap + period_width) / 2;
+    lv_obj_set_x(s_clock, left);
+    lv_obj_set_x(s_clock_period, left + clock_width + gap);
+    lv_obj_set_x(s_date, center_x - lv_obj_get_width(s_date) / 2);
+}
+
 static void create_header(lv_obj_t *root)
 {
     const panel_settings_t *settings = settings_get();
@@ -968,11 +983,10 @@ static void create_header(lv_obj_t *root)
     const int mqtt_x = 761;
 
     s_clock = make_label(root, "--:--", clock_x, 8, &lv_font_montserrat_28, T->text);
-    /* Right alignment keeps the period close even for single-digit hours. */
-    lv_obj_set_width(s_clock, 80);
-    lv_obj_set_style_text_align(s_clock, LV_TEXT_ALIGN_RIGHT, 0);
     s_clock_period = make_label(root, "", 673, 20, &lv_font_montserrat_14, T->text);
     s_date = make_label(root, "---, --- --", date_x, 42, &lv_font_montserrat_14, T->muted);
+
+    align_clock_labels();
 
     s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, wifi_x,
                              8 + (lv_font_get_line_height(&lv_font_montserrat_28) -
@@ -1126,6 +1140,7 @@ static void clock_timer_cb(lv_timer_t *timer)
     lv_label_set_text(s_clock, time_buf);
     lv_label_set_text(s_clock_period, tm_now.tm_hour < 12 ? "am" : "pm");
     lv_label_set_text(s_date, date_buf);
+    align_clock_labels();
 }
 
 esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)

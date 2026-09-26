@@ -101,6 +101,7 @@ int main(int argc,char **argv) {
     ui_apply_overhead_state(true,60);ui_apply_fan_state(true);
     ui_apply_echo_state(70,false,false,"Midnight City","M83");pending_state_timer_cb(NULL);
     lv_label_set_text(s_clock,"10:24");lv_label_set_text(s_clock_period,"am");lv_label_set_text(s_date,"Sat, Apr 26");
+    align_clock_labels();
     lv_obj_update_layout(lv_screen_active());
     assert_image_tree(lv_screen_active());
     lv_refr_now(NULL);
