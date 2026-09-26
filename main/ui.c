@@ -340,42 +340,12 @@ static lv_obj_t *add_decor_box(lv_obj_t *parent, int x, int y, int w, int h,
     return obj;
 }
 
-static void add_chain_icon(lv_obj_t *parent, int x, int y, uint32_t color)
-{
-    for (int i = 0; i < 2; ++i) {
-        lv_obj_t *link = lv_obj_create(parent);
-        lv_obj_set_pos(link, x + i * 13, y + (i ? 4 : 0));
-        lv_obj_set_size(link, 25, 12);
-        lv_obj_set_style_radius(link, 7, 0);
-        lv_obj_set_style_bg_opa(link, LV_OPA_TRANSP, 0);
-        lv_obj_set_style_border_width(link, 3, 0);
-        lv_obj_set_style_border_color(link, c(color), 0);
-        lv_obj_set_style_border_opa(link, 235, 0);
-        lv_obj_set_style_pad_all(link, 0, 0);
-        lv_obj_set_style_transform_rotation(link, i ? 3250 : 350, 0);
-        lv_obj_remove_flag(link, LV_OBJ_FLAG_SCROLLABLE);
-        lv_obj_remove_flag(link, LV_OBJ_FLAG_CLICKABLE);
-    }
-}
-
 static void add_bulb_icon(lv_obj_t *parent, int x, int y, uint32_t color)
 {
     add_circle(parent, x + 2, y, 22, color, 235);
     add_decor_box(parent, x + 8, y + 21, 11, 8, color, 230, 2);
     add_decor_box(parent, x + 10, y + 31, 7, 3, color, 190, 1);
 }
-
-static void add_mini_fan_icon(lv_obj_t *parent, int x, int y, uint32_t color)
-{
-    /* Compact four-blade fan matching the mockup title artwork. */
-    add_circle(parent, x + 13, y + 13, 8, color, 245);
-
-    add_decor_box(parent, x + 11, y,      10, 15, color, 225, 7);
-    add_decor_box(parent, x + 19, y + 11, 15, 10, color, 225, 7);
-    add_decor_box(parent, x + 11, y + 19, 10, 15, color, 225, 7);
-    add_decor_box(parent, x,      y + 11, 15, 10, color, 225, 7);
-}
-
 
 static void add_soccer_decor(lv_obj_t *screen)
 {
@@ -758,12 +728,12 @@ static void create_tapo_card(lv_obj_t *root)
 {
     lv_obj_t *card = make_card(root, 14, 78, 382, 187);
     if (T->magic) {
-        add_theme_sprite(card, THEME_ART_MAGIC_SPARK, 16, 6, true);
+        add_theme_sprite(card, THEME_ART_LIGHT_STRIP_ICON, 16, 7, false);
         make_label(card, "Light Strips", 78, 15, &lv_font_montserrat_22, T->text);
         make_status_dot(card, &s_tapo_status, 82, 48);
     } else {
         make_label(card, "Light Strips", 70, 15, &lv_font_montserrat_22, T->text);
-        add_chain_icon(card, 20, 20, T->accent_2);
+        add_theme_sprite(card, THEME_ART_LIGHT_STRIP_ICON, 14, 7, false);
         make_status_dot(card, &s_tapo_status, 72, 48);
     }
 
@@ -886,12 +856,12 @@ static void create_fan_card(lv_obj_t *root)
     }
 
     if (T->magic) {
-        add_mini_fan_icon(card, 42, 14, T->accent);
+        add_theme_sprite(card, THEME_ART_CEILING_FAN_ICON, 42, 9, false);
         make_label(card, "Ceiling Fan", 96, 15, &lv_font_montserrat_22, T->text);
         make_status_dot(card, &s_fan_status, 100, 48);
     } else {
         make_label(card, "Ceiling Fan", 70, 15, &lv_font_montserrat_22, T->text);
-        add_mini_fan_icon(card, 20, 14, T->accent);
+        add_theme_sprite(card, THEME_ART_CEILING_FAN_ICON, 18, 9, false);
         make_status_dot(card, &s_fan_status, 72, 48);
     }
 

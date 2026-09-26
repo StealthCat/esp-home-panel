@@ -384,19 +384,25 @@
     "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas; mirror horizontally"
   },
   {
-    "file": "magic_spark.png",
-    "source": "ChatGPT Image Sep 25, 2026, 09_42_19 AM (3).png",
-    "source_sha256": "f5c0542f5f8edb3adfc779767c75f72845ec4fc92a510b6d63a737db98853818",
-    "crop": [
-      1100,
-      791,
-      1401,
-      1064
-    ],
+    "file": "light_strip_icon.png",
+    "source": "Built-in image generation: exec-37e0becf-fa8c-4b35-a0be-cefe2f492630.png",
+    "source_sha256": "7d418617d66c9ba862bdd065ce65194d3c300b8181ec2bf38e48dafeead304e9",
     "display_size": [
       48,
-      56
+      48
     ],
-    "processing": "alpha < 5 removed; connected components at alpha > 12, keep main plus interior components >= 30 pixels, dilate 4 pixels; alpha trim; aspect-fit on 2x RGBA canvas"
+    "processing": "RGBA downsample to 2x runtime canvas, preserving transparency",
+    "prompt_summary": "Coiled white Wi-Fi RGB LED ribbon resembling a Tapo L920, spaced multicolor chips and inline controller; softly shaded product icon on transparent background."
+  },
+  {
+    "file": "ceiling_fan_icon.png",
+    "source": "Built-in image generation: exec-ec51f3a4-3428-46cd-8935-8b127f129522.png",
+    "source_sha256": "85ab21c6702c8fd478d18ca26ee0bd9a270dd31696a1aa77ffbef4b077064aed",
+    "display_size": [
+      44,
+      44
+    ],
+    "processing": "RGBA downsample to 2x runtime canvas, preserving transparency",
+    "prompt_summary": "Three curved pale-oak ceiling fan blades with wood grain and brushed silver hub; natural dimensional shading on transparent background."
   }
 ]
