@@ -22,6 +22,8 @@
 #include "wokwi_panel.h"
 #endif
 
+LV_FONT_DECLARE(font_outfit_semibold_48);
+
 static const char *TAG = "ui";
 
 static const panel_theme_t *T;
@@ -982,11 +984,11 @@ static void create_header(lv_obj_t *root)
 
     /* Use the former title/subtitle area, up to the clock and status block. */
     lv_obj_t *title_label =
-        make_label(root, title, 78, 8, &lv_font_montserrat_48, T->text);
+        make_label(root, title, 78, 8, &font_outfit_semibold_48, T->text);
     lv_obj_set_width(title_label, 500);
     lv_obj_set_height(title_label, 62);
     lv_obj_set_style_pad_top(title_label,
-                            (62 - lv_font_get_line_height(&lv_font_montserrat_48)) / 2, 0);
+                            (62 - lv_font_get_line_height(&font_outfit_semibold_48)) / 2, 0);
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
     const int clock_x = 600;

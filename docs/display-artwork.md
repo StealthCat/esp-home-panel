@@ -21,7 +21,8 @@ when an entity state arrives, and changes to Offline on MQTT disconnection.
 Online indicates a received state, not an independently polled device heartbeat.
 
 The configurable header title fills the former title/subtitle area in every
-theme, using larger text. Long titles scroll within that space. Header subtitles
+theme, using Outfit SemiBold at 48 px. Capitalization is preserved as entered
+in the web panel; mixed case is recommended. Long titles scroll within that space. Header subtitles
 are removed.
 
 ## Custom color circles
