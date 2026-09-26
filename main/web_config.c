@@ -246,15 +246,13 @@ static bool valid_home_assistant_targets(const panel_settings_t *cfg)
     if (!valid_entity_syntax(cfg->ha_tapo_entity) ||
         !valid_entity_syntax(cfg->ha_overhead_entity) ||
         !valid_entity_syntax(cfg->ha_fan_entity) ||
-        !valid_entity_syntax(cfg->ha_echo_entity) ||
-        !valid_entity_syntax(cfg->ha_echo_announce_script)) {
+        !valid_entity_syntax(cfg->ha_echo_entity)) {
         return false;
     }
 
     if (!entity_domain_is(cfg->ha_tapo_entity, "light") ||
         !entity_domain_is(cfg->ha_overhead_entity, "light") ||
-        !entity_domain_is(cfg->ha_echo_entity, "media_player") ||
-        !entity_domain_is(cfg->ha_echo_announce_script, "script")) {
+        !entity_domain_is(cfg->ha_echo_entity, "media_player")) {
         return false;
     }
 
@@ -278,7 +276,7 @@ static esp_err_t root_handler(httpd_req_t *req)
 
     char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], mqtt_discovery[160], panel_id[96], timezone[224];
     char display_title[128];
-    char ha_tapo[160], ha_overhead[160], ha_fan[160], ha_echo[160], ha_announce[160];
+    char ha_tapo[160], ha_overhead[160], ha_fan[160], ha_echo[160];
     html_escape(cfg->wifi_ssid, ssid, sizeof(ssid));
     html_escape(cfg->mqtt_uri, mqtt_uri, sizeof(mqtt_uri));
     html_escape(cfg->mqtt_username, mqtt_user, sizeof(mqtt_user));
@@ -290,7 +288,6 @@ static esp_err_t root_handler(httpd_req_t *req)
     html_escape(cfg->ha_overhead_entity, ha_overhead, sizeof(ha_overhead));
     html_escape(cfg->ha_fan_entity, ha_fan, sizeof(ha_fan));
     html_escape(cfg->ha_echo_entity, ha_echo, sizeof(ha_echo));
-    html_escape(cfg->ha_echo_announce_script, ha_announce, sizeof(ha_announce));
     html_escape(cfg->timezone, timezone, sizeof(timezone));
 
     httpd_resp_set_type(req, "text/html; charset=utf-8");
@@ -425,15 +422,9 @@ static esp_err_t root_handler(httpd_req_t *req)
              ha_fan, ha_echo);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
-    snprintf(buf, sizeof(buf),
-             "<label>Echo announcement script (required for Announce button)</label>"
-             "<input name='ha_echo_announce_script' maxlength='127' value=\"%s\" placeholder='script.office_echo_announce' autocapitalize='none' spellcheck='false'>",
-             ha_announce);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "<div class='hint'>Leave a field blank to leave that control unmapped. Light controls require light.*, Echo requires media_player.*, "
-        "fan accepts fan.* or switch.*, and the Announce button requires a script.* mapping.</div>"
+        "fan accepts fan.* or switch.*.</div>"
         "</section>"));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
@@ -509,8 +500,6 @@ static esp_err_t save_handler(httpd_req_t *req)
     form_get(body, "ha_overhead_entity", updated.ha_overhead_entity, sizeof(updated.ha_overhead_entity));
     form_get(body, "ha_fan_entity", updated.ha_fan_entity, sizeof(updated.ha_fan_entity));
     form_get(body, "ha_echo_entity", updated.ha_echo_entity, sizeof(updated.ha_echo_entity));
-    form_get(body, "ha_echo_announce_script", updated.ha_echo_announce_script,
-             sizeof(updated.ha_echo_announce_script));
     form_get(body, "timezone", updated.timezone, sizeof(updated.timezone));
 
     if (form_has(body, "clear_mqtt_password")) {

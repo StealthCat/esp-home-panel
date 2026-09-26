@@ -134,12 +134,6 @@ automation:
         {% else %}
           {{ '' }}
         {% endif %}
-      script_entity: >-
-        {% if trigger.id == 'command' %}
-          {{ trigger.payload_json.script_entity_id | default('', true) }}
-        {% else %}
-          {{ '' }}
-        {% endif %}
       event_type: >-
         {% if trigger.id == 'command' %}
           {{ trigger.payload_json.event_type | default('', true) }}
@@ -267,12 +261,6 @@ automation:
                       - action: media_player.media_next_track
                         target:
                           entity_id: "{{ entity }}"
-
-                  - conditions: "{{ event_type == 'announce' and script_entity | length > 0 }}"
-                    sequence:
-                      - action: script.turn_on
-                        target:
-                          entity_id: "{{ script_entity }}"
 
               - delay:
                   milliseconds: 150

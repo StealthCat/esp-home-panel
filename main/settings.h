@@ -49,7 +49,6 @@ typedef struct {
     char ha_overhead_entity[PANEL_HA_ENTITY_ID_MAX + 1];
     char ha_fan_entity[PANEL_HA_ENTITY_ID_MAX + 1];
     char ha_echo_entity[PANEL_HA_ENTITY_ID_MAX + 1];
-    char ha_echo_announce_script[PANEL_HA_ENTITY_ID_MAX + 1];
 
     char timezone[PANEL_TIMEZONE_MAX + 1];
 

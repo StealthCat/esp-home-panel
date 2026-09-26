@@ -173,7 +173,6 @@ Under **Home Assistant targets**, choose the entities for that particular panel.
 | Overhead light | `light.*` |
 | Ceiling fan | `fan.*` or `switch.*` |
 | Echo | `media_player.*` |
-| Echo announcement | `script.*` for legacy announcement events |
 
 Examples for an office panel:
 
@@ -182,7 +181,6 @@ light.office_led_strips
 light.office_overhead
 fan.office_ceiling_fan
 media_player.office_echo
-script.office_echo_announce
 ```
 
 A kitchen panel can use an entirely different set of entity IDs while sharing
@@ -198,12 +196,6 @@ send explicit commands; Previous and Next call the media player track services.
 Track navigation depends on support from the selected media player and source.
 After updating firmware, replace/reload this Home Assistant package to enable
 the new track commands.
-
-The Announce button has been removed from the display. Legacy announcement
-events still invoke the configured script. This is intentionally a
-script target because announcement/TTS support differs between media-player
-integrations. Put whatever TTS or Alexa-specific action you need in that Home
-Assistant script.
 
 Alexa mute is implemented as volume 0 / restore-volume instead of
 `media_player.volume_mute`, because Alexa media-player entities do not

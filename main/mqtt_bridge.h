@@ -24,7 +24,6 @@ void mqtt_bridge_echo_volume(uint8_t percent);
 void mqtt_bridge_echo_mute(bool muted, uint8_t target_volume);
 void mqtt_bridge_echo_play_pause(bool playing);
 void mqtt_bridge_echo_track(bool next);
-void mqtt_bridge_echo_announce(void);
 
 #ifdef __cplusplus
 }

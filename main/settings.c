@@ -130,7 +130,6 @@ esp_err_t settings_init(void)
     load_string(nvs, "ha_over", s_settings->ha_overhead_entity, sizeof(s_settings->ha_overhead_entity));
     load_string(nvs, "ha_fan", s_settings->ha_fan_entity, sizeof(s_settings->ha_fan_entity));
     load_string(nvs, "ha_echo", s_settings->ha_echo_entity, sizeof(s_settings->ha_echo_entity));
-    load_string(nvs, "ha_announce", s_settings->ha_echo_announce_script, sizeof(s_settings->ha_echo_announce_script));
     load_string(nvs, "timezone", s_settings->timezone, sizeof(s_settings->timezone));
 
     for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
@@ -199,7 +198,6 @@ esp_err_t settings_save(const panel_settings_t *settings)
     clean.ha_overhead_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
     clean.ha_fan_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
     clean.ha_echo_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
-    clean.ha_echo_announce_script[PANEL_HA_ENTITY_ID_MAX] = '\0';
     clean.timezone[PANEL_TIMEZONE_MAX] = '\0';
 
     if (clean.theme > 3) {
@@ -233,7 +231,6 @@ esp_err_t settings_save(const panel_settings_t *settings)
     SAVE_STR("ha_over", ha_overhead_entity);
     SAVE_STR("ha_fan", ha_fan_entity);
     SAVE_STR("ha_echo", ha_echo_entity);
-    SAVE_STR("ha_announce", ha_echo_announce_script);
     SAVE_STR("timezone", timezone);
 
 #undef SAVE_STR

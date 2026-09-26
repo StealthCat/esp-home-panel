@@ -430,7 +430,7 @@ static void publish_home_assistant_discovery(void)
         const char *name;
         const char *suffix;
         const char *state_topic;
-        const char *types[6];
+        const char *types[5];
         size_t type_count;
     };
 
@@ -464,8 +464,8 @@ static void publish_home_assistant_discovery(void)
             .name = "Echo Control",
             .suffix = "echo",
             .state_topic = s_topic_cmd_echo,
-            .types = {"volume", "mute", "play_pause", "previous_track", "next_track", "announce"},
-            .type_count = 6,
+            .types = {"volume", "mute", "play_pause", "previous_track", "next_track"},
+            .type_count = 5,
         },
     };
 
@@ -652,7 +652,6 @@ static void publish_json(const char *topic, const char *json)
 
 static void publish_targeted_json(const char *topic,
                                   const char *entity_id,
-                                  const char *script_entity_id,
                                   const char *json)
 {
     cJSON *root = cJSON_Parse(json);
@@ -663,9 +662,6 @@ static void publish_targeted_json(const char *topic,
 
     if (entity_id && entity_id[0] != '\0') {
         cJSON_AddStringToObject(root, "entity_id", entity_id);
-    }
-    if (script_entity_id && script_entity_id[0] != '\0') {
-        cJSON_AddStringToObject(root, "script_entity_id", script_entity_id);
     }
 
     char *payload = cJSON_PrintUnformatted(root);
@@ -785,7 +781,6 @@ void mqtt_bridge_tapo_power(bool on)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_tapo,
                           settings ? settings->ha_tapo_entity : NULL,
-                          NULL,
                           on ? "{\"event_type\":\"power\",\"on\":true}"
                              : "{\"event_type\":\"power\",\"on\":false}");
 }
@@ -800,7 +795,6 @@ void mqtt_bridge_tapo_brightness(uint8_t percent)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_tapo,
                           settings ? settings->ha_tapo_entity : NULL,
-                          NULL,
                           payload);
 }
 
@@ -814,7 +808,6 @@ void mqtt_bridge_tapo_rgb(uint8_t r, uint8_t g, uint8_t b)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_tapo,
                           settings ? settings->ha_tapo_entity : NULL,
-                          NULL,
                           payload);
 }
 
@@ -824,7 +817,6 @@ void mqtt_bridge_overhead_power(bool on)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_overhead,
                           settings ? settings->ha_overhead_entity : NULL,
-                          NULL,
                           on ? "{\"event_type\":\"power\",\"on\":true}"
                              : "{\"event_type\":\"power\",\"on\":false}");
 }
@@ -839,7 +831,6 @@ void mqtt_bridge_overhead_brightness(uint8_t percent)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_overhead,
                           settings ? settings->ha_overhead_entity : NULL,
-                          NULL,
                           payload);
 }
 
@@ -849,7 +840,6 @@ void mqtt_bridge_fan_power(bool on)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_fan,
                           settings ? settings->ha_fan_entity : NULL,
-                          NULL,
                           on ? "{\"event_type\":\"power\",\"on\":true}"
                              : "{\"event_type\":\"power\",\"on\":false}");
 }
@@ -864,7 +854,6 @@ void mqtt_bridge_echo_volume(uint8_t percent)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_echo,
                           settings ? settings->ha_echo_entity : NULL,
-                          NULL,
                           payload);
 }
 
@@ -881,7 +870,6 @@ void mqtt_bridge_echo_mute(bool muted, uint8_t target_volume)
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_echo,
                           settings ? settings->ha_echo_entity : NULL,
-                          NULL,
                           payload);
 }
 
@@ -893,7 +881,6 @@ void mqtt_bridge_echo_play_pause(bool playing)
     publish_targeted_json(
         s_topic_cmd_echo,
         settings ? settings->ha_echo_entity : NULL,
-        NULL,
         playing
             ? "{\"event_type\":\"play_pause\",\"playing\":true}"
             : "{\"event_type\":\"play_pause\",\"playing\":false}");
@@ -906,24 +893,6 @@ void mqtt_bridge_echo_track(bool next)
     publish_targeted_json(
         s_topic_cmd_echo,
         settings ? settings->ha_echo_entity : NULL,
-        NULL,
         next ? "{\"event_type\":\"next_track\"}"
              : "{\"event_type\":\"previous_track\"}");
 }
-
-void mqtt_bridge_echo_announce(void)
-{
-    note_local_command(CONTROL_ALEXA);
-    const panel_settings_t *settings = settings_get();
-
-    if (!settings || settings->ha_echo_announce_script[0] == '\0') {
-        ESP_LOGW(TAG,
-                 "Alexa announce pressed but no Home Assistant announcement script is configured");
-    }
-
-    publish_targeted_json(s_topic_cmd_echo,
-                          settings ? settings->ha_echo_entity : NULL,
-                          settings ? settings->ha_echo_announce_script : NULL,
-                          "{\"event_type\":\"announce\",\"action\":\"announce\"}");
-}
-

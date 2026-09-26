@@ -19,7 +19,6 @@ void mqtt_bridge_echo_volume(uint8_t p) {(void)p;echo_commands++;}
 void mqtt_bridge_echo_mute(bool m,uint8_t p) {(void)m;(void)p;echo_commands++;}
 void mqtt_bridge_echo_play_pause(bool p) {last_playing=p;echo_commands++;}
 void mqtt_bridge_echo_track(bool next) {last_next=next;echo_commands++;}
-void mqtt_bridge_echo_announce(void) {echo_commands++;}
 
 static void flush(lv_display_t *d,const lv_area_t *area,uint8_t *pixels) {
     (void)area;(void)pixels;lv_display_flush_ready(d);
