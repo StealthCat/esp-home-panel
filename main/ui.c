@@ -962,16 +962,22 @@ static void create_header(lv_obj_t *root)
                             (62 - lv_font_get_line_height(&font_outfit_semibold_48)) / 2, 0);
     lv_label_set_long_mode(title_label, LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 
-    const int clock_x = 600;
+    const int clock_x = 590;
     const int date_x = 590;
-    const int wifi_x = 752;
+    const int wifi_x = 702;
     const int mqtt_x = 761;
 
     s_clock = make_label(root, "--:--", clock_x, 8, &lv_font_montserrat_28, T->text);
-    s_clock_period = make_label(root, "", 690, 20, &lv_font_montserrat_16, T->text);
+    /* Right alignment keeps the period close even for single-digit hours. */
+    lv_obj_set_width(s_clock, 80);
+    lv_obj_set_style_text_align(s_clock, LV_TEXT_ALIGN_RIGHT, 0);
+    s_clock_period = make_label(root, "", 673, 20, &lv_font_montserrat_14, T->text);
     s_date = make_label(root, "---, --- --", date_x, 42, &lv_font_montserrat_14, T->muted);
 
-    s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, wifi_x, 20, &lv_font_montserrat_22, T->muted);
+    s_wifi_icon = make_label(root, LV_SYMBOL_WIFI, wifi_x,
+                             8 + (lv_font_get_line_height(&lv_font_montserrat_28) -
+                                  lv_font_get_line_height(&lv_font_montserrat_14)) / 2,
+                             &lv_font_montserrat_14, T->muted);
 
     s_mqtt_dot = lv_obj_create(root);
     lv_obj_set_pos(s_mqtt_dot, mqtt_x, 53);
