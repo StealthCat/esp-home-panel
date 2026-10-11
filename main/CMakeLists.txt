@@ -50,6 +50,8 @@ idf_component_register(
         "network_identity.c"
         "settings.c"
         "web_config.c"
+        "web_security.c"
+        "ota_update.c"
         "mqtt_bridge.c"
         "ui.c"
         "ui_theme.c"
@@ -57,6 +59,7 @@ idf_component_register(
         "theme_art.c"
         "wokwi_panel.c"
     INCLUDE_DIRS "."
+    EMBED_TXTFILES "firmware.html"
     REQUIRES
         esp_wifi
         esp_netif
@@ -64,6 +67,10 @@ idf_component_register(
         esp_hw_support
         esp_timer
         esp_http_server
+        app_update
+        esp_app_format
+        bootloader_support
+        mbedtls
         lwip
         nvs_flash
         mqtt
@@ -80,3 +87,5 @@ if(NOT CMAKE_BUILD_EARLY_EXPANSION AND NOT CMAKE_SCRIPT_MODE_FILE)
     target_compile_definitions(${lwip_lib} PRIVATE
         ESP_IDF_LWIP_HOOK_FILENAME="${CMAKE_CURRENT_LIST_DIR}/panel_lwip_hooks.h")
 endif()
+
+

@@ -13,6 +13,8 @@
 #include "network.h"
 #include "network_identity.h"
 #include "settings.h"
+#include "web_security.h"
+#include "ota_update.h"
 
 static const char *TAG = "web_config";
 static httpd_handle_t s_server;
@@ -273,6 +275,7 @@ static esp_err_t send_chunk(httpd_req_t *req, const char *text)
 
 static esp_err_t root_handler(httpd_req_t *req)
 {
+    if (!web_security_authorize(req, false)) return ESP_OK;
     const panel_settings_t *cfg = settings_get();
 
     char ssid[128], mqtt_uri[384], mqtt_user[160], mqtt_topic[320], mqtt_discovery[160], panel_id[96], timezone[224];
@@ -315,7 +318,13 @@ static esp_err_t root_handler(httpd_req_t *req)
              network_config_ap_active() ? network_get_config_ap_password() : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<form method='post' action='/save'><div class='grid'>"));
+    snprintf(buf, sizeof(buf), "<p><a href='/firmware' style='color:#8ed5ff'>Firmware Update &rarr;</a></p>"
+             "<form method='post' action='/save'><input type='hidden' name='csrf' value='%s'><div class='grid'>", web_security_token());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<section class='card full'><h2>Administrator access</h2>"
+        "<label>New administrator password</label><input name='admin_password' type='password' minlength='8' maxlength='64' autocomplete='new-password' placeholder='Leave blank to keep current password'>"
+        "<div class='hint'>Required for firmware uploads. Once set, sign in as <b>admin</b> to access settings and updates. Use 8&ndash;64 printable ASCII characters. Use this HTTP interface only on your trusted local network.</div></section>"));
 
     snprintf(buf, sizeof(buf),
              "<section class='card'><h2>Wi-Fi &amp; Network</h2>"
@@ -447,7 +456,9 @@ static esp_err_t root_handler(httpd_req_t *req)
         "<button class='secondary' type='button' onclick=\"location.reload()\">Reload</button>"
         "</div></form>"
         "<form method='post' action='/reset' onsubmit=\"return confirm('Reset all web configuration to firmware defaults?')\">"
-        "<div class='actions'><button class='danger' type='submit'>Reset configuration</button></div></form>"));
+        "<div class='actions'><button class='danger' type='submit'>Reset configuration</button></div>"));
+    snprintf(buf, sizeof(buf), "<input type='hidden' name='csrf' value='%s'></form>", web_security_token());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, PAGE_FOOT));
     return httpd_resp_send_chunk(req, NULL, 0);
@@ -465,15 +476,15 @@ static esp_err_t read_request_body(httpd_req_t *req, char **out_body)
     }
 
     size_t received = 0;
+    unsigned timeouts = 0;
     while (received < req->content_len) {
         int n = httpd_req_recv(req, body + received, req->content_len - received);
-        if (n == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
-        }
+        if (n == HTTPD_SOCK_ERR_TIMEOUT && ++timeouts < 3) continue;
         if (n <= 0) {
             free(body);
             return ESP_FAIL;
         }
+        timeouts = 0;
         received += (size_t)n;
     }
 
@@ -484,6 +495,7 @@ static esp_err_t read_request_body(httpd_req_t *req, char **out_body)
 
 static esp_err_t save_handler(httpd_req_t *req)
 {
+    if (!web_security_authorize(req, false)) return ESP_OK;
     char *body = NULL;
     esp_err_t err = read_request_body(req, &body);
     if (err != ESP_OK) {
@@ -491,8 +503,30 @@ static esp_err_t save_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    char csrf[34];
+    if (!form_get(body, "csrf", csrf, sizeof(csrf)) || !web_security_check_token(csrf)) {
+        free(body);
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_sendstr(req, "Session expired. Reload settings and try again.");
+        return ESP_OK;
+    }
     panel_settings_t updated = *settings_get();
     char tmp[256];
+
+    char password[PANEL_ADMIN_PASSWORD_MAX + 2];
+    if (form_get(body, "admin_password", password, sizeof(password)) && password[0]) {
+        size_t length = strlen(password);
+        bool valid = length >= 8 && length <= PANEL_ADMIN_PASSWORD_MAX;
+        for (size_t i = 0; i < length; ++i) {
+            if ((unsigned char)password[i] < 32 || (unsigned char)password[i] > 126) valid = false;
+        }
+        if (!valid) {
+            free(body);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Administrator password must be 8-64 printable ASCII characters.");
+            return ESP_OK;
+        }
+        strlcpy(updated.admin_password, password, sizeof(updated.admin_password));
+    }
 
     /* One extra byte detects overlong input instead of silently truncating it.
      * Missing fields preserve the hostname for older clients. */
@@ -641,7 +675,17 @@ static esp_err_t save_handler(httpd_req_t *req)
 
 static esp_err_t reset_handler(httpd_req_t *req)
 {
-    esp_err_t err = settings_reset();
+    if (!web_security_authorize(req, false)) return ESP_OK;
+    char *body = NULL, csrf[34];
+    esp_err_t err = read_request_body(req, &body);
+    bool valid = err == ESP_OK && form_get(body, "csrf", csrf, sizeof(csrf)) && web_security_check_token(csrf);
+    free(body);
+    if (!valid) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_sendstr(req, "Session expired. Reload settings and try again.");
+        return ESP_OK;
+    }
+    err = settings_reset();
     if (err != ESP_OK) {
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to reset configuration");
         return ESP_OK;
@@ -663,6 +707,7 @@ esp_err_t web_config_start(void)
         return ESP_OK;
     }
 
+    web_security_init();
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 8;
     config.stack_size = 8192;
@@ -692,6 +737,7 @@ esp_err_t web_config_start(void)
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &root));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &save));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &reset));
+    ESP_ERROR_CHECK(ota_update_register(s_server));
 
     if (network_is_connected() && network_get_sta_ip()) {
         ESP_LOGI(TAG, "Configuration UI: http://%s/", network_get_sta_ip());
@@ -702,3 +748,5 @@ esp_err_t web_config_start(void)
 
     return ESP_OK;
 }
+
+

@@ -120,6 +120,7 @@ esp_err_t settings_init(void)
 
     load_string(nvs, "wifi_ssid", s_settings->wifi_ssid, sizeof(s_settings->wifi_ssid));
     load_string(nvs, "hostname", s_settings->hostname, sizeof(s_settings->hostname));
+    load_string(nvs, "admin_pass", s_settings->admin_password, sizeof(s_settings->admin_password));
     if (!settings_valid_hostname(s_settings->hostname)) {
         default_panel_id(s_settings->hostname, sizeof(s_settings->hostname));
     }
@@ -206,6 +207,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
 
     panel_settings_t clean = *settings;
     clean.wifi_ssid[PANEL_WIFI_SSID_MAX] = '\0';
+    clean.admin_password[PANEL_ADMIN_PASSWORD_MAX] = '\0';
     clean.wifi_password[PANEL_WIFI_PASSWORD_MAX] = '\0';
     clean.mqtt_uri[PANEL_MQTT_URI_MAX] = '\0';
     clean.mqtt_username[PANEL_MQTT_USERNAME_MAX] = '\0';
@@ -240,6 +242,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
 
     SAVE_STR("wifi_ssid", wifi_ssid);
     SAVE_STR("hostname", hostname);
+    SAVE_STR("admin_pass", admin_password);
     SAVE_STR("wifi_pass", wifi_password);
     SAVE_STR("mqtt_uri", mqtt_uri);
     SAVE_STR("mqtt_user", mqtt_username);
@@ -306,3 +309,5 @@ esp_err_t settings_reset(void)
 
     return err;
 }
+
+

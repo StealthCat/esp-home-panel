@@ -4,6 +4,7 @@
 #include "settings.h"
 #include "ui.h"
 #include "web_config.h"
+#include "ota_update.h"
 
 #include "esp_err.h"
 #include "esp_log.h"
@@ -15,6 +16,7 @@ static const char *TAG = "app";
 
 void app_main(void)
 {
+    ota_update_boot_begin();
     esp_err_t err = nvs_flash_init();
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_ERROR_CHECK(nvs_flash_erase());
@@ -41,8 +43,10 @@ void app_main(void)
 
     ui_set_network_online(network_is_connected());
 
+    bool web_ready = false;
     if (err == ESP_OK) {
         esp_err_t web_err = web_config_start();
+        web_ready = web_err == ESP_OK;
         if (web_err != ESP_OK) {
             ESP_LOGE(TAG, "Web configuration startup failed: %s", esp_err_to_name(web_err));
         }
@@ -51,6 +55,7 @@ void app_main(void)
     bool mqtt_started = false;
 
     while (true) {
+        ota_update_boot_poll(web_ready);
         bool online = network_is_connected();
         ui_set_network_online(online);
 
@@ -77,3 +82,4 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(200));
     }
 }
+

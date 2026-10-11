@@ -10,6 +10,7 @@ extern "C" {
 
 #define PANEL_WIFI_SSID_MAX       32
 #define PANEL_HOSTNAME_MAX        32
+#define PANEL_ADMIN_PASSWORD_MAX  64
 #define PANEL_WIFI_PASSWORD_MAX   64
 #define PANEL_MQTT_URI_MAX        191
 #define PANEL_MQTT_USERNAME_MAX   63
@@ -24,6 +25,8 @@ extern "C" {
 
 typedef struct {
     char hostname[PANEL_HOSTNAME_MAX + 1];
+    /* Empty on first install; OTA requires an administrator password. */
+    char admin_password[PANEL_ADMIN_PASSWORD_MAX + 1];
     char wifi_ssid[PANEL_WIFI_SSID_MAX + 1];
     char wifi_password[PANEL_WIFI_PASSWORD_MAX + 1];
 
@@ -70,3 +73,5 @@ esp_err_t settings_reset(void);
 #ifdef __cplusplus
 }
 #endif
+
+

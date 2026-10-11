@@ -1,0 +1,43 @@
+name: Build panel firmware and test OTA
+
+on:
+  push:
+    branches: [main]
+    paths: ['main/**', 'tools/**', 'assets/**', 'boards/**', 'CMakeLists.txt', 'platformio.ini', 'partitions.csv', 'sdkconfig.defaults', '.github/workflows/build-firmware.yml']
+  pull_request:
+    paths: ['main/**', 'tools/**', 'assets/**', 'boards/**', 'CMakeLists.txt', 'platformio.ini', 'partitions.csv', 'sdkconfig.defaults', '.github/workflows/build-firmware.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: esp32s3-pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'main/idf_component.yml') }}
+      - name: Install build tools
+        run: pip install platformio==6.1.18 pillow
+      - name: Test settings, network identity and OTA failure handling
+        run: |
+          python tools/test_color_settings.py
+          python tools/test_network_identity.py
+          python tools/test_ota.py
+          python tools/test_component_cmake.py
+          node tools/test_firmware_ui.js
+      - name: Build ESP32-S3 firmware
+        run: pio run -e waveshare-7c-box
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esp-home-panel-ota-${{ github.sha }}
+          path: .pio/build/waveshare-7c-box/firmware.bin
+          if-no-files-found: error

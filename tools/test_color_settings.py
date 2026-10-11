@@ -51,18 +51,18 @@ typedef int nvs_handle_t;
 static uint32_t stored[6];
 static bool present[6];
 static int commits;
-static char saved_hostname[33];
+static char saved_hostname[33], saved_admin_password[65];
 static int nvs_open(const char *s,int m,nvs_handle_t *h) {(void)s;(void)m;*h=1;return 0;}
 static void nvs_close(nvs_handle_t h) {(void)h;}
-static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;if(!strcmp(k,"hostname") && saved_hostname[0]) {strlcpy(v,saved_hostname,*s);return 0;}return ESP_ERR_NVS_NOT_FOUND;}
-static int nvs_set_str(int h,const char *k,const char *v) {(void)h;if(!strcmp(k,"hostname"))strlcpy(saved_hostname,v,sizeof(saved_hostname));return 0;}
+static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;if(!strcmp(k,"hostname") && saved_hostname[0]) {strlcpy(v,saved_hostname,*s);return 0;}if(!strcmp(k,"admin_pass") && saved_admin_password[0]){strlcpy(v,saved_admin_password,*s);return 0;}return ESP_ERR_NVS_NOT_FOUND;}
+static int nvs_set_str(int h,const char *k,const char *v) {(void)h;if(!strcmp(k,"hostname"))strlcpy(saved_hostname,v,sizeof(saved_hostname));if(!strcmp(k,"admin_pass"))strlcpy(saved_admin_password,v,sizeof(saved_admin_password));return 0;}
 static int nvs_get_u8(int h,const char *k,uint8_t *v) {(void)h;(void)k;(void)v;return ESP_ERR_NVS_NOT_FOUND;}
 static int nvs_set_u8(int h,const char *k,uint8_t v) {(void)h;(void)k;(void)v;return 0;}
 static int color_index(const char *k) {assert(strlen(k)==7 && !strncmp(k,"color_",6));int i=k[6]-'0';assert(i>=0&&i<6);return i;}
 static int nvs_get_u32(int h,const char *k,uint32_t *v) {(void)h;int i=color_index(k);if(!present[i])return ESP_ERR_NVS_NOT_FOUND;*v=stored[i];return 0;}
 static int nvs_set_u32(int h,const char *k,uint32_t v) {(void)h;int i=color_index(k);stored[i]=v;present[i]=true;return 0;}
 static int nvs_commit(int h) {(void)h;commits++;return 0;}
-static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));saved_hostname[0]=0;return 0;}
+static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));saved_hostname[0]=0;saved_admin_password[0]=0;return 0;}
 typedef void *httpd_handle_t;
 typedef struct {size_t content_len;const char *body;} httpd_req_t;
 typedef struct {int max_uri_handlers,stack_size;bool lru_purge_enable;} httpd_config_t;
@@ -77,6 +77,7 @@ typedef struct {const char *uri;int method;esp_err_t (*handler)(httpd_req_t *);}
 static char response[24000];
 static int status,reboots;
 static int httpd_resp_send_chunk(httpd_req_t *r,const char *s,int n) {(void)r;(void)n;if(s)strcat(response,s);return 0;}
+static int httpd_resp_set_status(httpd_req_t *r,const char *s) {(void)r;status=atoi(s);return 0;}
 static int httpd_resp_set_type(httpd_req_t *r,const char *s) {(void)r;(void)s;return 0;}
 static int httpd_resp_set_hdr(httpd_req_t *r,const char *k,const char *v) {(void)r;(void)k;(void)v;return 0;}
 static int httpd_resp_send_err(httpd_req_t *r,int e,const char *s) {(void)r;(void)s;status=e;return 0;}
@@ -94,6 +95,11 @@ HARNESS = r'''
 #include "settings.c"
 #undef TAG
 #include "web_config.c"
+void web_security_init(void) {}
+bool web_security_authorize(httpd_req_t *r,bool required) {(void)r;(void)required;return true;}
+const char *web_security_token(void) {return "test-csrf";}
+bool web_security_check_token(const char *t) {return !strcmp(t,"test-csrf");}
+esp_err_t ota_update_register(httpd_handle_t server) {(void)server;return ESP_OK;}
 bool network_is_connected(void) {return true;}
 bool network_config_ap_active(void) {return false;}
 void network_identity_get_domain(char *dst, size_t size) {strlcpy(dst,"snoognet.core",size);}
@@ -102,7 +108,7 @@ const char *network_get_config_ap_ssid(void) {return "test";}
 const char *network_get_config_ap_password(void) {return "test";}
 static void post(const char *body) {
     char form[1024];
-    snprintf(form,sizeof(form),"panel_id=test&display_title=Home&mqtt_discovery_prefix=homeassistant&%s",body);
+    snprintf(form,sizeof(form),"csrf=test-csrf&panel_id=test&display_title=Home&mqtt_discovery_prefix=homeassistant&%s",body);
     httpd_req_t req={.content_len=strlen(form),.body=form};
     status=200;assert(save_handler(&req)==ESP_OK);
 }
@@ -155,6 +161,13 @@ int main(void) {
     assert(settings_save(&invalid)==ESP_ERR_INVALID_ARG);
     assert(settings_reset()==ESP_OK);assert(settings_init()==ESP_OK);
     assert(!strcmp(settings_get()->hostname,"panel-010101"));
+    post("admin_password=short");assert(status==400);
+    post("admin_password=good-password");assert(status==200);
+    assert(!strcmp(settings_get()->admin_password,"good-password"));
+    assert(settings_init()==ESP_OK && !strcmp(settings_get()->admin_password,"good-password"));
+    post("theme=2");assert(status==200 && !strcmp(settings_get()->admin_password,"good-password"));
+    httpd_req_t no_csrf={.content_len=7,.body="theme=1"};
+    status=200;assert(save_handler(&no_csrf)==ESP_OK && status==403);
     puts("Hostname save, reload, migration, validation, display and reset checks passed");
     puts("Color form, validation, NVS reload, migration and reset checks passed");
 }
@@ -179,3 +192,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
