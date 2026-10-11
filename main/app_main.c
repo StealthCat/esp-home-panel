@@ -2,6 +2,7 @@
 #include "mqtt_bridge.h"
 #include "network.h"
 #include "settings.h"
+#include "sensors.h"
 #include "ui.h"
 #include "web_config.h"
 #include "ota_update.h"
@@ -56,6 +57,7 @@ void app_main(void)
 
     while (true) {
         ota_update_boot_poll(web_ready);
+        sensors_poll();
         bool online = network_is_connected();
         ui_set_network_online(online);
 

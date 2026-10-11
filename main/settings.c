@@ -82,6 +82,7 @@ static void load_defaults(panel_settings_t *cfg)
     };
     memcpy(cfg->color_presets, colors, sizeof(colors));
 
+    cfg->sensor_interval_seconds = 10;
     cfg->theme = default_theme();
     cfg->backlight_percent = CONFIG_PANEL_BACKLIGHT;
 }
@@ -148,6 +149,10 @@ esp_err_t settings_init(void)
     }
 
     uint8_t value = 0;
+    if (nvs_get_u8(nvs, "als_enabled", &value) == ESP_OK && value <= 1)
+        s_settings->ambient_light_enabled = value;
+    if (nvs_get_u8(nvs, "sensor_interval", &value) == ESP_OK && value >= 1 && value <= 60)
+        s_settings->sensor_interval_seconds = value;
     if (nvs_get_u8(nvs, "theme", &value) == ESP_OK && value <= 3) {
         s_settings->theme = value;
     }
@@ -205,6 +210,9 @@ esp_err_t settings_save(const panel_settings_t *settings)
         if (settings->color_presets[i] > 0xFFFFFF) return ESP_ERR_INVALID_ARG;
     }
 
+    if (settings->ambient_light_enabled > 1 || settings->sensor_interval_seconds < 1 ||
+        settings->sensor_interval_seconds > 60) return ESP_ERR_INVALID_ARG;
+
     panel_settings_t clean = *settings;
     clean.wifi_ssid[PANEL_WIFI_SSID_MAX] = '\0';
     clean.admin_password[PANEL_ADMIN_PASSWORD_MAX] = '\0';
@@ -258,6 +266,11 @@ esp_err_t settings_save(const panel_settings_t *settings)
     SAVE_STR("timezone", timezone);
 
 #undef SAVE_STR
+
+    err = nvs_set_u8(nvs, "als_enabled", clean.ambient_light_enabled);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "sensor_interval", clean.sensor_interval_seconds);
+    if (err != ESP_OK) goto out;
 
     err = nvs_set_u8(nvs, "theme", clean.theme);
     if (err != ESP_OK) goto out;

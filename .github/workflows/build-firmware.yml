@@ -29,6 +29,7 @@ jobs:
         run: pip install platformio==6.1.18 pillow
       - name: Test settings, network identity and OTA failure handling
         run: |
+          python tools/test_sensors.py
           python tools/test_color_settings.py
           python tools/test_network_identity.py
           python tools/test_ota.py

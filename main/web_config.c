@@ -373,6 +373,16 @@ static esp_err_t root_handler(httpd_req_t *req)
              timezone);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
+    snprintf(buf, sizeof(buf),
+             "<section class='card'><h2>Sensors</h2>"
+             "<label>Ambient light sensor</label><select name='ambient_light_enabled'>"
+             "<option value='0'%s>Disabled</option><option value='1'%s>VEML7700 (I2C 0x10)</option></select>"
+             "<label>Reporting interval (seconds)</label><input name='sensor_interval_seconds' type='number' min='1' max='60' required value='%u'>"
+             "<div class='hint'>Connect a 3.3 V compatible VEML7700 to the shared I2C bus. Home Assistant automatically discovers Ambient light under this panel. Missing sensors report unavailable. Save and reboot to apply.</div></section>",
+             cfg->ambient_light_enabled ? "" : " selected",
+             cfg->ambient_light_enabled ? " selected" : "", cfg->sensor_interval_seconds);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "<section class='card full'><h2>Tapo color circles</h2>"
         "<div class='hint'>Choose the six preset colors, ordered left to right on the display. "
@@ -568,6 +578,21 @@ static esp_err_t save_handler(httpd_req_t *req)
         updated.mqtt_password[0] = '\0';
     } else if (form_get(body, "mqtt_password", tmp, sizeof(tmp)) && tmp[0]) {
         strlcpy(updated.mqtt_password, tmp, sizeof(updated.mqtt_password));
+    }
+
+    const char *sensor_fields[] = {"ambient_light_enabled", "sensor_interval_seconds"};
+    for (int i = 0; i < 2; ++i) {
+        if (form_get(body, sensor_fields[i], tmp, sizeof(tmp))) {
+            char *end = NULL;
+            long value = strtol(tmp, &end, 10);
+            if (!tmp[0] || *end || value < (i ? 1 : 0) || value > (i ? 60 : 1)) {
+                free(body);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor setting.");
+                return ESP_OK;
+            }
+            if (i) updated.sensor_interval_seconds = (uint8_t)value;
+            else updated.ambient_light_enabled = (uint8_t)value;
+        }
     }
 
     if (form_get(body, "theme", tmp, sizeof(tmp))) {

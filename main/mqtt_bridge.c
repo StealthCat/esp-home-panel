@@ -11,6 +11,7 @@
 #include "esp_timer.h"
 #include "mqtt_client.h"
 #include "settings.h"
+#include "sensors.h"
 #include "ui.h"
 
 static const char *TAG = "mqtt_bridge";
@@ -35,6 +36,10 @@ static char *s_topic_availability;
 static char *s_topic_request_state;
 static char *s_topic_refresh_command;
 
+static char *s_topic_lux;
+static char *s_topic_lux_availability;
+static char *s_discovery_lux_config;
+static int64_t s_last_sensor_publish_us;
 static char *s_topic_ha_status;
 static char *s_discovery_connection_config;
 static char *s_discovery_refresh_config;
@@ -177,6 +182,8 @@ static esp_err_t build_topics(const panel_settings_t *settings)
     MAKE_TOPIC(s_topic_cmd_fan, "/cmd/fan");
     MAKE_TOPIC(s_topic_cmd_echo, "/cmd/echo");
 
+    MAKE_TOPIC(s_topic_lux, "/sensor/illuminance/state");
+    MAKE_TOPIC(s_topic_lux_availability, "/sensor/illuminance/availability");
     MAKE_TOPIC(s_topic_availability, "/availability");
     MAKE_TOPIC(s_topic_request_state, "/request_state");
     MAKE_TOPIC(s_topic_refresh_command, "/control/refresh");
@@ -185,6 +192,10 @@ static esp_err_t build_topics(const panel_settings_t *settings)
 
     s_topic_ha_status = make_topic(discovery, "/status");
     if (!s_topic_ha_status) return ESP_ERR_NO_MEM;
+
+    s_discovery_lux_config =
+        make_discovery_topic(discovery, "sensor", panel_id, "illuminance");
+    if (!s_discovery_lux_config) return ESP_ERR_NO_MEM;
 
     s_discovery_connection_config =
         make_discovery_topic(discovery, "binary_sensor", panel_id, "connection");
@@ -383,6 +394,54 @@ static void publish_discovery_json(const char *topic, cJSON *root)
     free(payload);
 }
 
+static void publish_ambient_light(void)
+{
+    const panel_settings_t *cfg = settings_get();
+    if (!s_connected || !cfg || !cfg->ambient_light_enabled) return;
+    ambient_light_reading_t reading = sensors_ambient_light();
+    int64_t now = esp_timer_get_time();
+    bool available = reading.available &&
+        now - reading.sampled_us <= (int64_t)(cfg->sensor_interval_seconds * 3 + 5) * 1000000;
+    if (available) {
+        char value[32];
+        snprintf(value, sizeof(value), "%.2f", (double)reading.lux);
+        /* Unretained measurements prevent replay of stale lux after HA restart. */
+        mqtt_publish_logged(s_topic_lux, value, 1, 0);
+    }
+    mqtt_publish_logged(s_topic_lux_availability, available ? "online" : "offline", 1, 1);
+}
+
+static void publish_ambient_light_discovery(const panel_settings_t *cfg)
+{
+    if (!cfg->ambient_light_enabled) {
+        mqtt_publish_logged(s_discovery_lux_config, "", 1, 1);
+        mqtt_publish_logged(s_topic_lux, "", 1, 1);
+        mqtt_publish_logged(s_topic_lux_availability, "offline", 1, 1);
+        return;
+    }
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return;
+    cJSON_AddStringToObject(root, "name", "Ambient light");
+    add_unique_id(root, cfg, "illuminance");
+    add_device_info(root, cfg);
+    cJSON_AddStringToObject(root, "state_topic", s_topic_lux);
+    cJSON_AddStringToObject(root, "device_class", "illuminance");
+    cJSON_AddStringToObject(root, "state_class", "measurement");
+    cJSON_AddStringToObject(root, "unit_of_measurement", "lx");
+    cJSON_AddNumberToObject(root, "expire_after", cfg->sensor_interval_seconds * 3 + 5);
+    cJSON_AddStringToObject(root, "availability_mode", "all");
+    cJSON *availability = cJSON_AddArrayToObject(root, "availability");
+    const char *topics[] = {s_topic_availability, s_topic_lux_availability};
+    for (int i = 0; i < 2; ++i) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddStringToObject(item, "topic", topics[i]);
+        cJSON_AddItemToArray(availability, item);
+    }
+    publish_discovery_json(s_discovery_lux_config, root);
+    cJSON_Delete(root);
+    publish_ambient_light();
+}
+
 static void publish_home_assistant_discovery(void)
 {
     if (!s_connected) return;
@@ -395,6 +454,8 @@ static void publish_home_assistant_discovery(void)
     ESP_LOGI(TAG,
              "Publishing Home Assistant MQTT discovery prefix=\"%s\" runtime_root=\"%s\"",
              settings->mqtt_discovery_prefix, s_topic_root);
+
+    publish_ambient_light_discovery(settings);
 
     cJSON *root = cJSON_CreateObject();
     if (root) {
@@ -759,6 +820,13 @@ void mqtt_bridge_poll(void)
     }
 
     const int64_t now = esp_timer_get_time();
+    const panel_settings_t *cfg = settings_get();
+    if (cfg && cfg->ambient_light_enabled &&
+        (s_last_sensor_publish_us == 0 || now - s_last_sensor_publish_us >=
+         (int64_t)cfg->sensor_interval_seconds * 1000000)) {
+        publish_ambient_light();
+        s_last_sensor_publish_us = now;
+    }
 
     if (s_state_refresh_due_us > 0) {
         if (now >= s_state_refresh_due_us) {

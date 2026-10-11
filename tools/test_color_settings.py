@@ -51,18 +51,19 @@ typedef int nvs_handle_t;
 static uint32_t stored[6];
 static bool present[6];
 static int commits;
+static uint8_t als_enabled, sensor_interval;
 static char saved_hostname[33], saved_admin_password[65];
 static int nvs_open(const char *s,int m,nvs_handle_t *h) {(void)s;(void)m;*h=1;return 0;}
 static void nvs_close(nvs_handle_t h) {(void)h;}
 static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;if(!strcmp(k,"hostname") && saved_hostname[0]) {strlcpy(v,saved_hostname,*s);return 0;}if(!strcmp(k,"admin_pass") && saved_admin_password[0]){strlcpy(v,saved_admin_password,*s);return 0;}return ESP_ERR_NVS_NOT_FOUND;}
 static int nvs_set_str(int h,const char *k,const char *v) {(void)h;if(!strcmp(k,"hostname"))strlcpy(saved_hostname,v,sizeof(saved_hostname));if(!strcmp(k,"admin_pass"))strlcpy(saved_admin_password,v,sizeof(saved_admin_password));return 0;}
-static int nvs_get_u8(int h,const char *k,uint8_t *v) {(void)h;(void)k;(void)v;return ESP_ERR_NVS_NOT_FOUND;}
-static int nvs_set_u8(int h,const char *k,uint8_t v) {(void)h;(void)k;(void)v;return 0;}
+static int nvs_get_u8(int h,const char *k,uint8_t *v) {(void)h;if(!strcmp(k,"als_enabled")){*v=als_enabled;return 0;}if(!strcmp(k,"sensor_interval") && sensor_interval){*v=sensor_interval;return 0;}return ESP_ERR_NVS_NOT_FOUND;}
+static int nvs_set_u8(int h,const char *k,uint8_t v) {(void)h;if(!strcmp(k,"als_enabled"))als_enabled=v;if(!strcmp(k,"sensor_interval"))sensor_interval=v;return 0;}
 static int color_index(const char *k) {assert(strlen(k)==7 && !strncmp(k,"color_",6));int i=k[6]-'0';assert(i>=0&&i<6);return i;}
 static int nvs_get_u32(int h,const char *k,uint32_t *v) {(void)h;int i=color_index(k);if(!present[i])return ESP_ERR_NVS_NOT_FOUND;*v=stored[i];return 0;}
 static int nvs_set_u32(int h,const char *k,uint32_t v) {(void)h;int i=color_index(k);stored[i]=v;present[i]=true;return 0;}
 static int nvs_commit(int h) {(void)h;commits++;return 0;}
-static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));saved_hostname[0]=0;saved_admin_password[0]=0;return 0;}
+static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));als_enabled=0;sensor_interval=0;saved_hostname[0]=0;saved_admin_password[0]=0;return 0;}
 typedef void *httpd_handle_t;
 typedef struct {size_t content_len;const char *body;} httpd_req_t;
 typedef struct {int max_uri_handlers,stack_size;bool lru_purge_enable;} httpd_config_t;
@@ -168,6 +169,18 @@ int main(void) {
     post("theme=2");assert(status==200 && !strcmp(settings_get()->admin_password,"good-password"));
     httpd_req_t no_csrf={.content_len=7,.body="theme=1"};
     status=200;assert(save_handler(&no_csrf)==ESP_OK && status==403);
+    assert(settings_get()->sensor_interval_seconds==10 && !settings_get()->ambient_light_enabled);
+    post("ambient_light_enabled=1&sensor_interval_seconds=5");assert(status==200);
+    assert(settings_init()==ESP_OK && settings_get()->ambient_light_enabled==1 && settings_get()->sensor_interval_seconds==5);
+    post("sensor_interval_seconds=0");assert(status==400);
+    post("sensor_interval_seconds=61");assert(status==400);
+    post("sensor_interval_seconds=3x");assert(status==400);
+    post("ambient_light_enabled=2");assert(status==400);
+    post("theme=1");assert(status==200 && settings_get()->ambient_light_enabled==1);
+    post("ambient_light_enabled=0");assert(status==200 && !settings_get()->ambient_light_enabled);
+    assert(settings_reset()==ESP_OK && settings_init()==ESP_OK);
+    assert(settings_get()->sensor_interval_seconds==10 && !settings_get()->ambient_light_enabled);
+    puts("Sensor settings persistence, validation and reset checks passed");
     puts("Hostname save, reload, migration, validation, display and reset checks passed");
     puts("Color form, validation, NVS reload, migration and reset checks passed");
 }

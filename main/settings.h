@@ -60,6 +60,8 @@ typedef struct {
     /* RGB values for the six Tapo circles, ordered left to right. */
     uint32_t color_presets[PANEL_COLOR_PRESET_COUNT];
 
+    uint8_t ambient_light_enabled;
+    uint8_t sensor_interval_seconds; /* 1-60 seconds */
     uint8_t theme;
     uint8_t backlight_percent;
 } panel_settings_t;

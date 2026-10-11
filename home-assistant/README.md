@@ -260,3 +260,7 @@ connection.
 Keeping entity selection as entity-ID fields means each panel only needs its
 MQTT credentials and never needs a Home Assistant long-lived access token.
 
+
+## Panel ambient light sensor
+
+An optional VEML7700 connected to the panel publishes lux directly through MQTT discovery. Enable it under **Settings → Sensors**; no changes to the control bridge automation are needed. See [sensor wiring and setup](../docs/sensors.md).

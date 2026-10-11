@@ -53,6 +53,7 @@ idf_component_register(
         "web_security.c"
         "ota_update.c"
         "mqtt_bridge.c"
+        "sensors.c"
         "ui.c"
         "ui_theme.c"
         "font_outfit_semibold_48.c"

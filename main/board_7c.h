@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include "driver/i2c_master.h"
 #include "esp_err.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch.h"
@@ -17,9 +18,13 @@ typedef struct {
     esp_lcd_touch_handle_t touch;
 } board_7c_handles_t;
 
+/* Borrowed shared bus; callers must not delete it. NULL in the emulator. */
+i2c_master_bus_handle_t board_7c_i2c_bus(void);
+
 esp_err_t board_7c_init(board_7c_handles_t *handles);
 esp_err_t board_7c_set_backlight(uint8_t percent);
 
 #ifdef __cplusplus
 }
 #endif
+

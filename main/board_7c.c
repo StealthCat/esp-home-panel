@@ -5,6 +5,8 @@
 
 #ifdef WOKWI_EMULATOR
 
+i2c_master_bus_handle_t board_7c_i2c_bus(void) { return NULL; }
+
 #include "esp_check.h"
 #include "esp_log.h"
 #include "wokwi_panel.h"
@@ -84,6 +86,7 @@ typedef enum {
 
 static hw_profile_t s_hw_profile;
 static i2c_master_bus_handle_t s_i2c_bus;
+i2c_master_bus_handle_t board_7c_i2c_bus(void) { return s_i2c_bus; }
 static i2c_master_dev_handle_t s_box_iox;
 static i2c_master_dev_handle_t s_ch422g_wr_set;
 static i2c_master_dev_handle_t s_ch422g_wr_io;
@@ -461,3 +464,4 @@ esp_err_t board_7c_init(board_7c_handles_t *handles)
 }
 
 #endif
+
