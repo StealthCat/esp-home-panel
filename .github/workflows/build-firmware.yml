@@ -44,3 +44,25 @@ jobs:
           name: esp-home-panel-ota-${{ github.sha }}
           path: .pio/build/waveshare-7c-box/firmware.bin
           if-no-files-found: error
+
+  settings-ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install browser test tools
+        run: |
+          npm install --no-save --package-lock=false playwright@1.51.1
+          npx playwright install --with-deps chromium --only-shell
+      - name: Check desktop and mobile settings
+        run: node tools/test_settings_ui.js
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: settings-ui-previews
+          path: /tmp/panel-settings-check/*.png

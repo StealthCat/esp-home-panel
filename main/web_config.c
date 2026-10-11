@@ -19,33 +19,7 @@
 static const char *TAG = "web_config";
 static httpd_handle_t s_server;
 
-static const char PAGE_HEAD[] =
-"<!doctype html><html><head><meta charset='utf-8'>"
-"<meta name='viewport' content='width=device-width,initial-scale=1'>"
-"<title>ESP Home Panel</title><style>"
-":root{color-scheme:dark;background:#07111c;color:#f7fbff;font-family:system-ui,-apple-system,Segoe UI,sans-serif}"
-"*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#07111c,#0b1d31);min-height:100vh}"
-".wrap{max-width:880px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;gap:20px;align-items:center;margin-bottom:20px}"
-"h1{font-size:28px;margin:0}.sub{color:#a7bcd0;margin-top:5px}.pill{background:#15334a;border:1px solid #35536d;border-radius:999px;padding:8px 12px;color:#bfe8ff}"
-".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}"
-".card{background:#101d2a;border:1px solid #35536d;border-radius:16px;padding:18px;box-shadow:0 10px 30px #0005}"
-"h2{font-size:18px;margin:0 0 15px;color:#8ed5ff}label{display:block;font-size:13px;color:#a7bcd0;margin:12px 0 6px}"
-"input,select{width:100%;padding:11px 12px;border-radius:9px;border:1px solid #35536d;background:#071722;color:#f7fbff;font-size:15px}"
-"input[type=color]{height:48px;padding:4px;cursor:pointer}.presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}"
-"input[type=range]{padding:0}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}"
-".check{display:flex;gap:8px;align-items:center;font-size:13px;color:#a7bcd0;margin-top:8px}.check input{width:auto}"
-".hint{font-size:12px;color:#829bb0;margin-top:7px;line-height:1.4}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:18px}"
-"button{border:0;border-radius:10px;padding:12px 18px;font-size:15px;font-weight:700;cursor:pointer;background:#21a7ff;color:#03111c}"
-"button.secondary{background:#24394b;color:#f7fbff}button.danger{background:#ff667d;color:#21030a}"
-".full{grid-column:1/-1}.status{font-size:13px;line-height:1.6;color:#bdd0df}.status b{color:#fff}"
-"@media(max-width:600px){.wrap{padding:14px}.top{align-items:flex-start;flex-direction:column}}"
-"</style></head><body><div class='wrap'>";
-
-static const char PAGE_FOOT[] =
-"</div><script>"
-"const r=document.getElementById('backlight'),v=document.getElementById('backlightValue');"
-"if(r&&v){const u=()=>v.textContent=r.value+'%';r.addEventListener('input',u);u();}"
-"</script></body></html>";
+#include "web_config_assets.h"
 
 static void html_escape(const char *src, char *dst, size_t dst_size)
 {
@@ -302,32 +276,34 @@ static esp_err_t root_handler(httpd_req_t *req)
     char buf[2048];
     const char *ip = network_get_sta_ip();
     snprintf(buf, sizeof(buf),
-             "<div class='top'><div><h1>ESP Home Panel</h1>"
-             "<div class='sub'>Runtime configuration stored in NVS</div></div>"
+             "<div class='top'><div class='brand'><span class='brandmark' aria-hidden='true'>&#9638;</span><div>ESP Home Panel"
+             "<div class='eyebrow'>Device settings</div></div></div>"
              "<div class='pill'>%s</div></div>",
              network_is_connected() ? "Wi-Fi connected" : "Setup mode");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<div class='intro'><div class='eyebrow'>Configuration</div><h1>Panel settings</h1><p class='sub'>Connection, display, sensors, and Home Assistant.</p></div>"));
+
     snprintf(buf, sizeof(buf),
-             "<div class='card full status'><b>Network status</b><br>"
-             "Station IP: %s<br>"
-             "Setup AP: %s%s%s</div>",
+             "<div class='status'>"
+             "<span>IP address <b>%s</b></span>"
+             "<span>Setup access point <b>%s</b>%s%s</span></div>",
              ip ? ip : "not connected",
              network_config_ap_active() ? network_get_config_ap_ssid() : "inactive",
              network_config_ap_active() ? " &nbsp; Password: " : "",
              network_config_ap_active() ? network_get_config_ap_password() : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
-    snprintf(buf, sizeof(buf), "<p><a href='/firmware' style='color:#8ed5ff'>Firmware Update &rarr;</a></p>"
-             "<form method='post' action='/save'><input type='hidden' name='csrf' value='%s'><div class='grid'>", web_security_token());
+    snprintf(buf, sizeof(buf), "<nav id='settings-tabs' class='tabs' role='tablist' aria-label='Settings sections' hidden></nav><div id='save-notice' class='notice' role='status' aria-live='polite' hidden></div>"
+             "<form id='settings-form' method='post' action='/save'><input type='hidden' name='csrf' value='%s'><div id='settings-grid' class='grid'>", web_security_token());
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
-        "<section class='card full'><h2>Administrator access</h2>"
+        "<section class='card' data-tab='system'><h2>Administrator access</h2>"
         "<label>New administrator password</label><input name='admin_password' type='password' minlength='8' maxlength='64' autocomplete='new-password' placeholder='Leave blank to keep current password'>"
         "<div class='hint'>Required for firmware uploads. Once set, sign in as <b>admin</b> to access settings and updates. Use 8&ndash;64 printable ASCII characters. Use this HTTP interface only on your trusted local network.</div></section>"));
 
     snprintf(buf, sizeof(buf),
-             "<section class='card'><h2>Wi-Fi &amp; Network</h2>"
+             "<section class='card' data-tab='network'><h2>Wi-Fi &amp; Network</h2>"
              "<label>Hostname</label><input name='hostname' maxlength='32' required pattern='[a-z0-9](([a-z0-9]|-){0,30}[a-z0-9])?' value=\"%s\" autocapitalize='none' spellcheck='false'>"
              "<div class='hint'>Use a unique name without a domain, such as bedroom-panel. Advertised through DHCP and mDNS; independent of the MQTT panel ID.</div>"
              "<label>SSID</label><input name='wifi_ssid' maxlength='32' value=\"%s\" autocomplete='off'>"
@@ -340,7 +316,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     char domain[PANEL_DOMAIN_MAX + 1];
     network_identity_get_domain(domain, sizeof(domain));
     snprintf(buf, sizeof(buf),
-             "<section class='card'><h2>Network names</h2>"
+             "<section class='card' data-tab='network'><h2>Current network names</h2>"
              "<p>mDNS: <b>%s.local</b></p>"
              "<p>DHCP domain: <b>%s</b></p>"
              "<p>LAN name: <b>%s%s%s</b></p>"
@@ -350,8 +326,8 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     snprintf(buf, sizeof(buf),
-             "<section class='card'><h2>Display &amp; Theme</h2>"
-             "<label>Display title</label><input name='display_title' maxlength='31' value=\"%s\" placeholder='Home Control'>"
+             "<section class='card' data-tab='display'><h2>Display &amp; Theme</h2>"
+             "<label>Display title</label><input name='display_title' required maxlength='31' value=\"%s\" placeholder='Home Control'>"
              "<div class='hint'>Shown as the large title in the upper-left of the panel.</div>"
              "<label>Theme</label><select name='theme'>"
              "<option value='0'%s>Classic dark</option>"
@@ -374,7 +350,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     snprintf(buf, sizeof(buf),
-             "<section class='card'><h2>Sensors</h2>"
+             "<section class='card' data-tab='sensors'><h2>Ambient light</h2>"
              "<label>Ambient light sensor</label><select name='ambient_light_enabled'>"
              "<option value='0'%s>Disabled</option><option value='1'%s>VEML7700 (I2C 0x10)</option></select>"
              "<label>Reporting interval (seconds)</label><input name='sensor_interval_seconds' type='number' min='1' max='60' required value='%u'>"
@@ -384,7 +360,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     snprintf(buf, sizeof(buf),
-             "<section class='card'><h2>Presence sensor</h2>"
+             "<section class='card' data-tab='sensors'><h2>Presence sensor</h2>"
              "<label>Sensor</label><select name='presence_enabled'>"
              "<option value='0'%s>Disabled</option><option value='1'%s>Gravity C4001 (SEN0610, I2C)</option></select>"
              "<label>I2C address (match hardware switch)</label><select name='presence_address'>"
@@ -401,7 +377,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
-        "<section class='card full'><h2>Tapo color circles</h2>"
+        "<section class='card' data-tab='display'><h2>Tapo color circles</h2>"
         "<div class='hint'>Choose the six preset colors, ordered left to right on the display. "
         "These colors apply to every theme after Save &amp; reboot.</div><div class='presets'>"));
     for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
@@ -414,7 +390,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</div></section>"));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
-        "<section class='card full'><h2>MQTT</h2>"));
+        "<section class='card full' data-tab='home-assistant'><h2>MQTT</h2>"));
 
     snprintf(buf, sizeof(buf),
              "<div class='row'><div><label>Broker URI</label><input name='mqtt_uri' maxlength='191' value=\"%s\" placeholder='mqtt://192.168.1.2'></div>"
@@ -423,8 +399,8 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     snprintf(buf, sizeof(buf),
-             "<div class='row'><div><label>Panel ID</label><input name='panel_id' maxlength='31' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
-             "<div><label>Effective topic root</label><input value=\"%s/%s\" readonly></div></div>",
+             "<div class='row'><div><label>Panel ID</label><input name='panel_id' required pattern='[a-z0-9_-]+' maxlength='31' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
+             "<div><label>Effective topic root</label><input id='topic-preview' value=\"%s/%s\" readonly></div></div>",
              panel_id, mqtt_topic, panel_id);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
@@ -433,8 +409,8 @@ static esp_err_t root_handler(httpd_req_t *req)
 
     snprintf(buf, sizeof(buf),
              "<div class='row'><div><label>Home Assistant discovery prefix</label>"
-             "<input name='mqtt_discovery_prefix' maxlength='63' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
-             "<div><label>Discovery status topic</label><input value=\"%s/status\" readonly></div></div>",
+             "<input name='mqtt_discovery_prefix' required maxlength='63' value=\"%s\" autocapitalize='none' spellcheck='false'></div>"
+             "<div><label>Discovery status topic</label><input id='discovery-preview' value=\"%s/status\" readonly></div></div>",
              mqtt_discovery, mqtt_discovery);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
@@ -453,7 +429,7 @@ static esp_err_t root_handler(httpd_req_t *req)
         "</section>"));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
-        "<section class='card full'><h2>Home Assistant targets</h2>"
+        "<section class='card full' data-tab='home-assistant'><h2>Home Assistant targets</h2>"
         "<div class='hint'>Mosquitto transports MQTT messages but does not expose Home Assistant's entity registry. "
         "Enter the entity IDs shown in Home Assistant. The included MQTT bridge automation translates panel commands into Home Assistant actions.</div>"));
 
@@ -468,7 +444,7 @@ static esp_err_t root_handler(httpd_req_t *req)
     snprintf(buf, sizeof(buf),
              "<div class='row'><div><label>Ceiling fan / switch</label>"
              "<input name='ha_fan_entity' maxlength='127' value=\"%s\" placeholder='fan.office_fan or switch.office_fan' autocapitalize='none' spellcheck='false'></div>"
-             "<div><label>Echo / media player</label>"
+             "<div><label>Alexa / media player</label>"
              "<input name='ha_echo_entity' maxlength='127' value=\"%s\" placeholder='media_player.office_echo' autocapitalize='none' spellcheck='false'></div></div>",
              ha_fan, ha_echo);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
@@ -479,12 +455,19 @@ static esp_err_t root_handler(httpd_req_t *req)
         "</section>"));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
-        "</div><div class='actions'><button type='submit'>Save &amp; reboot</button>"
-        "<button class='secondary' type='button' onclick=\"location.reload()\">Reload</button>"
-        "</div></form>"
-        "<form method='post' action='/reset' onsubmit=\"return confirm('Reset all web configuration to firmware defaults?')\">"
-        "<div class='actions'><button class='danger' type='submit'>Reset configuration</button></div>"));
-    snprintf(buf, sizeof(buf), "<input type='hidden' name='csrf' value='%s'></form>", web_security_token());
+        "<section class='card' data-tab='system'><h2>Firmware updates</h2>"
+        "<p class='muted'>Install a new firmware version from your browser. Your saved settings stay in place.</p>"
+        "<a class='button-link secondary' href='/firmware'>Open firmware updater &rarr;</a>"
+        "<p class='hint'>Set an administrator password before your first upload.</p></section>"
+        "<section class='card full danger-card' data-tab='system'><h2>Reset configuration</h2>"
+        "<p class='hint'>Restore firmware defaults for Wi-Fi, MQTT, display, sensors, and administrator access. The panel will restart.</p>"
+        "<button class='danger' type='submit' form='reset-form'>Reset configuration</button></section>"
+        "</div><div class='savebar'><div><strong id='change-status'>Settings ready</strong>"
+        "<small>Saving applies all tabs and restarts the panel.</small></div><div class='actions'>"
+        "<button class='secondary' id='discard-settings' type='reset'>Discard changes</button>"
+        "<button id='save-settings' type='submit'>Save &amp; restart</button>"
+        "</div></div></form>"));
+    snprintf(buf, sizeof(buf), "<form id='reset-form' method='post' action='/reset'><input type='hidden' name='csrf' value='%s'></form>", web_security_token());
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, PAGE_FOOT));

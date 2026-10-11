@@ -79,9 +79,9 @@ typedef struct {const char *uri;int method;esp_err_t (*handler)(httpd_req_t *);}
 #define HTTPD_500_INTERNAL_SERVER_ERROR 500
 #define HTTP_GET 0
 #define HTTP_POST 1
-static char response[24000];
+static char response[64000];
 static int status,reboots;
-static int httpd_resp_send_chunk(httpd_req_t *r,const char *s,int n) {(void)r;(void)n;if(s)strcat(response,s);return 0;}
+static int httpd_resp_send_chunk(httpd_req_t *r,const char *s,int n) {(void)r;(void)n;if(s){assert(strlen(response)+strlen(s)<sizeof(response));strcat(response,s);}return 0;}
 static int httpd_resp_set_status(httpd_req_t *r,const char *s) {(void)r;status=atoi(s);return 0;}
 static int httpd_resp_set_type(httpd_req_t *r,const char *s) {(void)r;(void)s;return 0;}
 static int httpd_resp_set_hdr(httpd_req_t *r,const char *k,const char *v) {(void)r;(void)k;(void)v;return 0;}
