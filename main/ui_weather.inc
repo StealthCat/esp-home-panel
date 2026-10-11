@@ -192,6 +192,10 @@ static void update_weather_view(void)
     s_weather_revision=w->revision;
     lv_label_set_text(s_weather_heading,w->name[0]?w->name:"Your weather station");
     formatted(s_weather_summary,w->current.temp,"temp");
+    /* Keep extreme temperatures readable without dropping digits or units. */
+    lv_point_t temperature_size;
+    lv_text_get_size(&temperature_size,lv_label_get_text(s_weather_summary),&font_outfit_semibold_48,0,0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+    lv_obj_set_style_text_font(s_weather_summary,temperature_size.x>194?&lv_font_montserrat_36:&font_outfit_semibold_48,0);
     char value[64];weather_format(value,sizeof(value),w->current.feels,"temp",settings_get()->weather_units);snprintf(status,sizeof(status),"Feels like %s",value);lv_label_set_text(s_feels,status);
     weather_format(value,sizeof(value),w->current.dew,"temp",settings_get()->weather_units);snprintf(status,sizeof(status),"Dew point  %s",value);lv_label_set_text(s_dew,status);
     weather_format(value,sizeof(value),w->current.humidity,"percent",true);snprintf(status,sizeof(status),"Humidity   %s",value);lv_label_set_text(s_humidity,status);
