@@ -1,4 +1,5 @@
 #include "sensors.h"
+#include "c4001.h"
 #include "board_i2c.h"
 #include "settings.h"
 #include "esp_timer.h"
@@ -35,7 +36,7 @@ static esp_err_t write_register(uint8_t reg, uint16_t value)
     return i2c_master_transmit(s_device, bytes, sizeof(bytes), 20);
 }
 
-void sensors_poll(void)
+static void ambient_light_poll(void)
 {
     const panel_settings_t *cfg = settings_get();
     if (!cfg || !cfg->ambient_light_enabled) return;
@@ -76,4 +77,10 @@ void sensors_poll(void)
     }
     /* Saturation is not a valid measurement. Retry on the normal schedule. */
     store_reading(raw != UINT16_MAX, lux, now);
+}
+
+void sensors_poll(void)
+{
+    ambient_light_poll();
+    c4001_poll();
 }

@@ -52,18 +52,22 @@ static uint32_t stored[6];
 static bool present[6];
 static int commits;
 static uint8_t als_enabled, sensor_interval;
+static uint8_t prs_values[6];
+static bool prs_present[6];
+static const char *prs_keys[]={"prs_enabled","prs_address","prs_max_m","prs_trig_sens","prs_keep_sens","prs_hold_s"};
+static int prs_index(const char *key){for(int i=0;i<6;i++)if(!strcmp(key,prs_keys[i]))return i;return -1;}
 static char saved_hostname[33], saved_admin_password[65];
 static int nvs_open(const char *s,int m,nvs_handle_t *h) {(void)s;(void)m;*h=1;return 0;}
 static void nvs_close(nvs_handle_t h) {(void)h;}
 static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;if(!strcmp(k,"hostname") && saved_hostname[0]) {strlcpy(v,saved_hostname,*s);return 0;}if(!strcmp(k,"admin_pass") && saved_admin_password[0]){strlcpy(v,saved_admin_password,*s);return 0;}return ESP_ERR_NVS_NOT_FOUND;}
 static int nvs_set_str(int h,const char *k,const char *v) {(void)h;if(!strcmp(k,"hostname"))strlcpy(saved_hostname,v,sizeof(saved_hostname));if(!strcmp(k,"admin_pass"))strlcpy(saved_admin_password,v,sizeof(saved_admin_password));return 0;}
-static int nvs_get_u8(int h,const char *k,uint8_t *v) {(void)h;if(!strcmp(k,"als_enabled")){*v=als_enabled;return 0;}if(!strcmp(k,"sensor_interval") && sensor_interval){*v=sensor_interval;return 0;}return ESP_ERR_NVS_NOT_FOUND;}
-static int nvs_set_u8(int h,const char *k,uint8_t v) {(void)h;if(!strcmp(k,"als_enabled"))als_enabled=v;if(!strcmp(k,"sensor_interval"))sensor_interval=v;return 0;}
+static int nvs_get_u8(int h,const char *k,uint8_t *v) {(void)h;int i=prs_index(k);if(i>=0){if(!prs_present[i])return ESP_ERR_NVS_NOT_FOUND;*v=prs_values[i];return 0;}if(!strcmp(k,"als_enabled")){*v=als_enabled;return 0;}if(!strcmp(k,"sensor_interval") && sensor_interval){*v=sensor_interval;return 0;}return ESP_ERR_NVS_NOT_FOUND;}
+static int nvs_set_u8(int h,const char *k,uint8_t v) {(void)h;int i=prs_index(k);if(i>=0){prs_present[i]=true;prs_values[i]=v;return 0;}if(!strcmp(k,"als_enabled"))als_enabled=v;if(!strcmp(k,"sensor_interval"))sensor_interval=v;return 0;}
 static int color_index(const char *k) {assert(strlen(k)==7 && !strncmp(k,"color_",6));int i=k[6]-'0';assert(i>=0&&i<6);return i;}
 static int nvs_get_u32(int h,const char *k,uint32_t *v) {(void)h;int i=color_index(k);if(!present[i])return ESP_ERR_NVS_NOT_FOUND;*v=stored[i];return 0;}
 static int nvs_set_u32(int h,const char *k,uint32_t v) {(void)h;int i=color_index(k);stored[i]=v;present[i]=true;return 0;}
 static int nvs_commit(int h) {(void)h;commits++;return 0;}
-static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));als_enabled=0;sensor_interval=0;saved_hostname[0]=0;saved_admin_password[0]=0;return 0;}
+static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));memset(prs_present,0,sizeof(prs_present));als_enabled=0;sensor_interval=0;saved_hostname[0]=0;saved_admin_password[0]=0;return 0;}
 typedef void *httpd_handle_t;
 typedef struct {size_t content_len;const char *body;} httpd_req_t;
 typedef struct {int max_uri_handlers,stack_size;bool lru_purge_enable;} httpd_config_t;
@@ -180,6 +184,18 @@ int main(void) {
     post("ambient_light_enabled=0");assert(status==200 && !settings_get()->ambient_light_enabled);
     assert(settings_reset()==ESP_OK && settings_init()==ESP_OK);
     assert(settings_get()->sensor_interval_seconds==10 && !settings_get()->ambient_light_enabled);
+    assert(!settings_get()->presence_enabled && settings_get()->presence_address==42 && settings_get()->presence_hold_seconds==30);
+    post("presence_enabled=1&presence_address=43&presence_max_m=8&presence_trigger_sensitivity=9&presence_keep_sensitivity=0&presence_hold_seconds=120");
+    assert(status==200 && settings_init()==ESP_OK);
+    const panel_settings_t *pc=settings_get();
+    assert(pc->presence_enabled==1 && pc->presence_address==43 && pc->presence_max_m==8 && pc->presence_trigger_sensitivity==9 && pc->presence_keep_sensitivity==0 && pc->presence_hold_seconds==120);
+    const char *bad_presence[]={"presence_enabled=2","presence_address=44","presence_address=41","presence_max_m=9","presence_max_m=2","presence_trigger_sensitivity=10","presence_keep_sensitivity=-1","presence_hold_seconds=1","presence_hold_seconds=121","presence_hold_seconds=3x"};
+    for(unsigned i=0;i<sizeof(bad_presence)/sizeof(bad_presence[0]);i++){int before=commits;post(bad_presence[i]);assert(status==400 && commits==before);}
+    post("theme=0");assert(status==200 && settings_get()->presence_address==43);
+    invalid=*settings_get();invalid.presence_address=0;assert(settings_save(&invalid)==ESP_ERR_INVALID_ARG);
+    prs_values[1]=255;assert(settings_init()==ESP_OK && settings_get()->presence_address==42);
+    assert(settings_reset()==ESP_OK && settings_init()==ESP_OK && !settings_get()->presence_enabled);
+    puts("C4001 settings persistence, legacy forms, invalid NVS and validation checks passed");
     puts("Sensor settings persistence, validation and reset checks passed");
     puts("Hostname save, reload, migration, validation, display and reset checks passed");
     puts("Color form, validation, NVS reload, migration and reset checks passed");

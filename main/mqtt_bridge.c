@@ -12,6 +12,7 @@
 #include "mqtt_client.h"
 #include "settings.h"
 #include "sensors.h"
+#include "c4001.h"
 #include "ui.h"
 
 static const char *TAG = "mqtt_bridge";
@@ -36,6 +37,10 @@ static char *s_topic_availability;
 static char *s_topic_request_state;
 static char *s_topic_refresh_command;
 
+static char *s_topic_presence;
+static char *s_topic_presence_availability;
+static char *s_discovery_presence_config;
+static int64_t s_last_presence_publish_us;
 static char *s_topic_lux;
 static char *s_topic_lux_availability;
 static char *s_discovery_lux_config;
@@ -182,6 +187,8 @@ static esp_err_t build_topics(const panel_settings_t *settings)
     MAKE_TOPIC(s_topic_cmd_fan, "/cmd/fan");
     MAKE_TOPIC(s_topic_cmd_echo, "/cmd/echo");
 
+    MAKE_TOPIC(s_topic_presence, "/sensor/occupancy/state");
+    MAKE_TOPIC(s_topic_presence_availability, "/sensor/occupancy/availability");
     MAKE_TOPIC(s_topic_lux, "/sensor/illuminance/state");
     MAKE_TOPIC(s_topic_lux_availability, "/sensor/illuminance/availability");
     MAKE_TOPIC(s_topic_availability, "/availability");
@@ -192,6 +199,10 @@ static esp_err_t build_topics(const panel_settings_t *settings)
 
     s_topic_ha_status = make_topic(discovery, "/status");
     if (!s_topic_ha_status) return ESP_ERR_NO_MEM;
+
+    s_discovery_presence_config =
+        make_discovery_topic(discovery, "binary_sensor", panel_id, "occupancy");
+    if (!s_discovery_presence_config) return ESP_ERR_NO_MEM;
 
     s_discovery_lux_config =
         make_discovery_topic(discovery, "sensor", panel_id, "illuminance");
@@ -442,6 +453,47 @@ static void publish_ambient_light_discovery(const panel_settings_t *cfg)
     publish_ambient_light();
 }
 
+static void publish_presence(void)
+{
+    const panel_settings_t *cfg = settings_get();
+    if (!s_connected || !cfg || !cfg->presence_enabled) return;
+    presence_reading_t reading = c4001_reading();
+    bool available = reading.available && esp_timer_get_time() - reading.sampled_us <= 3000000;
+    if (available) mqtt_publish_logged(s_topic_presence, reading.occupied ? "ON" : "OFF", 1, 0);
+    mqtt_publish_logged(s_topic_presence_availability, available ? "online" : "offline", 1, 1);
+}
+
+static void publish_presence_discovery(const panel_settings_t *cfg)
+{
+    if (!cfg->presence_enabled) {
+        mqtt_publish_logged(s_discovery_presence_config, "", 1, 1);
+        mqtt_publish_logged(s_topic_presence, "", 1, 1);
+        mqtt_publish_logged(s_topic_presence_availability, "offline", 1, 1);
+        return;
+    }
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return;
+    cJSON_AddStringToObject(root, "name", "Occupancy");
+    add_unique_id(root, cfg, "occupancy");
+    add_device_info(root, cfg);
+    cJSON_AddStringToObject(root, "state_topic", s_topic_presence);
+    cJSON_AddStringToObject(root, "device_class", "occupancy");
+    cJSON_AddStringToObject(root, "payload_on", "ON");
+    cJSON_AddStringToObject(root, "payload_off", "OFF");
+    cJSON_AddNumberToObject(root, "expire_after", 5);
+    cJSON_AddStringToObject(root, "availability_mode", "all");
+    cJSON *availability = cJSON_AddArrayToObject(root, "availability");
+    const char *topics[] = {s_topic_availability, s_topic_presence_availability};
+    for (int i = 0; i < 2; ++i) {
+        cJSON *item = cJSON_CreateObject();
+        cJSON_AddStringToObject(item, "topic", topics[i]);
+        cJSON_AddItemToArray(availability, item);
+    }
+    publish_discovery_json(s_discovery_presence_config, root);
+    cJSON_Delete(root);
+    publish_presence();
+}
+
 static void publish_home_assistant_discovery(void)
 {
     if (!s_connected) return;
@@ -456,6 +508,7 @@ static void publish_home_assistant_discovery(void)
              settings->mqtt_discovery_prefix, s_topic_root);
 
     publish_ambient_light_discovery(settings);
+    publish_presence_discovery(settings);
 
     cJSON *root = cJSON_CreateObject();
     if (root) {
@@ -821,6 +874,11 @@ void mqtt_bridge_poll(void)
 
     const int64_t now = esp_timer_get_time();
     const panel_settings_t *cfg = settings_get();
+    if (cfg && cfg->presence_enabled &&
+        (s_last_presence_publish_us == 0 || now - s_last_presence_publish_us >= 1000000)) {
+        publish_presence();
+        s_last_presence_publish_us = now;
+    }
     if (cfg && cfg->ambient_light_enabled &&
         (s_last_sensor_publish_us == 0 || now - s_last_sensor_publish_us >=
          (int64_t)cfg->sensor_interval_seconds * 1000000)) {

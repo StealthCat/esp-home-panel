@@ -83,6 +83,13 @@ static void load_defaults(panel_settings_t *cfg)
     memcpy(cfg->color_presets, colors, sizeof(colors));
 
     cfg->sensor_interval_seconds = 10;
+    cfg->presence_enabled = 0;
+    cfg->presence_address = 42;
+    cfg->presence_max_m = 6;
+    cfg->presence_trigger_sensitivity = 5;
+    cfg->presence_keep_sensitivity = 5;
+    cfg->presence_hold_seconds = 30;
+
     cfg->theme = default_theme();
     cfg->backlight_percent = CONFIG_PANEL_BACKLIGHT;
 }
@@ -149,6 +156,19 @@ esp_err_t settings_init(void)
     }
 
     uint8_t value = 0;
+    if (nvs_get_u8(nvs, "prs_enabled", &value) == ESP_OK && value <= 1)
+        s_settings->presence_enabled = value;
+    if (nvs_get_u8(nvs, "prs_address", &value) == ESP_OK && value >= 42 && value <= 43)
+        s_settings->presence_address = value;
+    if (nvs_get_u8(nvs, "prs_max_m", &value) == ESP_OK && value >= 3 && value <= 8)
+        s_settings->presence_max_m = value;
+    if (nvs_get_u8(nvs, "prs_trig_sens", &value) == ESP_OK && value <= 9)
+        s_settings->presence_trigger_sensitivity = value;
+    if (nvs_get_u8(nvs, "prs_keep_sens", &value) == ESP_OK && value <= 9)
+        s_settings->presence_keep_sensitivity = value;
+    if (nvs_get_u8(nvs, "prs_hold_s", &value) == ESP_OK && value >= 2 && value <= 120)
+        s_settings->presence_hold_seconds = value;
+
     if (nvs_get_u8(nvs, "als_enabled", &value) == ESP_OK && value <= 1)
         s_settings->ambient_light_enabled = value;
     if (nvs_get_u8(nvs, "sensor_interval", &value) == ESP_OK && value >= 1 && value <= 60)
@@ -213,6 +233,13 @@ esp_err_t settings_save(const panel_settings_t *settings)
     if (settings->ambient_light_enabled > 1 || settings->sensor_interval_seconds < 1 ||
         settings->sensor_interval_seconds > 60) return ESP_ERR_INVALID_ARG;
 
+    if (settings->presence_enabled > 1) return ESP_ERR_INVALID_ARG;
+    if (settings->presence_address < 42 || settings->presence_address > 43) return ESP_ERR_INVALID_ARG;
+    if (settings->presence_max_m < 3 || settings->presence_max_m > 8) return ESP_ERR_INVALID_ARG;
+    if (settings->presence_trigger_sensitivity > 9) return ESP_ERR_INVALID_ARG;
+    if (settings->presence_keep_sensitivity > 9) return ESP_ERR_INVALID_ARG;
+    if (settings->presence_hold_seconds < 2 || settings->presence_hold_seconds > 120) return ESP_ERR_INVALID_ARG;
+
     panel_settings_t clean = *settings;
     clean.wifi_ssid[PANEL_WIFI_SSID_MAX] = '\0';
     clean.admin_password[PANEL_ADMIN_PASSWORD_MAX] = '\0';
@@ -266,6 +293,19 @@ esp_err_t settings_save(const panel_settings_t *settings)
     SAVE_STR("timezone", timezone);
 
 #undef SAVE_STR
+
+    err = nvs_set_u8(nvs, "prs_enabled", clean.presence_enabled);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "prs_address", clean.presence_address);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "prs_max_m", clean.presence_max_m);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "prs_trig_sens", clean.presence_trigger_sensitivity);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "prs_keep_sens", clean.presence_keep_sensitivity);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "prs_hold_s", clean.presence_hold_seconds);
+    if (err != ESP_OK) goto out;
 
     err = nvs_set_u8(nvs, "als_enabled", clean.ambient_light_enabled);
     if (err != ESP_OK) goto out;

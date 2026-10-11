@@ -44,6 +44,7 @@ static int i2c_master_transmit_receive(void *d,const uint8_t *v,size_t n,uint8_t
 '''
 TEST = r'''
 #include "sensors.c"
+void c4001_poll(void) {}
 static panel_settings_t cfg = {.sensor_interval_seconds=1};
 const panel_settings_t *settings_get(void) {return &cfg;}
 i2c_master_bus_handle_t board_7c_i2c_bus(void) {return no_bus?NULL:(void*)1;}

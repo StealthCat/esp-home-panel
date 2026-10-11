@@ -264,3 +264,5 @@ MQTT credentials and never needs a Home Assistant long-lived access token.
 ## Panel ambient light sensor
 
 An optional VEML7700 connected to the panel publishes lux directly through MQTT discovery. Enable it under **Settings → Sensors**; no changes to the control bridge automation are needed. See [sensor wiring and setup](../docs/sensors.md).
+
+An optional **Gravity C4001 SEN0610** also adds an **Occupancy** binary sensor to the panel device. Enable it under **Settings → Presence sensor** and match its I2C address switch. It works alongside the VEML7700 without modifying the control bridge automation. [C4001 wiring and configuration](../docs/sensors.md#c4001-presence-sensor-gravity-sen0610).

@@ -54,6 +54,7 @@ idf_component_register(
         "ota_update.c"
         "mqtt_bridge.c"
         "sensors.c"
+        "c4001.c"
         "ui.c"
         "ui_theme.c"
         "font_outfit_semibold_48.c"

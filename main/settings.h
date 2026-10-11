@@ -62,6 +62,12 @@ typedef struct {
 
     uint8_t ambient_light_enabled;
     uint8_t sensor_interval_seconds; /* 1-60 seconds */
+    uint8_t presence_enabled;
+    uint8_t presence_address;
+    uint8_t presence_max_m;
+    uint8_t presence_trigger_sensitivity;
+    uint8_t presence_keep_sensitivity;
+    uint8_t presence_hold_seconds;
     uint8_t theme;
     uint8_t backlight_percent;
 } panel_settings_t;

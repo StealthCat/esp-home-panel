@@ -383,6 +383,23 @@ static esp_err_t root_handler(httpd_req_t *req)
              cfg->ambient_light_enabled ? " selected" : "", cfg->sensor_interval_seconds);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
+    snprintf(buf, sizeof(buf),
+             "<section class='card'><h2>Presence sensor</h2>"
+             "<label>Sensor</label><select name='presence_enabled'>"
+             "<option value='0'%s>Disabled</option><option value='1'%s>Gravity C4001 (SEN0610, I2C)</option></select>"
+             "<label>I2C address (match hardware switch)</label><select name='presence_address'>"
+             "<option value='42'%s>0x2A</option><option value='43'%s>0x2B</option></select>"
+             "<label>Maximum detection range (meters)</label><input type='number' name='presence_max_m' min='3' max='8' required value='%u'>"
+             "<label>Trigger sensitivity (0-9)</label><input type='number' name='presence_trigger_sensitivity' min='0' max='9' required value='%u'>"
+             "<label>Hold sensitivity (0-9)</label><input type='number' name='presence_keep_sensitivity' min='0' max='9' required value='%u'>"
+             "<label>Vacancy delay (seconds)</label><input type='number' name='presence_hold_seconds' min='2' max='120' required value='%u'>"
+             "<div class='hint'>Set the sensor hardware to I2C. Reports Occupancy through Home Assistant MQTT discovery, independently of lux reporting. Range starts at 0.3 m; practical coverage depends on mounting. Save and reboot to apply.</div></section>",
+             cfg->presence_enabled ? "" : " selected", cfg->presence_enabled ? " selected" : "",
+             cfg->presence_address == 42 ? " selected" : "", cfg->presence_address == 43 ? " selected" : "",
+             cfg->presence_max_m, cfg->presence_trigger_sensitivity, cfg->presence_keep_sensitivity,
+             cfg->presence_hold_seconds);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
         "<section class='card full'><h2>Tapo color circles</h2>"
         "<div class='hint'>Choose the six preset colors, ordered left to right on the display. "
@@ -580,18 +597,27 @@ static esp_err_t save_handler(httpd_req_t *req)
         strlcpy(updated.mqtt_password, tmp, sizeof(updated.mqtt_password));
     }
 
-    const char *sensor_fields[] = {"ambient_light_enabled", "sensor_interval_seconds"};
-    for (int i = 0; i < 2; ++i) {
-        if (form_get(body, sensor_fields[i], tmp, sizeof(tmp))) {
+    struct sensor_field { const char *name; uint8_t *value; long min; long max; };
+    struct sensor_field sensor_fields[] = {
+        {"ambient_light_enabled", &updated.ambient_light_enabled, 0, 1},
+        {"sensor_interval_seconds", &updated.sensor_interval_seconds, 1, 60},
+        {"presence_enabled", &updated.presence_enabled, 0, 1},
+        {"presence_address", &updated.presence_address, 42, 43},
+        {"presence_max_m", &updated.presence_max_m, 3, 8},
+        {"presence_trigger_sensitivity", &updated.presence_trigger_sensitivity, 0, 9},
+        {"presence_keep_sensitivity", &updated.presence_keep_sensitivity, 0, 9},
+        {"presence_hold_seconds", &updated.presence_hold_seconds, 2, 120},
+    };
+    for (size_t i = 0; i < sizeof(sensor_fields) / sizeof(sensor_fields[0]); ++i) {
+        if (form_get(body, sensor_fields[i].name, tmp, sizeof(tmp))) {
             char *end = NULL;
             long value = strtol(tmp, &end, 10);
-            if (!tmp[0] || *end || value < (i ? 1 : 0) || value > (i ? 60 : 1)) {
+            if (!tmp[0] || *end || value < sensor_fields[i].min || value > sensor_fields[i].max) {
                 free(body);
                 httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid sensor setting.");
                 return ESP_OK;
             }
-            if (i) updated.sensor_interval_seconds = (uint8_t)value;
-            else updated.ambient_light_enabled = (uint8_t)value;
+            *sensor_fields[i].value = (uint8_t)value;
         }
     }
 
