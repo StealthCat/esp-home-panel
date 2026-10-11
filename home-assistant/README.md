@@ -113,8 +113,11 @@ they use the same firmware image.
 
 ## 2. Install the bridge
 
-The file `esp-home-panel-mqtt-bridge.yaml` is written as a Home Assistant
-package.
+The file [`esp_home_panel.yaml`](esp_home_panel.yaml) is a Home Assistant
+package. Keep this underscore-only filename when copying it into your packages
+directory: `!include_dir_named` uses the filename as the package name. If an older
+copy is named `esp-home-panel-mqtt-bridge.yaml`, rename or replace it; do not keep
+both copies.
 
 Only **one copy** of the package is needed for all panels sharing a base topic.
 
