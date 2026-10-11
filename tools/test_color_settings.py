@@ -51,17 +51,18 @@ typedef int nvs_handle_t;
 static uint32_t stored[6];
 static bool present[6];
 static int commits;
+static char saved_hostname[33];
 static int nvs_open(const char *s,int m,nvs_handle_t *h) {(void)s;(void)m;*h=1;return 0;}
 static void nvs_close(nvs_handle_t h) {(void)h;}
-static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;(void)k;(void)v;(void)s;return ESP_ERR_NVS_NOT_FOUND;}
-static int nvs_set_str(int h,const char *k,const char *v) {(void)h;(void)k;(void)v;return 0;}
+static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;if(!strcmp(k,"hostname") && saved_hostname[0]) {strlcpy(v,saved_hostname,*s);return 0;}return ESP_ERR_NVS_NOT_FOUND;}
+static int nvs_set_str(int h,const char *k,const char *v) {(void)h;if(!strcmp(k,"hostname"))strlcpy(saved_hostname,v,sizeof(saved_hostname));return 0;}
 static int nvs_get_u8(int h,const char *k,uint8_t *v) {(void)h;(void)k;(void)v;return ESP_ERR_NVS_NOT_FOUND;}
 static int nvs_set_u8(int h,const char *k,uint8_t v) {(void)h;(void)k;(void)v;return 0;}
 static int color_index(const char *k) {assert(strlen(k)==7 && !strncmp(k,"color_",6));int i=k[6]-'0';assert(i>=0&&i<6);return i;}
 static int nvs_get_u32(int h,const char *k,uint32_t *v) {(void)h;int i=color_index(k);if(!present[i])return ESP_ERR_NVS_NOT_FOUND;*v=stored[i];return 0;}
 static int nvs_set_u32(int h,const char *k,uint32_t v) {(void)h;int i=color_index(k);stored[i]=v;present[i]=true;return 0;}
 static int nvs_commit(int h) {(void)h;commits++;return 0;}
-static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));return 0;}
+static int nvs_erase_all(int h) {(void)h;memset(present,0,sizeof(present));saved_hostname[0]=0;return 0;}
 typedef void *httpd_handle_t;
 typedef struct {size_t content_len;const char *body;} httpd_req_t;
 typedef struct {int max_uri_handlers,stack_size;bool lru_purge_enable;} httpd_config_t;
@@ -95,6 +96,7 @@ HARNESS = r'''
 #include "web_config.c"
 bool network_is_connected(void) {return true;}
 bool network_config_ap_active(void) {return false;}
+void network_identity_get_domain(char *dst, size_t size) {strlcpy(dst,"snoognet.core",size);}
 const char *network_get_sta_ip(void) {return "192.0.2.1";}
 const char *network_get_config_ap_ssid(void) {return "test";}
 const char *network_get_config_ap_password(void) {return "test";}
@@ -133,6 +135,27 @@ int main(void) {
     assert(settings_get()->color_presets[0]==defaults[0]);
     assert(settings_reset()==ESP_OK);assert(settings_init()==ESP_OK);
     assert(!memcmp(settings_get()->color_presets,defaults,sizeof(defaults)));
+    assert(!strcmp(settings_get()->hostname,"panel-010101"));
+    post("hostname=bedroom-panel");
+    assert(status==200 && !strcmp(settings_get()->hostname,"bedroom-panel"));
+    assert(settings_init()==ESP_OK && !strcmp(settings_get()->hostname,"bedroom-panel"));
+    int saved_commits=commits, saved_reboots=reboots;
+    const char *bad_hosts[]={"", "-panel", "panel-", "panel.local", "panel_name", "Panel", "a%20b", "a%00b",
+        "abcdefghijklmnopqrstuvwxyz1234567", "%3Cscript%3E"};
+    for(size_t i=0;i<sizeof(bad_hosts)/sizeof(bad_hosts[0]);i++) {
+        char body[200];snprintf(body,sizeof(body),"hostname=%s",bad_hosts[i]);
+        post(body);assert(status==400 && commits==saved_commits && reboots==saved_reboots);
+    }
+    post("theme=1");assert(status==200 && !strcmp(settings_get()->hostname,"bedroom-panel"));
+    post("hostname=abcdefghijklmnopqrstuvwxyz123456");assert(status==200);
+    response[0]=0;assert(root_handler(&req)==ESP_OK);
+    assert(strstr(response,"abcdefghijklmnopqrstuvwxyz123456.snoognet.core"));
+    assert(strstr(response,"abcdefghijklmnopqrstuvwxyz123456.local"));
+    invalid=*settings_get();memset(invalid.hostname,'x',sizeof(invalid.hostname));
+    assert(settings_save(&invalid)==ESP_ERR_INVALID_ARG);
+    assert(settings_reset()==ESP_OK);assert(settings_init()==ESP_OK);
+    assert(!strcmp(settings_get()->hostname,"panel-010101"));
+    puts("Hostname save, reload, migration, validation, display and reset checks passed");
     puts("Color form, validation, NVS reload, migration and reset checks passed");
 }
 '''

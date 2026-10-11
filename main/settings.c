@@ -61,6 +61,7 @@ static void default_panel_id(char *dst, size_t dst_size)
 static void load_defaults(panel_settings_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
+    default_panel_id(cfg->hostname, sizeof(cfg->hostname));
 
     strlcpy(cfg->wifi_ssid, CONFIG_PANEL_WIFI_SSID, sizeof(cfg->wifi_ssid));
     strlcpy(cfg->wifi_password, CONFIG_PANEL_WIFI_PASSWORD, sizeof(cfg->wifi_password));
@@ -118,6 +119,10 @@ esp_err_t settings_init(void)
     }
 
     load_string(nvs, "wifi_ssid", s_settings->wifi_ssid, sizeof(s_settings->wifi_ssid));
+    load_string(nvs, "hostname", s_settings->hostname, sizeof(s_settings->hostname));
+    if (!settings_valid_hostname(s_settings->hostname)) {
+        default_panel_id(s_settings->hostname, sizeof(s_settings->hostname));
+    }
     load_string(nvs, "wifi_pass", s_settings->wifi_password, sizeof(s_settings->wifi_password));
     load_string(nvs, "mqtt_uri", s_settings->mqtt_uri, sizeof(s_settings->mqtt_uri));
     load_string(nvs, "mqtt_user", s_settings->mqtt_username, sizeof(s_settings->mqtt_username));
@@ -169,9 +174,24 @@ const panel_settings_t *settings_get(void)
     return s_settings;
 }
 
+bool settings_valid_hostname(const char *hostname)
+{
+    if (!hostname) return false;
+    size_t len = 0;
+    while (len <= PANEL_HOSTNAME_MAX && hostname[len]) ++len;
+    if (!len || len > PANEL_HOSTNAME_MAX || hostname[0] == '-' || hostname[len - 1] == '-') {
+        return false;
+    }
+    for (size_t i = 0; i < len; ++i) {
+        char c = hostname[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '-')) return false;
+    }
+    return true;
+}
+
 esp_err_t settings_save(const panel_settings_t *settings)
 {
-    if (!settings) {
+    if (!settings || !settings_valid_hostname(settings->hostname)) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -219,6 +239,7 @@ esp_err_t settings_save(const panel_settings_t *settings)
     } while (0)
 
     SAVE_STR("wifi_ssid", wifi_ssid);
+    SAVE_STR("hostname", hostname);
     SAVE_STR("wifi_pass", wifi_password);
     SAVE_STR("mqtt_uri", mqtt_uri);
     SAVE_STR("mqtt_user", mqtt_username);
@@ -285,4 +306,3 @@ esp_err_t settings_reset(void)
 
     return err;
 }
-

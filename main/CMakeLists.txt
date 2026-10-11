@@ -47,6 +47,7 @@ idf_component_register(
         "app_main.c"
         "board_7c.c"
         "network.c"
+        "network_identity.c"
         "settings.c"
         "web_config.c"
         "mqtt_bridge.c"
@@ -73,3 +74,9 @@ idf_component_register(
         esp_driver_spi
 )
 
+# Extend the IDF DHCP hooks without replacing its DNS/NTP/vendor handling.
+if(NOT CMAKE_BUILD_EARLY_EXPANSION AND NOT CMAKE_SCRIPT_MODE_FILE)
+    idf_component_get_property(lwip_lib lwip COMPONENT_LIB)
+    target_compile_definitions(${lwip_lib} PRIVATE
+        ESP_IDF_LWIP_HOOK_FILENAME="${CMAKE_CURRENT_LIST_DIR}/panel_lwip_hooks.h")
+endif()

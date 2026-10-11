@@ -46,6 +46,12 @@ endmacro()
             assert not (root/'generated-marker').exists(), 'Generation ran in script mode'
         (root/'CMakeLists.txt').write_text('cmake_minimum_required(VERSION 3.18)\n'
             'project(component_test NONE)\n'+register+
+            'add_library(fake_lwip INTERFACE)\n'
+            'function(idf_component_get_property out component property)\n'
+            ' set(${out} fake_lwip PARENT_SCOPE)\nendfunction()\n'
+            'function(target_compile_definitions target visibility)\n'
+            ' if(NOT ARGN MATCHES "ESP_IDF_LWIP_HOOK_FILENAME")\n'
+            ' message(FATAL_ERROR "Missing DHCP hook definition")\n endif()\nendfunction()\n'+
             'add_subdirectory(main)\n'
             'get_property(WATCH DIRECTORY main PROPERTY CMAKE_CONFIGURE_DEPENDS)\n'
             'if(NOT WATCH MATCHES "manifest.json")\n'

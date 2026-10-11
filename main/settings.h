@@ -9,6 +9,7 @@ extern "C" {
 #endif
 
 #define PANEL_WIFI_SSID_MAX       32
+#define PANEL_HOSTNAME_MAX        32
 #define PANEL_WIFI_PASSWORD_MAX   64
 #define PANEL_MQTT_URI_MAX        191
 #define PANEL_MQTT_USERNAME_MAX   63
@@ -22,6 +23,7 @@ extern "C" {
 #define PANEL_COLOR_PRESET_COUNT   6
 
 typedef struct {
+    char hostname[PANEL_HOSTNAME_MAX + 1];
     char wifi_ssid[PANEL_WIFI_SSID_MAX + 1];
     char wifi_password[PANEL_WIFI_PASSWORD_MAX + 1];
 
@@ -60,6 +62,7 @@ typedef struct {
 } panel_settings_t;
 
 esp_err_t settings_init(void);
+bool settings_valid_hostname(const char *hostname);
 const panel_settings_t *settings_get(void);
 esp_err_t settings_save(const panel_settings_t *settings);
 esp_err_t settings_reset(void);
@@ -67,4 +70,3 @@ esp_err_t settings_reset(void);
 #ifdef __cplusplus
 }
 #endif
-

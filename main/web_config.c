@@ -11,6 +11,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "network.h"
+#include "network_identity.h"
 #include "settings.h"
 
 static const char *TAG = "web_config";
@@ -103,7 +104,7 @@ static void url_decode(char *dst, size_t dst_size, const char *src, size_t src_l
         } else if (src[i] == '%' && i + 2 < src_len) {
             int hi = hex_value(src[i + 1]);
             int lo = hex_value(src[i + 2]);
-            if (hi >= 0 && lo >= 0) {
+            if (hi >= 0 && lo >= 0 && (hi != 0 || lo != 0)) {
                 dst[out++] = (char)((hi << 4) | lo);
                 i += 2;
             } else {
@@ -317,12 +318,26 @@ static esp_err_t root_handler(httpd_req_t *req)
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<form method='post' action='/save'><div class='grid'>"));
 
     snprintf(buf, sizeof(buf),
-             "<section class='card'><h2>Wi-Fi</h2>"
+             "<section class='card'><h2>Wi-Fi &amp; Network</h2>"
+             "<label>Hostname</label><input name='hostname' maxlength='32' required pattern='[a-z0-9](([a-z0-9]|-){0,30}[a-z0-9])?' value=\"%s\" autocapitalize='none' spellcheck='false'>"
+             "<div class='hint'>Use a unique name without a domain, such as bedroom-panel. Advertised through DHCP and mDNS; independent of the MQTT panel ID.</div>"
              "<label>SSID</label><input name='wifi_ssid' maxlength='32' value=\"%s\" autocomplete='off'>"
              "<label>Password</label><input name='wifi_password' type='password' maxlength='64' placeholder='Leave blank to keep current password' autocomplete='new-password'>"
              "<label class='check'><input type='checkbox' name='clear_wifi_password' value='1'>Clear saved Wi-Fi password</label>"
              "<div class='hint'>If the panel cannot join this network after reboot, it starts a setup access point automatically.</div>"
-             "</section>", ssid);
+             "</section>", cfg->hostname, ssid);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    char domain[PANEL_DOMAIN_MAX + 1];
+    network_identity_get_domain(domain, sizeof(domain));
+    snprintf(buf, sizeof(buf),
+             "<section class='card'><h2>Network names</h2>"
+             "<p>mDNS: <b>%s.local</b></p>"
+             "<p>DHCP domain: <b>%s</b></p>"
+             "<p>LAN name: <b>%s%s%s</b></p>"
+             "<div class='hint'>LAN DNS records are managed by your router/DNS server. UniFi may need a lease refresh to show a changed hostname. The DHCP domain does not replace the .local mDNS domain.</div></section>",
+             cfg->hostname, domain[0] ? domain : "Not supplied",
+             cfg->hostname, domain[0] ? "." : "", domain);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
     snprintf(buf, sizeof(buf),
@@ -478,6 +493,19 @@ static esp_err_t save_handler(httpd_req_t *req)
 
     panel_settings_t updated = *settings_get();
     char tmp[256];
+
+    /* One extra byte detects overlong input instead of silently truncating it.
+     * Missing fields preserve the hostname for older clients. */
+    char hostname[PANEL_HOSTNAME_MAX + 2];
+    if (form_get(body, "hostname", hostname, sizeof(hostname))) {
+        if (!settings_valid_hostname(hostname)) {
+            free(body);
+            httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST,
+                "Invalid hostname. Use 1-32 lowercase letters, digits or hyphens; no leading/trailing hyphen or domain suffix.");
+            return ESP_OK;
+        }
+        strlcpy(updated.hostname, hostname, sizeof(updated.hostname));
+    }
 
     if (form_get(body, "wifi_ssid", updated.wifi_ssid, sizeof(updated.wifi_ssid))) {
         /* copied */
@@ -674,4 +702,3 @@ esp_err_t web_config_start(void)
 
     return ESP_OK;
 }
-

@@ -14,6 +14,8 @@
 #include "esp_wifi.h"
 #include "freertos/event_groups.h"
 #include "settings.h"
+#include "network_identity.h"
+#include "mdns.h"
 
 static const char *TAG = "network";
 
@@ -27,6 +29,17 @@ static esp_netif_t *s_sta_netif;
 static esp_netif_t *s_ap_netif;
 static char s_sta_ip[16];
 static char s_config_ap_ssid[33];
+
+static void start_discovery(void)
+{
+    esp_err_t err = mdns_init();
+    if (err == ESP_OK) err = mdns_hostname_set(settings_get()->hostname);
+    if (err == ESP_OK) err = mdns_service_add("ESP Home Panel", "_http", "_tcp", 80, NULL, 0);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "mDNS discovery unavailable: %s", esp_err_to_name(err));
+        mdns_free();
+    }
+}
 
 static void start_sntp(void)
 {
@@ -59,6 +72,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t base, int32_t id, voi
     if (base == WIFI_EVENT && id == WIFI_EVENT_STA_DISCONNECTED) {
         s_connected = false;
         s_sta_ip[0] = '\0';
+        network_identity_clear_domain();
         if (s_wifi_events) {
             xEventGroupClearBits(s_wifi_events, WIFI_CONNECTED_BIT);
         }
@@ -145,6 +159,13 @@ esp_err_t network_start(void)
     if (!s_sta_netif || !s_ap_netif) {
         return ESP_ERR_NO_MEM;
     }
+
+    /* Set option 12 before Wi-Fi starts, including the first DHCP DISCOVER. */
+    ESP_RETURN_ON_ERROR(esp_netif_set_hostname(s_sta_netif, settings->hostname),
+                        TAG, "Unable to set station hostname");
+    ESP_RETURN_ON_ERROR(esp_netif_set_hostname(s_ap_netif, settings->hostname),
+                        TAG, "Unable to set setup hostname");
+    start_discovery();
 
     wifi_init_config_t wifi_cfg = WIFI_INIT_CONFIG_DEFAULT();
     ESP_ERROR_CHECK(esp_wifi_init(&wifi_cfg));
