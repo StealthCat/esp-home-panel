@@ -1,5 +1,5 @@
 #include "sensors.h"
-#include "board_7c.h"
+#include "board_i2c.h"
 #include "settings.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
