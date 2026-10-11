@@ -15,8 +15,8 @@ jobs:
   render-themes:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
         with:
           python-version: '3.12'
       - name: Check ESP-IDF component discovery and asset regeneration
@@ -40,7 +40,7 @@ jobs:
               build/host/panel_render "$theme" "build/previews/$view-$theme.ppm" "$view"
             done
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         with:
           name: lvgl-theme-previews
           path: build/previews/*.ppm
