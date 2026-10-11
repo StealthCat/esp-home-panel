@@ -2,10 +2,10 @@ name: Build panel firmware and test OTA
 
 on:
   push:
-    branches: [main]
-    paths: ['main/**', 'tools/**', 'assets/**', 'boards/**', 'CMakeLists.txt', 'platformio.ini', 'partitions.csv', 'sdkconfig.defaults', '.github/workflows/build-firmware.yml']
+    branches: [main, weather]
+    paths: ['main/**', 'home-assistant/**', 'tools/**', 'assets/**', 'boards/**', 'CMakeLists.txt', 'platformio.ini', 'partitions.csv', 'sdkconfig.defaults', '.github/workflows/build-firmware.yml']
   pull_request:
-    paths: ['main/**', 'tools/**', 'assets/**', 'boards/**', 'CMakeLists.txt', 'platformio.ini', 'partitions.csv', 'sdkconfig.defaults', '.github/workflows/build-firmware.yml']
+    paths: ['main/**', 'home-assistant/**', 'tools/**', 'assets/**', 'boards/**', 'CMakeLists.txt', 'platformio.ini', 'partitions.csv', 'sdkconfig.defaults', '.github/workflows/build-firmware.yml']
   workflow_dispatch:
 
 permissions:
@@ -26,9 +26,11 @@ jobs:
           path: ~/.platformio
           key: esp32s3-pio-${{ runner.os }}-${{ hashFiles('platformio.ini', 'main/idf_component.yml') }}
       - name: Install build tools
-        run: pip install platformio==6.1.18 pillow
+        run: pip install platformio==6.1.18 pillow pyyaml jinja2
       - name: Test settings, network identity and OTA failure handling
         run: |
+          python tools/test_display_policy.py
+          python tools/test_weather.py
           python tools/test_c4001.py
           python tools/test_presence_mqtt.py
           python tools/test_sensors.py

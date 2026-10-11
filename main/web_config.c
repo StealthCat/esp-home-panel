@@ -223,13 +223,17 @@ static bool valid_home_assistant_targets(const panel_settings_t *cfg)
     if (!valid_entity_syntax(cfg->ha_tapo_entity) ||
         !valid_entity_syntax(cfg->ha_overhead_entity) ||
         !valid_entity_syntax(cfg->ha_fan_entity) ||
-        !valid_entity_syntax(cfg->ha_echo_entity)) {
+        !valid_entity_syntax(cfg->ha_echo_entity) ||
+        !valid_entity_syntax(cfg->ha_station_entity) ||
+        !valid_entity_syntax(cfg->ha_weather_entity)) {
         return false;
     }
 
     if (!entity_domain_is(cfg->ha_tapo_entity, "light") ||
         !entity_domain_is(cfg->ha_overhead_entity, "light") ||
-        !entity_domain_is(cfg->ha_echo_entity, "media_player")) {
+        !entity_domain_is(cfg->ha_echo_entity, "media_player") ||
+        !entity_domain_is(cfg->ha_station_entity, "sensor") ||
+        !entity_domain_is(cfg->ha_weather_entity, "weather")) {
         return false;
     }
 
@@ -348,6 +352,35 @@ static esp_err_t root_handler(httpd_req_t *req)
              cfg->backlight_percent,
              timezone);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<section class='card' data-tab='display'><h2>Wake &amp; brightness</h2>"
+        "<p class='hint'>Sleep requires the C4001 sensor enabled under Sensors. The first tap only wakes the screen. Missing presence data keeps it awake.</p>"));
+    snprintf(buf, sizeof(buf), "<label>Turn off when unoccupied</label><select name='sleep_enabled'><option value='0'%s>Off</option><option value='1'%s>On</option></select>", cfg->sleep_enabled ? "" : " selected", cfg->sleep_enabled ? " selected" : "");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<label>Absence delay (seconds)</label><input name='sleep_delay_seconds' type='number' required min='5' max='240' value='%u'>", cfg->sleep_delay_seconds);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<label>Stay awake after touch (minutes)</label><input name='touch_wake_minutes' type='number' required min='1' max='30' value='%u'>", cfg->touch_wake_minutes);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<label>Automatic brightness</label><select name='auto_brightness'><option value='0'%s>Off</option><option value='1'%s>On</option></select>", cfg->auto_brightness ? "" : " selected", cfg->auto_brightness ? " selected" : "");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<label>Minimum brightness (%%)</label><input name='brightness_min' type='number' required min='5' max='100' value='%u'>", cfg->brightness_min);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<label>Maximum brightness (%%)</label><input name='brightness_max' type='number' required min='5' max='100' value='%u'>", cfg->brightness_max);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint'>Auto brightness requires the VEML7700 and PWM-capable 7C-BOX. LCD-7 supports on/off only. Manual brightness is the fallback. Absence delay is additional to the radar vacancy delay.</p>"));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</section><section class='card' data-tab='home-assistant'><h2>Weather</h2>"));
+    snprintf(buf, sizeof(buf), "<label>Weather page</label><select name='weather_enabled'><option value='0'%s>Off</option><option value='1'%s>On</option></select>", cfg->weather_enabled ? "" : " selected", cfg->weather_enabled ? " selected" : "");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    char escaped_ha_station_entity[PANEL_HA_ENTITY_ID_MAX * 6 + 1];
+    html_escape(cfg->ha_station_entity, escaped_ha_station_entity, sizeof(escaped_ha_station_entity));
+    snprintf(buf, sizeof(buf), "<label>Station outdoor temperature entity</label><input name='ha_station_entity' maxlength='127' pattern='sensor[.][a-z0-9_]+' autocapitalize='none' spellcheck='false' value=\"%s\" placeholder='sensor.station_outdoor_temperature'>", escaped_ha_station_entity);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    char escaped_ha_weather_entity[PANEL_HA_ENTITY_ID_MAX * 6 + 1];
+    html_escape(cfg->ha_weather_entity, escaped_ha_weather_entity, sizeof(escaped_ha_weather_entity));
+    snprintf(buf, sizeof(buf), "<label>Daily forecast entity</label><input name='ha_weather_entity' maxlength='127' pattern='weather[.][a-z0-9_]+' autocapitalize='none' spellcheck='false' value=\"%s\" placeholder='weather.home'>", escaped_ha_weather_entity);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint'>The outdoor temperature entity selects the station device; all its sensor entities are included (up to 48). Forecasts use a separate daily-capable weather entity. Install the weather MQTT package from the repository. Swipe the panel header to change pages.</p></section>"));
 
     snprintf(buf, sizeof(buf),
              "<section class='card' data-tab='sensors'><h2>Ambient light</h2>"
@@ -476,7 +509,7 @@ static esp_err_t root_handler(httpd_req_t *req)
 
 static esp_err_t read_request_body(httpd_req_t *req, char **out_body)
 {
-    if (req->content_len <= 0 || req->content_len > 4096) {
+    if (req->content_len <= 0 || req->content_len > 8192) {
         return ESP_ERR_INVALID_SIZE;
     }
 
@@ -580,8 +613,30 @@ static esp_err_t save_handler(httpd_req_t *req)
         strlcpy(updated.mqtt_password, tmp, sizeof(updated.mqtt_password));
     }
 
+    const char *weather_keys[] = {"ha_station_entity", "ha_weather_entity"};
+    char *weather_targets[] = {updated.ha_station_entity, updated.ha_weather_entity};
+    for (unsigned i = 0; i < 2; ++i) {
+        char entity[PANEL_HA_ENTITY_ID_MAX + 2];
+        if (form_get(body, weather_keys[i], entity, sizeof(entity))) {
+            if (strlen(entity) > PANEL_HA_ENTITY_ID_MAX) {
+                free(body);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Weather entity ID is too long.");
+                return ESP_OK;
+            }
+            strlcpy(weather_targets[i], entity, PANEL_HA_ENTITY_ID_MAX + 1);
+        }
+    }
+
     struct sensor_field { const char *name; uint8_t *value; long min; long max; };
     struct sensor_field sensor_fields[] = {
+        {"sleep_enabled", &updated.sleep_enabled, 0, 1},
+        {"sleep_delay_seconds", &updated.sleep_delay_seconds, 5, 240},
+        {"touch_wake_minutes", &updated.touch_wake_minutes, 1, 30},
+        {"auto_brightness", &updated.auto_brightness, 0, 1},
+        {"brightness_min", &updated.brightness_min, 5, 100},
+        {"brightness_max", &updated.brightness_max, 5, 100},
+        {"weather_enabled", &updated.weather_enabled, 0, 1},
+
         {"ambient_light_enabled", &updated.ambient_light_enabled, 0, 1},
         {"sensor_interval_seconds", &updated.sensor_interval_seconds, 1, 60},
         {"presence_enabled", &updated.presence_enabled, 0, 1},
@@ -658,6 +713,11 @@ static esp_err_t save_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    if (updated.brightness_min > updated.brightness_max) {
+        free(body);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Minimum brightness must not exceed maximum brightness.");
+        return ESP_OK;
+    }
     if (!valid_home_assistant_targets(&updated)) {
         free(body);
         httpd_resp_send_err(
@@ -744,7 +804,7 @@ esp_err_t web_config_start(void)
     web_security_init();
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
     config.max_uri_handlers = 8;
-    config.stack_size = 8192;
+    config.stack_size = 12288;
     config.lru_purge_enable = true;
 
     esp_err_t err = httpd_start(&s_server, &config);

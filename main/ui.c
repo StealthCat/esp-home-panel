@@ -18,6 +18,11 @@
 #include "settings.h"
 #include "ui_theme.h"
 #include "theme_art.h"
+#include "weather.h"
+#include "display_policy.h"
+#include "sensors.h"
+#include "c4001.h"
+#include "esp_timer.h"
 #ifdef WOKWI_EMULATOR
 #include "wokwi_panel.h"
 #endif
@@ -1124,8 +1129,15 @@ static void clock_timer_cb(lv_timer_t *timer)
     align_clock_labels();
 }
 
+#include "ui_weather.inc"
+
 esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
 {
+    if (settings_get()->weather_enabled) {
+        if (!weather_init()) return ESP_ERR_NO_MEM;
+        s_weather_view = heap_caps_calloc(1, sizeof(*s_weather_view), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_weather_view) return ESP_ERR_NO_MEM;
+    }
     T = panel_theme_get();
     ESP_LOGI(TAG, "Starting LVGL theme id=%d title=\"%s\"",
              (int)T->id,
@@ -1204,11 +1216,18 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
     init_styles();
     add_theme_decor(root);
     create_header(root);
-    create_tapo_card(root);
-    create_overhead_card(root);
-    create_fan_card(root);
-    create_echo_card(root);
+    s_controls_page = lv_obj_create(root);
+    lv_obj_remove_style_all(s_controls_page);
+    lv_obj_set_size(s_controls_page, 800, 480);
+    lv_obj_remove_flag(s_controls_page, LV_OBJ_FLAG_SCROLLABLE);
+    create_tapo_card(s_controls_page);
+    create_overhead_card(s_controls_page);
+    create_fan_card(s_controls_page);
+    create_echo_card(s_controls_page);
     if (T->kittens) add_theme_sprite(root, THEME_ART_KITTEN_PEEK, 18, 54, false);
+
+    create_weather_page(root);
+    create_display_behavior();
 
     lv_timer_create(pending_state_timer_cb, 20, NULL);
     lv_timer_create(clock_timer_cb, 1000, NULL);

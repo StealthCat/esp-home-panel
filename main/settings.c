@@ -90,6 +90,13 @@ static void load_defaults(panel_settings_t *cfg)
     cfg->presence_keep_sensitivity = 5;
     cfg->presence_hold_seconds = 30;
 
+    cfg->sleep_enabled = 0;
+    cfg->sleep_delay_seconds = 60;
+    cfg->touch_wake_minutes = 2;
+    cfg->auto_brightness = 0;
+    cfg->brightness_min = 10;
+    cfg->brightness_max = 100;
+    cfg->weather_enabled = 0;
     cfg->theme = default_theme();
     cfg->backlight_percent = CONFIG_PANEL_BACKLIGHT;
 }
@@ -155,7 +162,18 @@ esp_err_t settings_init(void)
         }
     }
 
+    load_string(nvs, "ha_station", s_settings->ha_station_entity, sizeof(s_settings->ha_station_entity));
+    load_string(nvs, "ha_weather", s_settings->ha_weather_entity, sizeof(s_settings->ha_weather_entity));
     uint8_t value = 0;
+    if (nvs_get_u8(nvs, "sleep_on", &value) == ESP_OK && value <= 1) s_settings->sleep_enabled = value;
+    if (nvs_get_u8(nvs, "sleep_delay", &value) == ESP_OK && value >= 5 && value <= 240) s_settings->sleep_delay_seconds = value;
+    if (nvs_get_u8(nvs, "wake_minutes", &value) == ESP_OK && value >= 1 && value <= 30) s_settings->touch_wake_minutes = value;
+    if (nvs_get_u8(nvs, "auto_bright", &value) == ESP_OK && value <= 1) s_settings->auto_brightness = value;
+    if (nvs_get_u8(nvs, "bright_min", &value) == ESP_OK && value >= 5 && value <= 100) s_settings->brightness_min = value;
+    if (nvs_get_u8(nvs, "bright_max", &value) == ESP_OK && value >= 5 && value <= 100) s_settings->brightness_max = value;
+    if (nvs_get_u8(nvs, "weather_on", &value) == ESP_OK && value <= 1) s_settings->weather_enabled = value;
+    if (s_settings->brightness_min > s_settings->brightness_max) s_settings->brightness_min = s_settings->brightness_max;
+
     if (nvs_get_u8(nvs, "prs_enabled", &value) == ESP_OK && value <= 1)
         s_settings->presence_enabled = value;
     if (nvs_get_u8(nvs, "prs_address", &value) == ESP_OK && value >= 42 && value <= 43)
@@ -240,7 +258,17 @@ esp_err_t settings_save(const panel_settings_t *settings)
     if (settings->presence_keep_sensitivity > 9) return ESP_ERR_INVALID_ARG;
     if (settings->presence_hold_seconds < 2 || settings->presence_hold_seconds > 120) return ESP_ERR_INVALID_ARG;
 
+    if (settings->sleep_enabled > 1) return ESP_ERR_INVALID_ARG;
+    if (settings->sleep_delay_seconds < 5 || settings->sleep_delay_seconds > 240) return ESP_ERR_INVALID_ARG;
+    if (settings->touch_wake_minutes < 1 || settings->touch_wake_minutes > 30) return ESP_ERR_INVALID_ARG;
+    if (settings->auto_brightness > 1) return ESP_ERR_INVALID_ARG;
+    if (settings->brightness_min < 5 || settings->brightness_min > 100) return ESP_ERR_INVALID_ARG;
+    if (settings->brightness_max < 5 || settings->brightness_max > 100) return ESP_ERR_INVALID_ARG;
+    if (settings->weather_enabled > 1) return ESP_ERR_INVALID_ARG;
+    if (settings->brightness_min > settings->brightness_max) return ESP_ERR_INVALID_ARG;
     panel_settings_t clean = *settings;
+    clean.ha_station_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
+    clean.ha_weather_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
     clean.wifi_ssid[PANEL_WIFI_SSID_MAX] = '\0';
     clean.admin_password[PANEL_ADMIN_PASSWORD_MAX] = '\0';
     clean.wifi_password[PANEL_WIFI_PASSWORD_MAX] = '\0';
@@ -291,6 +319,8 @@ esp_err_t settings_save(const panel_settings_t *settings)
     SAVE_STR("ha_fan", ha_fan_entity);
     SAVE_STR("ha_echo", ha_echo_entity);
     SAVE_STR("timezone", timezone);
+    SAVE_STR("ha_station", ha_station_entity);
+    SAVE_STR("ha_weather", ha_weather_entity);
 
 #undef SAVE_STR
 
@@ -312,6 +342,20 @@ esp_err_t settings_save(const panel_settings_t *settings)
     err = nvs_set_u8(nvs, "sensor_interval", clean.sensor_interval_seconds);
     if (err != ESP_OK) goto out;
 
+    err = nvs_set_u8(nvs, "sleep_on", clean.sleep_enabled);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "sleep_delay", clean.sleep_delay_seconds);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "wake_minutes", clean.touch_wake_minutes);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "auto_bright", clean.auto_brightness);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "bright_min", clean.brightness_min);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "bright_max", clean.brightness_max);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "weather_on", clean.weather_enabled);
+    if (err != ESP_OK) goto out;
     err = nvs_set_u8(nvs, "theme", clean.theme);
     if (err != ESP_OK) goto out;
 

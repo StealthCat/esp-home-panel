@@ -1,6 +1,7 @@
 #pragma once
 
 #include <stdint.h>
+#include <stdbool.h>
 #include "esp_err.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch.h"
@@ -19,6 +20,7 @@ typedef struct {
 
 esp_err_t board_7c_init(board_7c_handles_t *handles);
 esp_err_t board_7c_set_backlight(uint8_t percent);
+bool board_7c_has_pwm_backlight(void);
 
 #ifdef __cplusplus
 }

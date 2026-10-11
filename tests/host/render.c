@@ -4,6 +4,28 @@
 #include "../../main/ui.c"
 
 static panel_settings_t config;
+static int64_t fake_now = 100000000;
+static weather_snapshot_t demo_weather;
+static presence_reading_t demo_presence;
+static uint8_t backlight;
+int64_t esp_timer_get_time(void) { return fake_now; }
+bool board_7c_has_pwm_backlight(void) { return true; }
+esp_err_t board_7c_set_backlight(uint8_t p) { backlight=p;return ESP_OK; }
+presence_reading_t c4001_reading(void) { return demo_presence; }
+ambient_light_reading_t sensors_ambient_light(void) { return (ambient_light_reading_t){0}; }
+bool weather_init(void) { return true; }
+bool weather_copy(weather_snapshot_t *out) { *out=demo_weather;return true; }
+static lv_indev_t *test_input;
+static lv_point_t input_point;
+static bool input_pressed;
+static void read_touch(lv_indev_t *input,lv_indev_data_t *data) {
+    (void)input;data->point=input_point;data->state=input_pressed ? LV_INDEV_STATE_PRESSED : LV_INDEV_STATE_RELEASED;
+}
+static void touch_at(int x,int y,bool pressed) {
+    input_point=(lv_point_t){x,y};input_pressed=pressed;
+    fake_now+=30000;lv_tick_inc(30);lv_indev_read(test_input);
+}
+
 static uint16_t framebuffer[800 * 480];
 static int tapo_commands, fan_commands, echo_commands;
 static bool last_playing, last_next;
@@ -30,7 +52,10 @@ lv_display_t *wokwi_panel_create_display(void) {
     lv_display_set_flush_cb(d,flush);
     return d;
 }
-esp_err_t wokwi_panel_add_touch(lv_display_t *d) {(void)d;return ESP_OK;}
+esp_err_t wokwi_panel_add_touch(lv_display_t *d) {
+    test_input=lv_indev_create();lv_indev_set_type(test_input,LV_INDEV_TYPE_POINTER);
+    lv_indev_set_display(test_input,d);lv_indev_set_read_cb(test_input,read_touch);return ESP_OK;
+}
 
 static void assert_image_tree(lv_obj_t *parent) {
     for(uint32_t i=0;i<lv_obj_get_child_count(parent);i++) {
@@ -47,12 +72,16 @@ static void assert_image_tree(lv_obj_t *parent) {
     }
 }
 int main(int argc,char **argv) {
-    if(argc!=3) {fprintf(stderr,"usage: panel_render THEME OUTPUT.ppm\n");return 2;}
+    if(argc<3 || argc>4) {fprintf(stderr,"usage: panel_render THEME OUTPUT.ppm\n");return 2;}
     const uint32_t custom_colors[PANEL_COLOR_PRESET_COUNT] = {
         0x123456, 0xFFFFFF, 0x000000, 0x00FF00, 0xABCDEF, 0xE83691
     };
     memcpy(config.color_presets, custom_colors, sizeof(custom_colors));
     config.theme=(uint8_t)atoi(argv[1]);
+    config.backlight_percent=75;
+    config.weather_enabled=1;
+    config.touch_wake_minutes=2;
+    config.sleep_delay_seconds=60;
     assert(ui_start(NULL,NULL)==ESP_OK);
     assert(strcmp(lv_label_get_text(s_tapo_status),"Waiting")==0);
     for (int i = 0; i < PANEL_COLOR_PRESET_COUNT; ++i) {
@@ -102,6 +131,61 @@ int main(int argc,char **argv) {
     ui_apply_echo_state(70,false,false,"Midnight City","M83");pending_state_timer_cb(NULL);
     lv_label_set_text(s_clock,"10:24");lv_label_set_text(s_clock_period,"am");lv_label_set_text(s_date,"Sat, Apr 26");
     align_clock_labels();
+    lv_obj_update_layout(lv_screen_active());
+    assert_image_tree(lv_screen_active());
+    /* Real pointer input: a sleeping tap over a switch must only wake. */
+    config.sleep_enabled=config.presence_enabled=1;
+    demo_presence=(presence_reading_t){true,false,fake_now};
+    display_timer_cb(NULL);
+    fake_now+=200000000;lv_tick_inc(200000);
+    demo_presence.sampled_us=fake_now;
+    display_timer_cb(NULL);
+    assert(s_display_policy.asleep && backlight==0);
+    lv_obj_update_layout(lv_layer_top());
+    int prior=tapo_commands;
+    touch_at(344,107,true);display_timer_cb(NULL);
+    assert(backlight>0);
+    touch_at(344,107,false);display_timer_cb(NULL);
+    assert(tapo_commands==prior);
+    assert(lv_obj_has_flag(s_wake_shield,LV_OBJ_FLAG_HIDDEN));
+    touch_at(344,107,true);touch_at(344,107,false);
+    assert(tapo_commands==prior+1);
+    /* Header taps and horizontal gestures navigate; lower controls do not. */
+    touch_at(300,30,true);touch_at(300,30,false);assert(s_show_weather);
+    touch_at(550,30,true);touch_at(300,30,true);touch_at(200,30,false);
+    assert(!s_show_weather);
+    config.sleep_enabled=0;
+    demo_weather.revision=1;
+    demo_weather.station_available=demo_weather.forecast_available=true;
+    demo_weather.station_received_us=demo_weather.forecast_received_us=fake_now;
+    demo_weather.station_age_seconds=45;
+    snprintf(demo_weather.name,sizeof(demo_weather.name),"Evans Weather");
+    const char *labels[]={"Outdoor temperature","Humidity","Wind speed / direction","Wind gust","Rain today","Relative pressure","UV index","Solar radiation","Indoor temperature","Indoor humidity","Rain this month","Station battery"};
+    const char *values[]={"76.4","62","4.8 / NW","9.2","0.14","30.06","4","386","72.1","48","2.38","Normal"};
+    const char *units[]={"°F","%","mph","mph","in","inHg","","W/m²","°F","%","in",""};
+    demo_weather.field_count=12;
+    for(int i=0;i<12;i++) {
+        snprintf(demo_weather.fields[i].label,80,"%s",labels[i]);
+        snprintf(demo_weather.fields[i].value,40,"%s",values[i]);
+        snprintf(demo_weather.fields[i].unit,24,"%s",units[i]);
+    }
+    const char *conditions[]={"sunny","partlycloudy","rainy","cloudy","sunny"};
+    demo_weather.day_count=5;
+    for(int i=0;i<5;i++) {
+        snprintf(demo_weather.days[i].date,24,"Oct %d",11+i);
+        snprintf(demo_weather.days[i].condition,40,"%s",conditions[i]);
+        snprintf(demo_weather.days[i].high,32,"%d °F",78+i);
+        snprintf(demo_weather.days[i].low,32,"%d °F",55+i);
+        snprintf(demo_weather.days[i].rain,40,"%d%% rain",i*10);
+    }
+    update_weather_view();
+    assert(strstr(lv_label_get_text(s_weather_summary),"76.4"));
+    assert(strstr(lv_label_get_text(lv_obj_get_child(s_weather_fields[11],1)),"Normal"));
+    fake_now+=2000000000;update_weather_view();
+    assert(strstr(lv_label_get_text(s_weather_status),"Stale"));
+    assert(strstr(lv_label_get_text(s_forecast_status),"Stale"));
+    fake_now-=2000000000;update_weather_view();
+    set_page(argc==4);
     lv_obj_update_layout(lv_screen_active());
     assert_image_tree(lv_screen_active());
     lv_refr_now(NULL);

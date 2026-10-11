@@ -5,3 +5,5 @@
 #define MALLOC_CAP_INTERNAL 0
 #define MALLOC_CAP_DEFAULT 0
 static inline void *heap_caps_malloc(size_t size, int flags) {(void)flags;return malloc(size);}
+
+static inline void *heap_caps_calloc(size_t n,size_t size,int flags) {(void)flags;return calloc(n,size);}

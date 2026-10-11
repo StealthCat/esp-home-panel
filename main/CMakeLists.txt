@@ -55,6 +55,8 @@ idf_component_register(
         "mqtt_bridge.c"
         "sensors.c"
         "c4001.c"
+        "display_policy.c"
+        "weather.c"
         "ui.c"
         "ui_theme.c"
         "font_outfit_semibold_48.c"

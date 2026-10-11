@@ -68,6 +68,15 @@ typedef struct {
     uint8_t presence_trigger_sensitivity;
     uint8_t presence_keep_sensitivity;
     uint8_t presence_hold_seconds;
+    uint8_t sleep_enabled;
+    uint8_t sleep_delay_seconds;
+    uint8_t touch_wake_minutes;
+    uint8_t auto_brightness;
+    uint8_t brightness_min;
+    uint8_t brightness_max;
+    uint8_t weather_enabled;
+    char ha_station_entity[PANEL_HA_ENTITY_ID_MAX + 1];
+    char ha_weather_entity[PANEL_HA_ENTITY_ID_MAX + 1];
     uint8_t theme;
     uint8_t backlight_percent;
 } panel_settings_t;

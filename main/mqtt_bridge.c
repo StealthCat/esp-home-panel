@@ -14,6 +14,7 @@
 #include "sensors.h"
 #include "c4001.h"
 #include "ui.h"
+#include "weather.h"
 
 static const char *TAG = "mqtt_bridge";
 
@@ -22,6 +23,11 @@ static bool s_connected;
 static int64_t s_last_state_request_us;
 static char s_client_id[64];
 
+static char *s_topic_weather, *s_topic_forecast, *s_topic_weather_request;
+static int64_t s_weather_due_us, s_forecast_due_us;
+static char *s_weather_rx;
+static int s_weather_rx_total, s_weather_rx_used;
+static bool s_weather_rx_forecast;
 static char *s_topic_state_tapo;
 static char *s_topic_state_overhead;
 static char *s_topic_state_fan;
@@ -177,6 +183,9 @@ static esp_err_t build_topics(const panel_settings_t *settings)
         if (!dst) return ESP_ERR_NO_MEM; \
     } while (0)
 
+    MAKE_TOPIC(s_topic_weather, "/state/weather");
+    MAKE_TOPIC(s_topic_forecast, "/state/forecast");
+    MAKE_TOPIC(s_topic_weather_request, "/request_weather");
     MAKE_TOPIC(s_topic_state_tapo, "/state/tapo");
     MAKE_TOPIC(s_topic_state_overhead, "/state/overhead");
     MAKE_TOPIC(s_topic_state_fan, "/state/fan");
@@ -607,6 +616,57 @@ static void publish_home_assistant_discovery(void)
     }
 }
 
+static void publish_weather_request(bool force)
+{
+    const panel_settings_t *cfg = settings_get();
+    int64_t now = esp_timer_get_time();
+    if (!s_connected || !cfg->weather_enabled || (!force && now < s_weather_due_us)) return;
+    bool forecast = force || now >= s_forecast_due_us;
+    cJSON *root = cJSON_CreateObject();
+    if (!root) return;
+    cJSON_AddStringToObject(root, "station", cfg->ha_station_entity);
+    cJSON_AddStringToObject(root, "forecast", cfg->ha_weather_entity);
+    cJSON_AddBoolToObject(root, "refresh_forecast", forecast);
+    char *payload = cJSON_PrintUnformatted(root);
+    cJSON_Delete(root);
+    if (!payload) return;
+    if (mqtt_publish_logged(s_topic_weather_request, payload, 1, 0) >= 0) {
+        s_weather_due_us = now + 30000000LL;
+        if (forecast) s_forecast_due_us = now + 900000000LL;
+    }
+    free(payload);
+}
+
+/* ESP-MQTT fragments large publications. Only accept sequential fragments of
+ * a bounded weather payload; never parse a prefix or an unrelated topic. */
+static bool receive_weather_fragment(esp_mqtt_event_handle_t event)
+{
+    if (event->current_data_offset == 0) {
+        free(s_weather_rx); s_weather_rx = NULL;
+        s_weather_rx_used = s_weather_rx_total = 0;
+        bool forecast = topic_equals(event, s_topic_forecast);
+        if (!forecast && !topic_equals(event, s_topic_weather)) return false;
+        if (!settings_get()->weather_enabled || event->total_data_len <= 0 ||
+            event->total_data_len > WEATHER_MAX_PAYLOAD) return true;
+        s_weather_rx = heap_caps_malloc((size_t)event->total_data_len + 1, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
+        if (!s_weather_rx) return true;
+        s_weather_rx_total = event->total_data_len;
+        s_weather_rx_forecast = forecast;
+    } else if (!s_weather_rx) return true;
+    if (event->current_data_offset != s_weather_rx_used || event->total_data_len != s_weather_rx_total ||
+        event->data_len < 0 || event->data_len > s_weather_rx_total - s_weather_rx_used) {
+        free(s_weather_rx); s_weather_rx = NULL; return true;
+    }
+    memcpy(s_weather_rx + s_weather_rx_used, event->data, event->data_len);
+    s_weather_rx_used += event->data_len;
+    if (s_weather_rx_used == s_weather_rx_total) {
+        s_weather_rx[s_weather_rx_used] = 0;
+        weather_receive(s_weather_rx_forecast, s_weather_rx, s_weather_rx_used, esp_timer_get_time());
+        free(s_weather_rx); s_weather_rx = NULL;
+    }
+    return true;
+}
+
 static void publish_state_request(void)
 {
     if (!s_client || !s_connected || !s_topic_request_state) {
@@ -680,6 +740,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         ESP_LOGI(TAG, "MQTT EVENT connected session_present=%d client_id=\"%s\"",
                  event ? event->session_present : 0, s_client_id);
 
+        mqtt_subscribe_logged(s_topic_weather, 1);
+        mqtt_subscribe_logged(s_topic_forecast, 1);
         mqtt_subscribe_logged(s_topic_state_tapo, 1);
         mqtt_subscribe_logged(s_topic_state_overhead, 1);
         mqtt_subscribe_logged(s_topic_state_fan, 1);
@@ -690,9 +752,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         mqtt_publish_logged(s_topic_availability, "online", 1, 1);
         publish_home_assistant_discovery();
         publish_state_request();
+        publish_weather_request(true);
         break;
 
     case MQTT_EVENT_DISCONNECTED:
+        free(s_weather_rx); s_weather_rx = NULL;
         s_connected = false;
         ui_set_mqtt_online(false);
         ESP_LOGW(TAG, "MQTT EVENT disconnected");
@@ -711,6 +775,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
 
     case MQTT_EVENT_DATA:
+        if (receive_weather_fragment(event)) break;
         log_rx_event(event);
 
         if (topic_equals(event, s_topic_ha_status)) {
@@ -718,6 +783,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
                 ESP_LOGI(TAG, "Home Assistant MQTT birth received; republishing discovery");
                 publish_home_assistant_discovery();
                 publish_state_request();
+                publish_weather_request(true);
             }
         } else if (topic_equals(event, s_topic_refresh_command)) {
             ESP_LOGI(TAG, "Home Assistant refresh button requested state");
@@ -868,6 +934,7 @@ esp_err_t mqtt_bridge_start(void)
 
 void mqtt_bridge_poll(void)
 {
+    publish_weather_request(false);
     if (!s_connected) {
         return;
     }

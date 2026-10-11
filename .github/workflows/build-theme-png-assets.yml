@@ -2,7 +2,7 @@ name: Validate theme artwork and displays
 
 on:
   push:
-    branches: [main]
+    branches: [main, weather]
     paths: ['assets/**', 'main/**', 'tools/**', 'tests/host/**', '.github/workflows/build-theme-png-assets.yml']
   pull_request:
     paths: ['assets/**', 'main/**', 'tools/**', 'tests/host/**', '.github/workflows/build-theme-png-assets.yml']
@@ -36,6 +36,7 @@ jobs:
           mkdir -p build/previews
           for theme in 0 1 2 3; do
             build/host/panel_render "$theme" "build/previews/theme-$theme.ppm"
+            build/host/panel_render "$theme" "build/previews/weather-$theme.ppm" weather
           done
       - uses: actions/upload-artifact@v4
         with:

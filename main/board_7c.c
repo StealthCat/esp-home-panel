@@ -14,6 +14,8 @@ i2c_master_bus_handle_t board_7c_i2c_bus(void) { return NULL; }
 
 static const char *TAG = "board_7c";
 
+bool board_7c_has_pwm_backlight(void) { return true; }
+
 esp_err_t board_7c_set_backlight(uint8_t percent)
 {
     ESP_LOGD(TAG, "Wokwi virtual backlight: %u%%", percent);
@@ -261,6 +263,8 @@ static esp_err_t detect_and_init_i2c(void)
 
     return ESP_OK;
 }
+
+bool board_7c_has_pwm_backlight(void) { return s_hw_profile == HW_PROFILE_7C_BOX; }
 
 esp_err_t board_7c_set_backlight(uint8_t percent)
 {

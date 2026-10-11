@@ -19,3 +19,7 @@ Firmware uploads use the dedicated updater linked from **System**. Configuration
 ## Development checks
 
 `python tools/render_web_config.py` prints the production handler's HTML using a host fixture with fake network/settings data. `node tools/test_settings_ui.js` uses Playwright to exercise that HTML at desktop and mobile sizes; CI runs these browser checks and retains screenshots as the `settings-ui-previews` artifact. The fixture never contacts a physical panel.
+
+Weather configuration is under Home Assistant. Presence sleep and automatic
+brightness are under Display. See [weather and display setup](weather-display.md)
+for hardware support and Home Assistant package installation.
