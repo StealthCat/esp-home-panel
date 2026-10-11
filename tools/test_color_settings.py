@@ -204,8 +204,9 @@ int main(void) {
     post("weather_api_key=&weather_app_key=app-secret&weather_forecast_key=forecast-secret");
     assert(status==200 && !strcmp(settings_get()->weather_api_key,"secret-key"));
     assert(settings_init()==ESP_OK && !strcmp(settings_get()->weather_app_key,"app-secret") && !strcmp(settings_get()->weather_forecast_key,"forecast-secret"));
-    post("weather_provider=1&weather_forecast=1");assert(status==200);
-    post("weather_provider=0&weather_forecast=0&clear_weather_app_key=1&clear_weather_forecast_key=1");assert(status==200);
+    post("weather_provider=1&weather_forecast=1");assert(status==400);
+    post("weather_provider=1&weather_forecast=1&weather_api_key=ambient-secret");assert(status==200);
+    post("weather_provider=0&weather_api_key=secret-key&weather_forecast=0&clear_weather_app_key=1&clear_weather_forecast_key=1");assert(status==200);
     assert(!settings_get()->weather_app_key[0] && !settings_get()->weather_forecast_key[0]);
     const char *bad_weather[]={"sleep_enabled=2","sleep_delay_seconds=0","touch_wake_minutes=31","brightness_min=90&brightness_max=80","weather_provider=2","weather_forecast=3","weather_poll_minutes=0","weather_station=bad%0Aname","weather_provider=1"};
     for(unsigned i=0;i<sizeof(bad_weather)/sizeof(bad_weather[0]);i++){int before=commits;post(bad_weather[i]);assert(status==400 && commits==before);}

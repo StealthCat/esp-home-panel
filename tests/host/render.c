@@ -151,9 +151,13 @@ int main(int argc,char **argv) {
     touch_at(344,107,true);touch_at(344,107,false);
     assert(tapo_commands==prior+1);
     /* Header taps and horizontal gestures navigate; lower controls do not. */
-    touch_at(300,30,true);touch_at(300,30,false);assert(s_show_weather);
+    touch_at(300,30,true);touch_at(300,30,false);assert(s_show_weather);assert(!strcmp(lv_label_get_text(s_page_indicator),"Weather"));
     touch_at(550,30,true);touch_at(300,30,true);touch_at(200,30,false);
-    assert(!s_show_weather);
+    assert(!s_show_weather);assert(!strcmp(lv_label_get_text(s_page_indicator),"Controls"));
+    char clock_text[24];struct tm clock_tm={.tm_year=126,.tm_mon=9,.tm_mday=11,.tm_hour=0,.tm_min=5,.tm_isdst=-1};
+    weather_clock(clock_text,sizeof(clock_text),mktime(&clock_tm));assert(!strcmp(clock_text,"12:05 am"));
+    clock_tm.tm_hour=12;weather_clock(clock_text,sizeof(clock_text),mktime(&clock_tm));assert(!strcmp(clock_text,"12:05 pm"));
+    clock_tm.tm_hour=19;weather_clock(clock_text,sizeof(clock_text),mktime(&clock_tm));assert(!strcmp(clock_text,"7:05 pm"));
     config.sleep_enabled=0;
     weather_reset(&demo_weather);
     demo_weather.revision=1;

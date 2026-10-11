@@ -30,7 +30,7 @@ static void set_page(bool weather)
     s_show_weather=weather&&settings_get()->weather_enabled;
     if(s_show_weather){lv_obj_add_flag(s_controls_page,LV_OBJ_FLAG_HIDDEN);lv_obj_remove_flag(s_weather_page,LV_OBJ_FLAG_HIDDEN);}
     else{lv_obj_remove_flag(s_controls_page,LV_OBJ_FLAG_HIDDEN);if(s_weather_page)lv_obj_add_flag(s_weather_page,LV_OBJ_FLAG_HIDDEN);}
-    if(s_page_indicator)lv_label_set_text(s_page_indicator,s_show_weather?"<  Weather  2/2  >":"<  Controls  1/2  >");
+    if(s_page_indicator)lv_label_set_text(s_page_indicator,s_show_weather?"Weather":"Controls");
 }
 static void header_navigation_cb(lv_event_t *e)
 {
@@ -146,6 +146,12 @@ static void weather_section(unsigned section)
 }
 static void weather_tab_cb(lv_event_t *e){weather_section((unsigned)(uintptr_t)lv_event_get_user_data(e));}
 static void close_weather_modal(lv_event_t *e){(void)e;if(s_weather_modal){lv_obj_delete(s_weather_modal);s_weather_modal=NULL;}}
+static void weather_clock(char *out,size_t size,time_t stamp)
+{
+    if(!stamp){snprintf(out,size,"--");return;}
+    struct tm local;localtime_r(&stamp,&local);
+    snprintf(out,size,"%d:%02d %s",local.tm_hour%12?local.tm_hour%12:12,local.tm_min,local.tm_hour<12?"am":"pm");
+}
 static void show_day(lv_event_t *e)
 {
     unsigned index=(unsigned)(uintptr_t)lv_event_get_user_data(e);if(index>=s_weather_view->day_count)return;
@@ -164,8 +170,8 @@ static void show_day(lv_event_t *e)
     snprintf(line,sizeof(line),"Rain %s  |  Chance %s",hi,lo);weather_text(s_weather_modal,line,169,128,430,&lv_font_montserrat_16,T->muted);
     weather_format(hi,sizeof(hi),day->wind,"wind",metric);weather_format(lo,sizeof(lo),day->uv,"",metric);
     snprintf(line,sizeof(line),"Wind %s  |  UV %s",hi,lo);weather_text(s_weather_modal,line,169,156,430,&lv_font_montserrat_16,T->muted);
-    if(day->sunrise){localtime_r(&day->sunrise,&tm);strftime(hi,sizeof(hi),"%H:%M",&tm);}else snprintf(hi,sizeof(hi),"--");
-    if(day->sunset){localtime_r(&day->sunset,&tm);strftime(lo,sizeof(lo),"%H:%M",&tm);}else snprintf(lo,sizeof(lo),"--");
+    weather_clock(hi,sizeof(hi),day->sunrise);
+    weather_clock(lo,sizeof(lo),day->sunset);
     snprintf(line,sizeof(line),"Sunrise %s   /   Sunset %s",hi,lo);weather_text(s_weather_modal,line,22,207,580,&lv_font_montserrat_16,T->accent);
     const char *narrative=day->narrative[0]?day->narrative:"Forecast values are model guidance for the station location. Actual local conditions may differ.";
     label=weather_text(s_weather_modal,narrative,22,245,580,&lv_font_montserrat_16,T->muted);lv_label_set_long_mode(label,LV_LABEL_LONG_MODE_WRAP);lv_obj_set_height(label,70);
@@ -208,9 +214,9 @@ static void update_weather_view(void)
     weather_icon_t today=w->day_count?w->days[0].icon:WX_UNKNOWN;
     lv_obj_set_user_data(s_hero_icon,(void *)(uintptr_t)today);lv_obj_invalidate(s_hero_icon);
     char rise[20]="--",set[20]="--";struct tm tm;
-    if(w->day_count&&w->days[0].sunrise){localtime_r(&w->days[0].sunrise,&tm);strftime(rise,sizeof(rise),"%H:%M",&tm);}
-    if(w->day_count&&w->days[0].sunset){localtime_r(&w->days[0].sunset,&tm);strftime(set,sizeof(set),"%H:%M",&tm);}
-    snprintf(status,sizeof(status),"%s / %s",rise,set);lv_label_set_text(s_sun,status);
+    weather_clock(rise,sizeof(rise),w->day_count?w->days[0].sunrise:0);
+    weather_clock(set,sizeof(set),w->day_count?w->days[0].sunset:0);
+    snprintf(status,sizeof(status),"%s\n%s",rise,set);lv_label_set_text(s_sun,status);
     char lo[48],hi[48];weather_format(hi,sizeof(hi),w->day_count>1?w->days[1].high:NAN,"temp",settings_get()->weather_units);weather_format(lo,sizeof(lo),w->day_count>1?w->days[1].low:NAN,"temp",settings_get()->weather_units);
     snprintf(status,sizeof(status),"%s\nLow %s",hi,lo);lv_label_set_text(s_tomorrow,status);
     for(unsigned i=0;i<WEATHER_MAX_FIELDS;i++){
@@ -312,7 +318,7 @@ static void create_weather_page(lv_obj_t *root)
         lv_obj_t *tile=make_card(now,14+i*195,349,187,98);
         weather_text(tile,titles[i],14,13,159,&lv_font_montserrat_14,T->muted);
         *values[i]=weather_text(tile,"--",14,42,160,i==3?&lv_font_montserrat_16:&lv_font_montserrat_20,i==1?T->warm:T->text);
-        if(i==3){lv_label_set_long_mode(*values[i],LV_LABEL_LONG_MODE_WRAP);lv_obj_set_height(*values[i],50);}
+        if(i>=2){lv_label_set_long_mode(*values[i],LV_LABEL_LONG_MODE_WRAP);lv_obj_set_height(*values[i],50);}
     }
     lv_obj_t *outlook=s_weather_sections[1];
     lv_obj_t *chart_card=make_card(outlook,14,130,772,124);
@@ -337,7 +343,7 @@ static void create_weather_page(lv_obj_t *root)
     /* Source attribution persists on every weather view. */
     s_forecast_status=weather_text(s_weather_page,"Forecast waiting",18,464,766,&lv_font_montserrat_14,T->muted);
     lv_label_set_long_mode(s_forecast_status,LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
-    s_page_indicator=weather_text(root,"<  Controls  1/2  >",82,62,260,&lv_font_montserrat_14,T->muted);
+    s_page_indicator=weather_text(root,"Controls",82,62,260,&lv_font_montserrat_14,T->muted);
     s_header_hit=weather_container(root,0,0,800,77);lv_obj_add_flag(s_header_hit,LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(s_header_hit,header_navigation_cb,LV_EVENT_GESTURE,NULL);
     lv_obj_add_event_cb(s_header_hit,header_navigation_cb,LV_EVENT_SHORT_CLICKED,NULL);

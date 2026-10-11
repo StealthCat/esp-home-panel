@@ -33,6 +33,30 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
  await page.locator('[name=auto_brightness]').selectOption('1');
  await page.getByRole('tab',{name:'Weather',exact:true}).click();
  await page.locator('[name=weather_enabled]').selectOption('1');
+ // Provider-dependent visibility, requirements and payloads.
+ assert(!(await page.locator('#weather-ambient-key').isVisible()));
+ assert(!(await page.locator('#weather-wu-key').isVisible()));
+ await page.locator('[name=weather_forecast]').selectOption('1');
+ assert(await page.locator('#weather-wu-key').isVisible());
+ assert(!(await page.locator('[name=weather_forecast_key]').evaluate(i=>i.required)));
+ await page.locator('[name=weather_provider]').selectOption('1');
+ assert(await page.locator('#weather-ambient-key').isVisible());
+ assert(await page.locator('[name=weather_app_key]').evaluate(i=>i.required));
+ assert(await page.locator('[name=weather_forecast_key]').evaluate(i=>i.required));
+ assert.equal(await page.locator('#weather-station-label').textContent(),'Ambient station name or MAC address');
+ await page.locator('[name=weather_app_key]').fill('ambient-app');
+ await page.locator('[name=weather_forecast_key]').fill('forecast-key');
+ await page.locator('[name=weather_forecast]').selectOption('0');
+ assert(!(await page.locator('#weather-wu-key').isVisible()));
+ assert(!(await page.evaluate(()=>new FormData(document.getElementById('settings-form')).has('weather_forecast_key'))));
+ await page.locator('[name=weather_forecast]').selectOption('2');
+ assert((await page.locator('#weather-forecast-help').textContent()).includes('Only station observations'));
+ await page.locator('[name=weather_forecast]').selectOption('1');
+ assert.equal(await page.locator('[name=weather_forecast_key]').inputValue(),'forecast-key');
+ await page.locator('[name=weather_provider]').selectOption('0');
+ assert(!(await page.locator('#weather-ambient-key').isVisible()));
+ assert(!(await page.evaluate(()=>new FormData(document.getElementById('settings-form')).has('weather_app_key'))));
+ await page.locator('[name=weather_forecast]').selectOption('0');
  await page.locator('[name=weather_station]').fill('KTEST1');
  await page.locator('[name=weather_api_key]').fill('secret-key');
  await page.getByRole('tab',{name:'Sensors',exact:true}).click();
@@ -48,6 +72,7 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
  await page.locator('[name=display_title]').fill('Living room');
  failSave=true;await page.locator('#save-settings').click();await page.locator('#save-notice.error').waitFor();
  assert.equal(await page.locator('[name=display_title]').inputValue(),'Living room');assert(!(await page.locator('[name=display_title]').isDisabled()));
+ assert(!(await page.locator('#weather-ambient-key').isVisible()));assert(!(await page.locator('#weather-wu-key').isVisible()));
  assert.equal(sent.get('weather_enabled'),'1');assert.equal(sent.get('weather_station'),'KTEST1');assert.equal(sent.get('sleep_enabled'),'1');assert.equal(sent.get('auto_brightness'),'1');
  assert.equal(sent.get('presence_enabled'),'1');assert.equal(sent.get('csrf'),'test-csrf');assert.equal(sent.get('hostname'),'panel-010101');assert.equal(sent.get('display_title'),'Living room');
  await page.locator('#discard-settings').click();assert.equal(await page.locator('[name=display_title]').inputValue(),'Home Control');assert(await page.locator('#save-settings').isDisabled());
@@ -61,6 +86,19 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
    await page.screenshot({path:path.join(output,`${id}-${width}.png`),fullPage:true});
   }
  }
+ await page.locator('#tab-weather').click();
+ await page.locator('[name=weather_enabled]').selectOption('1');
+ for(const provider of ['0','1']){
+  await page.locator('[name=weather_provider]').selectOption(provider);
+  for(const forecast of ['0','1','2']){
+   await page.locator('[name=weather_forecast]').selectOption(forecast);
+   assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));
+   await page.screenshot({path:path.join(output,`weather-provider-${provider}-forecast-${forecast}.png`),fullPage:true});
+  }
+ }
+ await page.locator('#discard-settings').click();
+ assert(await page.locator('[name=weather_provider]').isDisabled());
+ assert(!(await page.locator('#weather-ambient-key').isVisible()));
  await page.goto('http://panel.test/#sensors');assert.equal(await page.locator('#tab-sensors').getAttribute('aria-selected'),'true');
  await page.locator('[name=presence_enabled]').selectOption('1');failSave=false;await page.locator('#save-settings').click();await page.getByRole('link',{name:'Reconnect to panel'}).waitFor();assert.equal(await page.locator('#change-status').textContent(),'Settings saved');assert(await page.locator('#save-settings').isDisabled());
  await page.goto('http://panel.test/firmware');await page.screenshot({path:path.join(output,'firmware-390.png'),fullPage:true});

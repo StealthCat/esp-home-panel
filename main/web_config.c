@@ -365,44 +365,51 @@ static esp_err_t root_handler(httpd_req_t *req)
     snprintf(buf, sizeof(buf), "<label>Maximum brightness (%%)</label><input name='brightness_max' type='number' required min='5' max='100' value='%u'>", cfg->brightness_max);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint'>Auto brightness requires the VEML7700 and PWM-capable 7C-BOX. LCD-7 supports on/off only. Manual brightness is the fallback. Absence delay is additional to the radar vacancy delay.</p>"));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</section><section class='card' data-tab='weather'><h2>Weather station</h2><p class='hint'>Direct HTTPS observations from your station provider. No Home Assistant or MQTT weather bridge is needed.</p>"));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</section><section class='card full' data-tab='weather'><h2>Weather display</h2><p class='hint'>Choose your station service and a forecast source. Swipe or tap the display header to open Weather.</p>"));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<label>Weather page</label><select name='weather_enabled'>"));
     snprintf(buf, sizeof(buf), "<option value='0'%s>Off</option>", cfg->weather_enabled == 0 ? " selected" : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     snprintf(buf, sizeof(buf), "<option value='1'%s>On</option>", cfg->weather_enabled == 1 ? " selected" : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</select>"));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint' id='weather-summary' aria-live='polite'>Configure your station below, then enable the weather display.</p></section><section class='card' data-tab='weather'><h2>Current conditions</h2><fieldset id='weather-station-settings'>"));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<label>Observation provider</label><select name='weather_provider'>"));
     snprintf(buf, sizeof(buf), "<option value='0'%s>Weather Underground</option>", cfg->weather_provider == 0 ? " selected" : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     snprintf(buf, sizeof(buf), "<option value='1'%s>Ambient Weather</option>", cfg->weather_provider == 1 ? " selected" : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</select>"));
+    char weather_station[768];
+    html_escape(cfg->weather_station, weather_station, sizeof(weather_station));
+    snprintf(buf, sizeof(buf), "<label id='weather-station-label'>Station ID or Ambient name / MAC</label><input name='weather_station' maxlength='127' value=\"%s\" autocapitalize='none' spellcheck='false'><p class='hint' id='weather-station-help'>Weather Underground: PWS station ID (not its upload password). Ambient: exact station name or MAC address; matching is case-insensitive.</p>", weather_station);
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<label id='weather-api-label'>Station API key</label><input name='weather_api_key' data-saved='%u' data-provider='%u' type='password' maxlength='128' autocomplete='new-password' placeholder='%s'><label class='check'><input type='checkbox' name='clear_weather_api_key'> Clear saved key</label>", !!cfg->weather_api_key[0], cfg->weather_provider, cfg->weather_api_key[0] ? "Saved - leave blank to keep" : "Not configured");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<fieldset id='weather-ambient-key'><label>Ambient application key</label><input name='weather_app_key' data-saved='%u' type='password' maxlength='128' autocomplete='new-password' placeholder='%s'><label class='check'><input type='checkbox' name='clear_weather_app_key'> Clear saved key</label></fieldset>", !!cfg->weather_app_key[0], cfg->weather_app_key[0] ? "Saved - leave blank to keep" : "Not configured");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint'>Blank keys keep saved credentials. Enter a new station API key when changing station providers.</p></fieldset></section><section class='card' data-tab='weather'><h2>Forecast</h2><fieldset id='weather-forecast-settings'>"));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<label>Forecast source</label><select name='weather_forecast'>"));
+    snprintf(buf, sizeof(buf), "<option value='0'%s>Open-Meteo — hourly and daily</option>", cfg->weather_forecast == 0 ? " selected" : "");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<option value='1'%s>Weather Underground — daily</option>", cfg->weather_forecast == 1 ? " selected" : "");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    snprintf(buf, sizeof(buf), "<option value='2'%s>No forecast</option>", cfg->weather_forecast == 2 ? " selected" : "");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</select>"));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint' id='weather-forecast-help' aria-live='polite'>Open-Meteo needs no key. Weather Underground requires a key with forecast access.</p>"));
+    snprintf(buf, sizeof(buf), "<fieldset id='weather-wu-key'><label id='weather-forecast-key-label'>Weather Underground forecast API key</label><input name='weather_forecast_key' data-saved='%u' type='password' maxlength='128' autocomplete='new-password' placeholder='%s'><label class='check'><input type='checkbox' name='clear_weather_forecast_key'> Clear saved key</label></fieldset>", !!cfg->weather_forecast_key[0], cfg->weather_forecast_key[0] ? "Saved - leave blank to keep" : "Not configured");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint'>Forecasts use the station location and refresh every 15 minutes. Set the display timezone to match your station.</p></fieldset></section><section class='card full' data-tab='weather'><h2>Units &amp; refresh</h2><fieldset id='weather-display-settings'><div class='row'><div>"));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<label>Display units</label><select name='weather_units'>"));
     snprintf(buf, sizeof(buf), "<option value='0'%s>Fahrenheit / mph / inches</option>", cfg->weather_units == 0 ? " selected" : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     snprintf(buf, sizeof(buf), "<option value='1'%s>Celsius / km/h / mm</option>", cfg->weather_units == 1 ? " selected" : "");
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</select>"));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<label>Forecast source</label><select name='weather_forecast'>"));
-    snprintf(buf, sizeof(buf), "<option value='0'%s>Open-Meteo (as in Heat Index Display)</option>", cfg->weather_forecast == 0 ? " selected" : "");
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</div><div>"));
+    snprintf(buf, sizeof(buf), "<label>Observation refresh (minutes)</label><input name='weather_poll_minutes' type='number' min='1' max='30' required value='%u'>", cfg->weather_poll_minutes);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-    snprintf(buf, sizeof(buf), "<option value='1'%s>Weather Underground (requires forecast access)</option>", cfg->weather_forecast == 1 ? " selected" : "");
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-    snprintf(buf, sizeof(buf), "<option value='2'%s>No forecast</option>", cfg->weather_forecast == 2 ? " selected" : "");
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</select>"));
-    char weather_station[768];
-    html_escape(cfg->weather_station, weather_station, sizeof(weather_station));
-    snprintf(buf, sizeof(buf), "<label>Station ID, name or MAC</label><input name='weather_station' maxlength='127' value=\"%s\" autocapitalize='none' spellcheck='false'><p class='hint'>Weather Underground: PWS station ID (not its upload password). Ambient: exact station name or MAC address; matching is case-insensitive.</p><label>Observation refresh (minutes)</label><input name='weather_poll_minutes' type='number' min='1' max='30' required value='%u'>", weather_station, cfg->weather_poll_minutes);
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-    snprintf(buf, sizeof(buf), "<label>Provider API key</label><input name='weather_api_key' type='password' maxlength='128' autocomplete='new-password' placeholder='%s'><label class='check'><input type='checkbox' name='clear_weather_api_key'> Clear saved key</label>", cfg->weather_api_key[0] ? "Saved - leave blank to keep" : "Not configured");
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-    snprintf(buf, sizeof(buf), "<label>Ambient application key</label><input name='weather_app_key' type='password' maxlength='128' autocomplete='new-password' placeholder='%s'><label class='check'><input type='checkbox' name='clear_weather_app_key'> Clear saved key</label>", cfg->weather_app_key[0] ? "Saved - leave blank to keep" : "Not configured");
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-    snprintf(buf, sizeof(buf), "<label>Weather Underground forecast API key</label><input name='weather_forecast_key' type='password' maxlength='128' autocomplete='new-password' placeholder='%s'><label class='check'><input type='checkbox' name='clear_weather_forecast_key'> Clear saved key</label>", cfg->weather_forecast_key[0] ? "Saved - leave blank to keep" : "Not configured");
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
-    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "<p class='hint'>Ambient requires both API and application keys. Open-Meteo supplies forecasts at the station coordinates without a key. For WU forecasts, leave the separate forecast key blank to reuse a WU observation key; access depends on your key entitlement. Forecasts refresh every 15 minutes. Keys are never displayed after saving.</p></section>"));
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</div></div></fieldset></section>"));
 
     snprintf(buf, sizeof(buf),
              "<section class='card' data-tab='sensors'><h2>Ambient light</h2>"
@@ -748,6 +755,12 @@ static esp_err_t save_handler(httpd_req_t *req)
         return ESP_OK;
     }
 
+    if (updated.weather_enabled && updated.weather_provider != settings_get()->weather_provider &&
+        (!form_get(body,"weather_api_key",tmp,sizeof(tmp)) || !tmp[0])) {
+        free(body);
+        httpd_resp_send_err(req,HTTPD_400_BAD_REQUEST,"Enter a new station API key when changing weather providers.");
+        return ESP_OK;
+    }
     if (updated.weather_enabled && (!updated.weather_station[0] || !updated.weather_api_key[0] ||
         (updated.weather_provider == 1 && !updated.weather_app_key[0]) ||
         (updated.weather_provider == 1 && updated.weather_forecast == 1 && !updated.weather_forecast_key[0]))) {

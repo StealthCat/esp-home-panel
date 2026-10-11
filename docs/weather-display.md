@@ -29,6 +29,12 @@ keep their existing display behavior. Save settings and allow the panel to resta
 
 Weather works independently of Home Assistant and MQTT. Open **Settings → Weather**,
 choose a station provider, enter its credentials, enable the weather page, and save.
+The form shows the credentials needed for the selected providers: Ambient adds
+an application key; WU forecasts add a required key for Ambient stations or an
+optional separate key for WU stations. Open-Meteo needs no forecast key. Hidden
+fields keep their saved values. Changing the station provider requires entering
+its API key. Turning Weather off disables configuration without erasing it.
+
 Keys are stored on the panel. Saved keys are never filled back into the HTML form;
 leave a key blank to keep it or use its Clear checkbox to remove it.
 
@@ -59,13 +65,13 @@ A WU display name is not its station ID. Credentials for the two services are no
 
 Forecasts require valid coordinates in the station response. Missing coordinates
 are reported on screen. Forecast times, sunrise and sunset use the panel's
-configured POSIX timezone; set that to the station's timezone under Display.
+configured POSIX timezone, with sunrise/sunset displayed in 12-hour am/pm format; set that to the station's timezone under Display.
 Select imperial or metric display units independently of the provider.
 
 ### Navigation and information
 
 Swipe horizontally or tap the title/time header to switch between Home Control
-and Weather. Three weather tabs provide:
+and Weather. The header label simply reads **Controls** or **Weather**. Three weather tabs provide:
 
 - **Now:** outdoor temperature, calculated feels-like temperature, humidity,
   dew point, wind speed/gusts and compass, rain total/rate, UV/solar radiation,
