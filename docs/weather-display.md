@@ -74,7 +74,7 @@ Swipe horizontally or tap the title/time header to switch between Home Control
 and Weather. The header label simply reads **Controls** or **Weather**. Three weather tabs provide:
 
 - **Now:** outdoor temperature, calculated feels-like temperature, humidity,
-  dew point, wind speed/gusts and compass, rain total/rate, UV/solar radiation,
+  dew point, wind speed/gusts and a shaded direction arrow, rain total/rate, UV/solar radiation,
   pressure, heat index, sunrise/sunset, and tomorrow's temperatures.
 - **Outlook:** twelve-hour temperature line and rain-probability bars with
   time labels, plus five daily cards with high/low, illustrated conditions, and
@@ -119,7 +119,8 @@ fan and media controls. Sensor MQTT discovery is unchanged.
 - `python tools/test_color_settings.py`: validation, persistence and blank-key semantics.
 - `node tools/test_settings_ui.js`: desktop/mobile weather tab and form submission.
 - Host LVGL renderer: all four themes and weather views, control gestures and
-  wake-only first touch. GitHub Actions retains firmware and UI preview artifacts.
+  wake-only first touch, stable forecast widgets, and no redraws for unchanged
+  weather/clock/network state. GitHub Actions retains firmware and UI preview artifacts.
 
 Live provider credentials and physical sensor/backlight behavior still need
 on-device verification after installing the firmware.

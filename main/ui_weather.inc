@@ -14,6 +14,21 @@ static unsigned s_weather_section;
 static display_policy_t s_display_policy;
 static int s_last_backlight=-1;
 
+/* Keep labels and their scrolling animations stable between real changes. */
+static void weather_set_text(lv_obj_t *label,const char *text)
+{
+    if(strcmp(lv_label_get_text(label),text))lv_label_set_text(label,text);
+}
+static lv_obj_t *s_day_dates[WEATHER_DAYS],*s_day_icons[WEATHER_DAYS];
+static lv_obj_t *s_day_highs[WEATHER_DAYS],*s_day_lows[WEATHER_DAYS],*s_day_rains[WEATHER_DAYS],*s_day_bars[WEATHER_DAYS];
+static weather_hour_t s_drawn_hours[WEATHER_HOURS];
+static unsigned s_drawn_hour_count;
+static float s_drawn_direction=NAN;
+static void weather_set_icon(lv_obj_t *obj,weather_icon_t icon)
+{
+    if((weather_icon_t)(uintptr_t)lv_obj_get_user_data(obj)==icon)return;
+    lv_obj_set_user_data(obj,(void *)(uintptr_t)icon);lv_obj_invalidate(obj);
+}
 static lv_obj_t *weather_text(lv_obj_t *parent,const char *value,int x,int y,int width,const lv_font_t *font,uint32_t color)
 {
     lv_obj_t *label=make_label(parent,value,x,y,font,color);
@@ -30,7 +45,7 @@ static void set_page(bool weather)
     s_show_weather=weather&&settings_get()->weather_enabled;
     if(s_show_weather){lv_obj_add_flag(s_controls_page,LV_OBJ_FLAG_HIDDEN);lv_obj_remove_flag(s_weather_page,LV_OBJ_FLAG_HIDDEN);}
     else{lv_obj_remove_flag(s_controls_page,LV_OBJ_FLAG_HIDDEN);if(s_weather_page)lv_obj_add_flag(s_weather_page,LV_OBJ_FLAG_HIDDEN);}
-    if(s_page_indicator)lv_label_set_text(s_page_indicator,s_show_weather?"Weather":"Controls");
+    if(s_page_indicator)weather_set_text(s_page_indicator,s_show_weather?"Weather":"Controls");
 }
 static void header_navigation_cb(lv_event_t *e)
 {
@@ -105,14 +120,27 @@ static void compass_draw(lv_event_t *e)
 {
     lv_obj_t *o=lv_event_get_target(e);lv_area_t a;lv_obj_get_coords(o,&a);lv_layer_t *layer=lv_event_get_layer(e);
     int cx=(a.x1+a.x2)/2,cy=(a.y1+a.y2)/2;
-    wx_disc(layer,cx-43,cy-43,86,86,T->accent,22);
-    for(int i=0;i<16;i++){float angle=i*0.392699f;wx_line(layer,cx+(int)(sinf(angle)*35),cy-(int)(cosf(angle)*35),cx+(int)(sinf(angle)*40),cy-(int)(cosf(angle)*40),i%4?1:2,T->muted,180);}
+    /* Soft bezel and shaded face, with a single raised directional arrow. */
+    wx_disc(layer,cx-41,cy-39,84,84,0x000000,55);
+    wx_disc(layer,cx-42,cy-42,84,84,T->card_border,220);
+    lv_draw_rect_dsc_t face;lv_draw_rect_dsc_init(&face);face.radius=LV_RADIUS_CIRCLE;
+    face.bg_color=c(T->card_bg_2);face.bg_opa=LV_OPA_COVER;
+    face.bg_grad.dir=LV_GRAD_DIR_VER;face.bg_grad.stops_count=2;
+    face.bg_grad.stops[0].color=lv_color_mix(c(T->accent),c(T->card_bg_2),65);face.bg_grad.stops[0].opa=255;face.bg_grad.stops[0].frac=0;
+    face.bg_grad.stops[1].color=c(T->card_bg);face.bg_grad.stops[1].opa=255;face.bg_grad.stops[1].frac=255;
+    lv_area_t circle={cx-39,cy-39,cx+39,cy+39};lv_draw_rect(layer,&face,&circle);
+    for(int i=0;i<4;i++){float angle=i*1.5707963f;wx_disc(layer,cx+(int)(sinf(angle)*34)-1,cy-(int)(cosf(angle)*34)-1,3,3,T->muted,140);}
     float direction=s_weather_view->current.direction;
     if(isfinite(direction)){
-        float angle=direction*0.017453293f;float dx=sinf(angle),dy=-cosf(angle);
-        wx_triangle(layer,cx+(int)(dx*31),cy+(int)(dy*31),cx+(int)(dy*8),cy-(int)(dx*8),cx-(int)(dy*8),cy+(int)(dx*8),T->accent);
-        wx_triangle(layer,cx-(int)(dx*24),cy-(int)(dy*24),cx+(int)(dy*7),cy-(int)(dx*7),cx-(int)(dy*7),cy+(int)(dx*7),T->muted);
-        wx_disc(layer,cx-4,cy-4,8,8,T->text,255);
+        float angle=direction*0.017453293f,dx=sinf(angle),dy=-cosf(angle);
+        for(int pass=0;pass<2;pass++){
+            int offset=pass?0:2;uint32_t color=pass?T->accent:0x000000;
+            int x=cx+offset,y=cy+offset;
+            wx_line(layer,x-(int)(dx*20),y-(int)(dy*20),x+(int)(dx*12),y+(int)(dy*12),pass?9:12,color,pass?255:65);
+            wx_triangle(layer,x+(int)(dx*30),y+(int)(dy*30),x+(int)(dx*7+dy*14),y+(int)(dy*7-dx*14),x+(int)(dx*7-dy*14),y+(int)(dy*7+dx*14),color);
+        }
+        wx_line(layer,cx-(int)(dx*18)+1,cy-(int)(dy*18)-1,cx+(int)(dx*12)+1,cy+(int)(dy*12)-1,2,T->text,150);
+        wx_line(layer,cx+(int)(dx*26),cy+(int)(dy*26),cx+(int)(dx*8+dy*10),cy+(int)(dy*8-dx*10),2,T->text,130);
     }
 }
 static void chart_draw(lv_event_t *e)
@@ -161,7 +189,7 @@ static void show_day(lv_event_t *e)
     char date[80];struct tm tm;localtime_r(&day->date,&tm);strftime(date,sizeof(date),"%A, %B %d",&tm);
     weather_text(s_weather_modal,date,22,18,520,&lv_font_montserrat_22,T->text);
     lv_obj_t *close=lv_button_create(s_weather_modal);lv_obj_set_pos(close,564,10);lv_obj_set_size(close,48,40);
-    lv_obj_set_style_bg_color(close,c(T->card_bg_2),0);lv_obj_t *label=lv_label_create(close);lv_label_set_text(label,LV_SYMBOL_CLOSE);lv_obj_center(label);lv_obj_add_event_cb(close,close_weather_modal,LV_EVENT_CLICKED,NULL);
+    lv_obj_set_style_bg_color(close,c(T->card_bg_2),0);lv_obj_t *label=lv_label_create(close);weather_set_text(label,LV_SYMBOL_CLOSE);lv_obj_center(label);lv_obj_add_event_cb(close,close_weather_modal,LV_EVENT_CLICKED,NULL);
     weather_icon(s_weather_modal,24,62,124,day->icon);
     weather_text(s_weather_modal,weather_icon_name(day->icon),169,61,420,&lv_font_montserrat_22,T->text);
     char hi[40],lo[40],line[160];weather_format(hi,sizeof(hi),day->high,"temp",metric);weather_format(lo,sizeof(lo),day->low,"temp",metric);
@@ -176,7 +204,7 @@ static void show_day(lv_event_t *e)
     const char *narrative=day->narrative[0]?day->narrative:"Forecast values are model guidance for the station location. Actual local conditions may differ.";
     label=weather_text(s_weather_modal,narrative,22,245,580,&lv_font_montserrat_16,T->muted);lv_label_set_long_mode(label,LV_LABEL_LONG_MODE_WRAP);lv_obj_set_height(label,70);
 }
-static void formatted(lv_obj_t *label,float value,const char *kind){char text[64];weather_format(text,sizeof(text),value,kind,settings_get()->weather_units);lv_label_set_text(label,text);}
+static void formatted(lv_obj_t *label,float value,const char *kind){char text[64];weather_format(text,sizeof(text),value,kind,settings_get()->weather_units);weather_set_text(label,text);}
 static void update_weather_view(void)
 {
     if(!s_weather_view||!weather_copy(s_weather_view))return;
@@ -187,66 +215,74 @@ static void update_weather_view(void)
     if(w->station_status[0])snprintf(status,sizeof(status),"%s | %s%s",provider,w->observed_at?"Cached - ":"",w->station_status);
     else if(w->observed_at)snprintf(status,sizeof(status),"%s | %sObserved %u min ago%s",provider,stale?"Stale - ":"",age/60,w->truncated?" | First 48 readings":"");
     else snprintf(status,sizeof(status),"%s | Waiting for station",provider);
-    lv_label_set_text(s_weather_status,status);
+    weather_set_text(s_weather_status,status);
     unsigned forecast_age=w->forecast_received_us?(unsigned)((now-w->forecast_received_us)/60000000):0;
     const char *forecast=settings_get()->weather_forecast==1?"Weather Underground":"Open-Meteo";
     if(w->forecast_status[0])snprintf(status,sizeof(status),"%s forecast | %s%s",forecast,w->day_count?"Cached - ":"",w->forecast_status);
     else if(w->forecast_received_us)snprintf(status,sizeof(status),"%s forecast | %s%u min ago",forecast,forecast_age>30?"Stale - ":"Updated ",forecast_age);
     else snprintf(status,sizeof(status),"Forecast waiting for station coordinates");
-    lv_label_set_text(s_forecast_status,status);
+    weather_set_text(s_forecast_status,status);
     if(w->revision==s_weather_revision)return;
     s_weather_revision=w->revision;
-    lv_label_set_text(s_weather_heading,w->name[0]?w->name:"Your weather station");
+    weather_set_text(s_weather_heading,w->name[0]?w->name:"Your weather station");
     formatted(s_weather_summary,w->current.temp,"temp");
     /* Keep extreme temperatures readable without dropping digits or units. */
     lv_point_t temperature_size;
     lv_text_get_size(&temperature_size,lv_label_get_text(s_weather_summary),&font_outfit_semibold_48,0,0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
-    lv_obj_set_style_text_font(s_weather_summary,temperature_size.x>194?&lv_font_montserrat_36:&font_outfit_semibold_48,0);
-    char value[64];weather_format(value,sizeof(value),w->current.feels,"temp",settings_get()->weather_units);snprintf(status,sizeof(status),"Feels like %s",value);lv_label_set_text(s_feels,status);
-    weather_format(value,sizeof(value),w->current.dew,"temp",settings_get()->weather_units);snprintf(status,sizeof(status),"Dew point  %s",value);lv_label_set_text(s_dew,status);
-    weather_format(value,sizeof(value),w->current.humidity,"percent",true);snprintf(status,sizeof(status),"Humidity   %s",value);lv_label_set_text(s_humidity,status);
-    formatted(s_wind,w->current.wind,"wind");weather_format(value,sizeof(value),w->current.gust,"wind",settings_get()->weather_units);snprintf(status,sizeof(status),"Gust %s",value);lv_label_set_text(s_gust,status);
+    const lv_font_t *temperature_font=temperature_size.x>194?&lv_font_montserrat_36:&font_outfit_semibold_48;
+    if(lv_obj_get_style_text_font(s_weather_summary,0)!=temperature_font)lv_obj_set_style_text_font(s_weather_summary,temperature_font,0);
+    char value[64];weather_format(value,sizeof(value),w->current.feels,"temp",settings_get()->weather_units);snprintf(status,sizeof(status),"Feels like %s",value);weather_set_text(s_feels,status);
+    weather_format(value,sizeof(value),w->current.dew,"temp",settings_get()->weather_units);snprintf(status,sizeof(status),"Dew point  %s",value);weather_set_text(s_dew,status);
+    weather_format(value,sizeof(value),w->current.humidity,"percent",true);snprintf(status,sizeof(status),"Humidity   %s",value);weather_set_text(s_humidity,status);
+    formatted(s_wind,w->current.wind,"wind");weather_format(value,sizeof(value),w->current.gust,"wind",settings_get()->weather_units);snprintf(status,sizeof(status),"Gust %s",value);weather_set_text(s_gust,status);
     static const char *dirs[]={"N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"};
-    if(isfinite(w->current.direction))snprintf(status,sizeof(status),"From %s  %.0f°",dirs[(int)lroundf(w->current.direction/22.5f)%16],w->current.direction);else snprintf(status,sizeof(status),"Direction unavailable");lv_label_set_text(s_wind_dir,status);lv_obj_invalidate(s_compass);
+    if(isfinite(w->current.direction))snprintf(status,sizeof(status),"From %s  %.0f°",dirs[(int)lroundf(w->current.direction/22.5f)%16],w->current.direction);else snprintf(status,sizeof(status),"Direction unavailable");weather_set_text(s_wind_dir,status);
+    if((isfinite(w->current.direction)!=isfinite(s_drawn_direction)) || (isfinite(w->current.direction)&&w->current.direction!=s_drawn_direction)){
+        s_drawn_direction=w->current.direction;lv_obj_invalidate(s_compass);
+    }
     formatted(s_pressure,w->current.pressure,"pressure");formatted(s_rain_day,w->current.rain_day,"rain");formatted(s_rain_rate,w->current.rain_rate,"rate");
-    weather_format(value,sizeof(value),w->current.uv,"",true);snprintf(status,sizeof(status),"UV %s",value);lv_label_set_text(s_uv,status);
+    weather_format(value,sizeof(value),w->current.uv,"",true);snprintf(status,sizeof(status),"UV %s",value);weather_set_text(s_uv,status);
     formatted(s_solar,w->current.solar,"W/m2");formatted(s_risk,w->current.heat_index,"temp");
     weather_icon_t today=w->day_count?w->days[0].icon:WX_UNKNOWN;
-    lv_obj_set_user_data(s_hero_icon,(void *)(uintptr_t)today);lv_obj_invalidate(s_hero_icon);
+    weather_set_icon(s_hero_icon,today);
     char rise[20]="--",set[20]="--";struct tm tm;
     weather_clock(rise,sizeof(rise),w->day_count?w->days[0].sunrise:0);
     weather_clock(set,sizeof(set),w->day_count?w->days[0].sunset:0);
-    snprintf(status,sizeof(status),"%s\n%s",rise,set);lv_label_set_text(s_sun,status);
+    snprintf(status,sizeof(status),"%s\n%s",rise,set);weather_set_text(s_sun,status);
     char lo[48],hi[48];weather_format(hi,sizeof(hi),w->day_count>1?w->days[1].high:NAN,"temp",settings_get()->weather_units);weather_format(lo,sizeof(lo),w->day_count>1?w->days[1].low:NAN,"temp",settings_get()->weather_units);
-    snprintf(status,sizeof(status),"%s\nLow %s",hi,lo);lv_label_set_text(s_tomorrow,status);
+    snprintf(status,sizeof(status),"High %s\nLow %s",hi,lo);weather_set_text(s_tomorrow,status);
     for(unsigned i=0;i<WEATHER_MAX_FIELDS;i++){
         lv_obj_t *cell=s_weather_fields[i];if(i>=w->field_count){lv_obj_add_flag(cell,LV_OBJ_FLAG_HIDDEN);continue;}
-        lv_obj_remove_flag(cell,LV_OBJ_FLAG_HIDDEN);lv_label_set_text(lv_obj_get_child(cell,0),w->fields[i].label);
-        snprintf(status,sizeof(status),"%s %s",w->fields[i].value,w->fields[i].unit);lv_label_set_text(lv_obj_get_child(cell,1),status);
+        lv_obj_remove_flag(cell,LV_OBJ_FLAG_HIDDEN);weather_set_text(lv_obj_get_child(cell,0),w->fields[i].label);
+        snprintf(status,sizeof(status),"%s %s",w->fields[i].value,w->fields[i].unit);weather_set_text(lv_obj_get_child(cell,1),status);
     }
     for(unsigned i=0;i<WEATHER_DAYS;i++){
-        lv_obj_t *card=s_forecast_cards[i];lv_obj_clean(card);if(T->magic)add_magic_card_ornaments(card,144,180);
-        if(i>=w->day_count){weather_text(card,"Waiting",18,74,114,&lv_font_montserrat_16,T->muted);continue;}
-        weather_day_t *day=&w->days[i];localtime_r(&day->date,&tm);strftime(value,sizeof(value),"%a %m/%d",&tm);
-        weather_text(card,value,14,10,120,&lv_font_montserrat_14,T->text);weather_icon(card,40,27,68,day->icon);
-        weather_format(hi,sizeof(hi),day->high,"temp",settings_get()->weather_units);weather_format(lo,sizeof(lo),day->low,"temp",settings_get()->weather_units);
-        weather_text(card,hi,14,95,120,&lv_font_montserrat_22,T->text);snprintf(status,sizeof(status),"Low %s",lo);weather_text(card,status,14,124,120,&lv_font_montserrat_14,T->muted);
-        weather_format(value,sizeof(value),day->rain_chance,"percent",true);snprintf(status,sizeof(status),"%s rain",value);weather_text(card,status,18,147,114,&lv_font_montserrat_14,T->accent);
-        lv_obj_t *bar=weather_container(card,18,169,110,4);lv_obj_set_style_bg_color(bar,c(T->card_border),0);lv_obj_set_style_bg_opa(bar,100,0);
-        if(isfinite(day->rain_chance)){lv_obj_t *fill=weather_container(bar,0,0,(int)(day->rain_chance*1.1f),4);lv_obj_set_style_bg_color(fill,c(T->accent),0);lv_obj_set_style_bg_opa(fill,255,0);}
+        const weather_day_t *day=i<w->day_count?&w->days[i]:NULL;
+        if(day){localtime_r(&day->date,&tm);strftime(value,sizeof(value),"%a %m/%d",&tm);}else snprintf(value,sizeof(value),"Waiting");
+        weather_set_text(s_day_dates[i],value);weather_set_icon(s_day_icons[i],day?day->icon:WX_UNKNOWN);
+        weather_format(hi,sizeof(hi),day?day->high:NAN,"temp",settings_get()->weather_units);
+        weather_format(lo,sizeof(lo),day?day->low:NAN,"temp",settings_get()->weather_units);
+        weather_set_text(s_day_highs[i],hi);snprintf(status,sizeof(status),"Low %s",lo);weather_set_text(s_day_lows[i],status);
+        weather_format(value,sizeof(value),day?day->rain_chance:NAN,"percent",true);
+        snprintf(status,sizeof(status),"%s rain",value);weather_set_text(s_day_rains[i],status);
+        int bar_width=day&&isfinite(day->rain_chance)?(int)(day->rain_chance*1.1f):0;
+        if(lv_obj_get_width(s_day_bars[i])!=bar_width)lv_obj_set_width(s_day_bars[i],bar_width);
     }
     if(w->hour_count){
         float min=INFINITY,max=-INFINITY;
         for(unsigned i=0;i<w->hour_count;i++)if(isfinite(w->hours[i].temp)){min=fminf(min,w->hours[i].temp);max=fmaxf(max,w->hours[i].temp);}
         weather_format(lo,sizeof(lo),min,"temp",settings_get()->weather_units);weather_format(hi,sizeof(hi),max,"temp",settings_get()->weather_units);
         snprintf(status,sizeof(status),"NEXT %u HOURS  |  %s to %s  |  Line: temperature / bars: rain chance",w->hour_count,lo,hi);
-        lv_label_set_text(s_chart_caption,status);
-        for(unsigned i=0;i<4;i++){unsigned index=i*(w->hour_count-1)/3;localtime_r(&w->hours[index].time,&tm);strftime(value,sizeof(value),"%H:%M",&tm);lv_label_set_text(s_chart_times[i],value);}
+        weather_set_text(s_chart_caption,status);
+        for(unsigned i=0;i<4;i++){unsigned index=i*(w->hour_count-1)/3;localtime_r(&w->hours[index].time,&tm);strftime(value,sizeof(value),"%H:%M",&tm);weather_set_text(s_chart_times[i],value);}
     }else{
-        lv_label_set_text(s_chart_caption,settings_get()->weather_forecast==1?"DAILY OUTLOOK BELOW  |  Hourly chart requires Open-Meteo":"Hourly forecast is not available yet");
-        for(unsigned i=0;i<4;i++)lv_label_set_text(s_chart_times[i],"--");
+        weather_set_text(s_chart_caption,settings_get()->weather_forecast==1?"DAILY OUTLOOK BELOW  |  Hourly chart requires Open-Meteo":"Hourly forecast is not available yet");
+        for(unsigned i=0;i<4;i++)weather_set_text(s_chart_times[i],"--");
     }
-    lv_obj_invalidate(s_hour_chart);
+    if(s_drawn_hour_count!=w->hour_count||memcmp(s_drawn_hours,w->hours,w->hour_count*sizeof(*w->hours))){
+        memcpy(s_drawn_hours,w->hours,w->hour_count*sizeof(*w->hours));s_drawn_hour_count=w->hour_count;
+        lv_obj_invalidate(s_hour_chart);
+    }
 }
 static void display_timer_cb(lv_timer_t *timer)
 {
@@ -284,7 +320,7 @@ static void create_weather_page(lv_obj_t *root)
         lv_obj_t *button=lv_button_create(s_weather_page);s_weather_tabs[i]=button;
         lv_obj_set_pos(button,448+i*114,84);lv_obj_set_size(button,106,36);
         lv_obj_set_style_radius(button,18,0);lv_obj_set_style_shadow_width(button,0,0);
-        lv_obj_t *label=lv_label_create(button);lv_label_set_text(label,tabs[i]);lv_obj_center(label);
+        lv_obj_t *label=lv_label_create(button);weather_set_text(label,tabs[i]);lv_obj_center(label);
         lv_obj_add_event_cb(button,weather_tab_cb,LV_EVENT_CLICKED,(void *)(uintptr_t)i);
     }
     lv_obj_t *now=s_weather_sections[0];
@@ -329,6 +365,14 @@ static void create_weather_page(lv_obj_t *root)
         s_forecast_cards[i]=make_card(outlook,14+i*156,264,148,184);
         lv_obj_add_flag(s_forecast_cards[i],LV_OBJ_FLAG_CLICKABLE);
         lv_obj_add_event_cb(s_forecast_cards[i],show_day,LV_EVENT_CLICKED,(void *)(uintptr_t)i);
+        lv_obj_t *card=s_forecast_cards[i];
+        s_day_dates[i]=weather_text(card,"Waiting",14,10,120,&lv_font_montserrat_14,T->text);
+        s_day_icons[i]=weather_icon(card,40,27,68,WX_UNKNOWN);
+        s_day_highs[i]=weather_text(card,"--",14,95,120,&lv_font_montserrat_22,T->text);
+        s_day_lows[i]=weather_text(card,"Low --",14,124,120,&lv_font_montserrat_14,T->muted);
+        s_day_rains[i]=weather_text(card,"-- rain",18,147,114,&lv_font_montserrat_14,T->accent);
+        lv_obj_t *bar=weather_container(card,18,169,110,4);lv_obj_set_style_bg_color(bar,c(T->card_border),0);lv_obj_set_style_bg_opa(bar,100,0);
+        s_day_bars[i]=weather_container(bar,0,0,0,4);lv_obj_set_style_bg_color(s_day_bars[i],c(T->accent),0);lv_obj_set_style_bg_opa(s_day_bars[i],255,0);
     }
     lv_obj_t *detail=make_card(s_weather_sections[2],14,130,772,318);
     lv_obj_add_flag(detail,LV_OBJ_FLAG_SCROLLABLE);lv_obj_set_scroll_dir(detail,LV_DIR_VER);

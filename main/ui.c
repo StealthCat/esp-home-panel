@@ -1123,10 +1123,13 @@ static void clock_timer_cb(lv_timer_t *timer)
     }
     strftime(date_buf, sizeof(date_buf), "%a, %b %d", &tm_now);
 
-    lv_label_set_text(s_clock, time_buf);
-    lv_label_set_text(s_clock_period, tm_now.tm_hour < 12 ? "am" : "pm");
-    lv_label_set_text(s_date, date_buf);
-    align_clock_labels();
+    const char *period=tm_now.tm_hour<12?"am":"pm";
+    bool changed=strcmp(lv_label_get_text(s_clock),time_buf)||strcmp(lv_label_get_text(s_clock_period),period);
+    if(changed){
+        lv_label_set_text(s_clock,time_buf);lv_label_set_text(s_clock_period,period);
+        align_clock_labels();
+    }
+    if(strcmp(lv_label_get_text(s_date),date_buf))lv_label_set_text(s_date,date_buf);
 }
 
 #include "ui_weather.inc"
@@ -1241,8 +1244,10 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
 void ui_set_network_online(bool online)
 {
     portENTER_CRITICAL(&s_pending_ui_mux);
-    s_pending_ui.network_online = online;
-    s_pending_ui.dirty |= UI_PENDING_NETWORK;
+    if(s_pending_ui.network_online != online){
+        s_pending_ui.network_online = online;
+        s_pending_ui.dirty |= UI_PENDING_NETWORK;
+    }
     portEXIT_CRITICAL(&s_pending_ui_mux);
 }
 

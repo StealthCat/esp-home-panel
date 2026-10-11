@@ -27,6 +27,7 @@ static void touch_at(int x,int y,bool pressed) {
 }
 
 static uint16_t framebuffer[800 * 480];
+static unsigned flush_count;
 static int tapo_commands, fan_commands, echo_commands;
 static bool last_playing, last_next;
 static uint32_t last_rgb;
@@ -43,7 +44,7 @@ void mqtt_bridge_echo_play_pause(bool p) {last_playing=p;echo_commands++;}
 void mqtt_bridge_echo_track(bool next) {last_next=next;echo_commands++;}
 
 static void flush(lv_display_t *d,const lv_area_t *area,uint8_t *pixels) {
-    (void)area;(void)pixels;lv_display_flush_ready(d);
+    (void)area;(void)pixels;flush_count++;lv_display_flush_ready(d);
 }
 lv_display_t *wokwi_panel_create_display(void) {
     lv_display_t *d=lv_display_create(800,480);
@@ -194,6 +195,21 @@ int main(int argc,char **argv) {
     lv_text_get_size(&text_size,lv_label_get_text(s_weather_summary),lv_obj_get_style_text_font(s_weather_summary,0),0,0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
     assert(text_size.x<=lv_obj_get_width(s_weather_summary));
     demo_weather.current.temp=24.7;demo_weather.revision++;update_weather_view();
+    /* Stable data must not redraw or recreate forecast widgets. */
+    set_page(true);weather_section(1);lv_obj_update_layout(lv_screen_active());lv_refr_now(NULL);
+    lv_obj_t *day_label=s_day_highs[0];unsigned before_flush=flush_count;
+    for(unsigned i=0;i<8;i++){update_weather_view();lv_refr_now(NULL);}
+    assert(flush_count==before_flush);
+    demo_weather.revision++;update_weather_view();lv_refr_now(NULL);
+    assert(flush_count==before_flush && s_day_highs[0]==day_label);
+    demo_weather.days[0].high+=1;demo_weather.revision++;update_weather_view();lv_refr_now(NULL);
+    assert(flush_count>before_flush && s_day_highs[0]==day_label);
+    assert(strstr(lv_label_get_text(s_tomorrow),"High ") && strstr(lv_label_get_text(s_tomorrow),"Low "));
+    demo_weather.days[0].high-=1;demo_weather.revision++;update_weather_view();
+    weather_section(0);clock_timer_cb(NULL);lv_refr_now(NULL);before_flush=flush_count;
+    clock_timer_cb(NULL);ui_set_network_online(true);pending_state_timer_cb(NULL);lv_refr_now(NULL);
+    assert(flush_count==before_flush);
+    lv_label_set_text(s_clock,"10:24");lv_label_set_text(s_clock_period,"am");lv_label_set_text(s_date,"Sat, Apr 26");align_clock_labels();
     set_page(argc==4);
     if(argc==4 && !strcmp(argv[3],"forecast"))weather_section(1);
     if(argc==4 && !strcmp(argv[3],"station"))weather_section(2);
