@@ -36,7 +36,9 @@ jobs:
           mkdir -p build/previews
           for theme in 0 1 2 3; do
             build/host/panel_render "$theme" "build/previews/theme-$theme.ppm"
-            build/host/panel_render "$theme" "build/previews/weather-$theme.ppm" weather
+            for view in weather forecast station day; do
+              build/host/panel_render "$theme" "build/previews/$view-$theme.ppm" "$view"
+            done
           done
       - uses: actions/upload-artifact@v4
         with:

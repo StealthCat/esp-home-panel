@@ -1,10 +1,11 @@
 # Web configuration
 
-Open the panel's network address in a browser. Settings are grouped into five tabs:
+Open the panel's network address in a browser. Settings are grouped into six tabs:
 
 - **Network:** Wi-Fi credentials, hostname, and current network names.
 - **Display:** title, theme, backlight, timezone, and light-strip color presets.
 - **Home Assistant:** MQTT connection, discovery, and entity mappings.
+- **Weather:** direct Ambient/WU station, API keys, forecast source, units and polling.
 - **Sensors:** VEML7700 ambient light and Gravity C4001 presence settings.
 - **System:** administrator password, firmware updater, and configuration reset.
 
@@ -20,6 +21,6 @@ Firmware uploads use the dedicated updater linked from **System**. Configuration
 
 `python tools/render_web_config.py` prints the production handler's HTML using a host fixture with fake network/settings data. `node tools/test_settings_ui.js` uses Playwright to exercise that HTML at desktop and mobile sizes; CI runs these browser checks and retains screenshots as the `settings-ui-previews` artifact. The fixture never contacts a physical panel.
 
-Weather configuration is under Home Assistant. Presence sleep and automatic
+Weather configuration has its own Weather tab and does not require Home Assistant. Presence sleep and automatic
 brightness are under Display. See [weather and display setup](weather-display.md)
-for hardware support and Home Assistant package installation.
+for hardware support and provider setup.

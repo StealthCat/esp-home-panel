@@ -155,37 +155,31 @@ int main(int argc,char **argv) {
     touch_at(550,30,true);touch_at(300,30,true);touch_at(200,30,false);
     assert(!s_show_weather);
     config.sleep_enabled=0;
+    weather_reset(&demo_weather);
     demo_weather.revision=1;
     demo_weather.station_available=demo_weather.forecast_available=true;
     demo_weather.station_received_us=demo_weather.forecast_received_us=fake_now;
-    demo_weather.station_age_seconds=45;
-    snprintf(demo_weather.name,sizeof(demo_weather.name),"Evans Weather");
-    const char *labels[]={"Outdoor temperature","Humidity","Wind speed / direction","Wind gust","Rain today","Relative pressure","UV index","Solar radiation","Indoor temperature","Indoor humidity","Rain this month","Station battery"};
-    const char *values[]={"76.4","62","4.8 / NW","9.2","0.14","30.06","4","386","72.1","48","2.38","Normal"};
-    const char *units[]={"°F","%","mph","mph","in","inHg","","W/m²","°F","%","in",""};
+    demo_weather.observed_at=time(NULL)-45;
+    strcpy(demo_weather.name,"Evans Weather");
+    demo_weather.current=(weather_current_t){.temp=24.7,.humidity=62,.feels=25.8,.dew=17,.heat_index=25.8,.wind_chill=NAN,.wind=7.7,.gust=14.8,.direction=315,.pressure=1018,.rain_rate=0,.rain_day=3.5,.uv=4,.solar=386};
+    const char *labels[]={"Outdoor temperature","Humidity","Wind speed","Wind gust","Rain today","Relative pressure","UV index","Solar radiation","Indoor temperature","Indoor humidity","Rain this month","Station battery"};
+    const char *values[]={"76.5 °F","62%","4.8 mph","9.2 mph","0.14 in","30.06 inHg","4","386 W/m2","72.1 °F","48%","2.38 in","Normal"};
     demo_weather.field_count=12;
-    for(int i=0;i<12;i++) {
-        snprintf(demo_weather.fields[i].label,80,"%s",labels[i]);
-        snprintf(demo_weather.fields[i].value,40,"%s",values[i]);
-        snprintf(demo_weather.fields[i].unit,24,"%s",units[i]);
-    }
-    const char *conditions[]={"sunny","partlycloudy","rainy","cloudy","sunny"};
+    for(int i=0;i<12;i++) {snprintf(demo_weather.fields[i].label,sizeof(demo_weather.fields[i].label),"%s",labels[i]);snprintf(demo_weather.fields[i].value,sizeof(demo_weather.fields[i].value),"%s",values[i]);}
+    weather_icon_t icons[]={WX_PARTLY,WX_CLEAR,WX_RAIN,WX_STORM,WX_CLOUD};
     demo_weather.day_count=5;
     for(int i=0;i<5;i++) {
-        snprintf(demo_weather.days[i].date,24,"Oct %d",11+i);
-        snprintf(demo_weather.days[i].condition,40,"%s",conditions[i]);
-        snprintf(demo_weather.days[i].high,32,"%d °F",78+i);
-        snprintf(demo_weather.days[i].low,32,"%d °F",55+i);
-        snprintf(demo_weather.days[i].rain,40,"%d%% rain",i*10);
+        demo_weather.days[i]=(weather_day_t){.date=time(NULL)+i*86400,.sunrise=time(NULL)-14400,.sunset=time(NULL)+21600,.icon=icons[i],.high=26+i,.low=14+i,.rain_chance=i*20,.rain=i*2,.wind=15+i,.uv=4};
+        strcpy(demo_weather.days[i].narrative,"Clouds giving way to sunshine. A light northwest breeze with a chance of showers later in the day.");
     }
+    demo_weather.hour_count=12;
+    for(int i=0;i<12;i++)demo_weather.hours[i]=(weather_hour_t){.time=time(NULL)+i*3600,.temp=24+4*sinf(i*0.4),.rain_chance=i*7,.rain=i*0.2};
     update_weather_view();
-    assert(strstr(lv_label_get_text(s_weather_summary),"76.4"));
-    assert(strstr(lv_label_get_text(lv_obj_get_child(s_weather_fields[11],1)),"Normal"));
-    fake_now+=2000000000;update_weather_view();
-    assert(strstr(lv_label_get_text(s_weather_status),"Stale"));
-    assert(strstr(lv_label_get_text(s_forecast_status),"Stale"));
-    fake_now-=2000000000;update_weather_view();
+    assert(strstr(lv_label_get_text(s_weather_summary),"76.5"));
     set_page(argc==4);
+    if(argc==4 && !strcmp(argv[3],"forecast"))weather_section(1);
+    if(argc==4 && !strcmp(argv[3],"station"))weather_section(2);
+    if(argc==4 && !strcmp(argv[3],"day")){weather_section(1);lv_obj_send_event(s_forecast_cards[0],LV_EVENT_CLICKED,NULL);}
     lv_obj_update_layout(lv_screen_active());
     assert_image_tree(lv_screen_active());
     lv_refr_now(NULL);

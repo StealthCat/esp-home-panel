@@ -57,6 +57,7 @@ idf_component_register(
         "c4001.c"
         "display_policy.c"
         "weather.c"
+        "weather_parse.c"
         "ui.c"
         "ui_theme.c"
         "font_outfit_semibold_48.c"
@@ -70,6 +71,7 @@ idf_component_register(
         esp_event
         esp_hw_support
         esp_timer
+        esp_http_client
         esp_http_server
         app_update
         esp_app_format

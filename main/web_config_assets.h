@@ -9,7 +9,7 @@ static const char PAGE_FOOT[] =
 "<p class='footer'>ESP Home Panel \u00b7 Local device settings</p></main><script>'use strict';\n"
 "const form=document.getElementById('settings-form');\n"
 "if(form){\n"
-" const groups=[['network','Network','Connect your panel and give it a name on your network.'],['display','Display','Make the screen, theme, and light presets your own.'],['home-assistant','Home Assistant','Connect your broker and map the devices you control.'],['sensors','Sensors','Bring ambient light and room occupancy into Home Assistant.'],['system','System','Manage administrator access, firmware, and configuration.']];\n"
+" const groups=[['network','Network','Connect your panel and give it a name on your network.'],['display','Display','Make the screen, theme, and light presets your own.'],['home-assistant','Home Assistant','Connect your broker and map the devices you control.'],['weather','Weather','Connect your station directly and choose forecast and display units.'],['sensors','Sensors','Bring ambient light and room occupancy into Home Assistant.'],['system','System','Manage administrator access, firmware, and configuration.']];\n"
 " const nav=document.getElementById('settings-tabs'),grid=document.getElementById('settings-grid');\n"
 " const panels=new Map(),tabs=[];\n"
 " for(const [id,title,description] of groups){\n"

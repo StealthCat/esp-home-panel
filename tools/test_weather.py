@@ -1,75 +1,37 @@
 #!/usr/bin/env python3
-"""Production weather parser + MQTT fragmentation, and HA payload templates."""
-import json
+"""Exercise production direct-provider parsers and request safety helpers."""
 import os
 from pathlib import Path
 import subprocess
 import tempfile
 import urllib.request
-import datetime
-import re
-import yaml
-from jinja2.nativetypes import NativeEnvironment
 ROOT=Path(__file__).resolve().parents[1]
-source=(ROOT/'main/mqtt_bridge.c').read_text()
-fragment=source[source.index('static bool receive_weather_fragment('):source.index('static void publish_state_request(')]
 TEST=r'''
 #include <assert.h>
-#include <stdio.h>
+#include <math.h>
 #include <string.h>
-#include "weather.c"
-#include "settings.h"
-static panel_settings_t cfg={.weather_enabled=1};
-const panel_settings_t *settings_get(void) {return &cfg;}
-int64_t esp_timer_get_time(void) {return 1000000;}
-typedef struct {int current_data_offset,total_data_len,data_len;const char *topic,*data;} event_t;
-typedef event_t *esp_mqtt_event_handle_t;
-static bool topic_equals(esp_mqtt_event_handle_t e,const char *s) {return e->topic && !strcmp(e->topic,s);}
-static const char *s_topic_weather="weather",*s_topic_forecast="forecast";
-static char *s_weather_rx;
-static int s_weather_rx_total,s_weather_rx_used;
-static bool s_weather_rx_forecast;
-FRAGMENT
+#include "weather.h"
+#define STATION(s,a,id) weather_parse_station(&w,s,strlen(s),a,id,false)
+#define FORECAST(s,wu) weather_parse_forecast(&w,s,strlen(s),wu,1780000000)
 int main(void) {
- assert(weather_init());
- const char *station="{\"version\":1,\"available\":true,\"name\":\"Station\",\"age_seconds\":22,\"fields\":[{\"label\":\"Temperature\",\"value\":\"0\",\"unit\":\"°F\"}]}";
- event_t e={.total_data_len=(int)strlen(station),.data_len=10,.topic="weather",.data=station};
- assert(receive_weather_fragment(&e));
- weather_snapshot_t out;weather_copy(&out);assert(out.revision==0);
- e.current_data_offset=10;e.data=station+10;e.data_len=e.total_data_len-10;e.topic=NULL;
- assert(receive_weather_fragment(&e));weather_copy(&out);
- assert(out.field_count==1 && out.station_available && out.station_age_seconds==22);
- assert(!strcmp(out.fields[0].value,"0") && !strcmp(out.fields[0].unit,"°F"));
- unsigned revision=out.revision;
- assert(!weather_receive(false,"{bad",4,1000000));
- assert(!weather_receive(false,"{}",2,1000000));
- const char *missing="{\"version\":1,\"available\":false,\"fields\":[]}";
- assert(weather_receive(false,missing,strlen(missing),2000000));
- weather_copy(&out);assert(!out.station_available && out.field_count==0);
- const char *forecast="{\"version\":1,\"available\":true,\"days\":[{\"date\":\"Mon\",\"condition\":\"rainy\",\"high\":\"75 °F\",\"low\":\"--\",\"rain\":\"90% rain\"}]}";
- assert(weather_receive(true,forecast,strlen(forecast),3000000));
- weather_copy(&out);assert(out.day_count==1 && !strcmp(out.days[0].low,"--"));
- assert(out.revision==revision+2 && !out.station_available);
- // Oversize and out-of-order fragments never mutate a valid snapshot.
- e=(event_t){.total_data_len=WEATHER_MAX_PAYLOAD+1,.data_len=10,.topic="weather",.data=station};
- assert(receive_weather_fragment(&e));assert(!s_weather_rx);
- e.total_data_len=strlen(station);assert(receive_weather_fragment(&e));
- e.current_data_offset=20;e.data=station+20;e.data_len=2;e.topic=NULL;
- assert(receive_weather_fragment(&e));assert(!s_weather_rx);
- weather_copy(&out);assert(out.revision==revision+2);
- // A new non-weather publication cancels partial weather input safely.
- e=(event_t){.total_data_len=(int)strlen(station),.data_len=10,.topic="weather",.data=station};
- assert(receive_weather_fragment(&e));e.topic="other";
- assert(!receive_weather_fragment(&e));assert(!s_weather_rx);
- cJSON *large=cJSON_CreateObject();cJSON_AddNumberToObject(large,"version",1);
- cJSON_AddBoolToObject(large,"available",1);cJSON *fields=cJSON_AddArrayToObject(large,"fields");
- for(int i=0;i<60;i++){cJSON *field=cJSON_CreateObject();cJSON_AddStringToObject(field,"label","Wind");cJSON_AddStringToObject(field,"value","Unavailable");cJSON_AddItemToArray(fields,field);}
- char *payload=cJSON_PrintUnformatted(large);assert(weather_receive(false,payload,strlen(payload),4000000));
- weather_copy(&out);assert(out.field_count==48 && out.truncated && !strcmp(out.fields[0].value,"Unavailable"));
- free(payload);cJSON_Delete(large);free(s_weather);s_weather=NULL;
+ weather_snapshot_t w;weather_reset(&w);assert(isnan(w.current.temp));
+ const char *wu="{\"observations\":[{\"stationID\":\"KTEST1\",\"epoch\":1780000000,\"lat\":40,\"lon\":-75,\"humidity\":0,\"winddir\":0,\"metric\":{\"temp\":0,\"windSpeed\":0,\"precipTotal\":0,\"pressure\":1013}}]}";
+ assert(STATION(wu,false,"ktest1"));assert(w.current.temp==0 && w.current.humidity==0 && w.current.rain_day==0);assert(isnan(w.current.gust));assert(w.latitude==40);
+ assert(!STATION(wu,false,"OTHER"));assert(!STATION("{bad",false,"KTEST1"));
+ const char *aw="[{\"macAddress\":\"AA:BB:CC:DD:EE:FF\",\"info\":{\"name\":\"Garden\",\"coords\":{\"geo\":{\"coordinates\":[-75,40]}}},\"lastData\":{\"dateutc\":1780000000000,\"tempf\":77,\"humidity\":60,\"windspeedmph\":10,\"baromrelin\":30,\"dailyrainin\":1,\"temp1f\":32}}]";
+ assert(STATION(aw,true,"Garden"));assert(fabs(w.current.temp-25)<0.01 && fabs(w.current.wind-16.09344)<0.01 && fabs(w.current.rain_day-25.4)<0.01);assert(w.longitude==-75 && isfinite(w.current.dew));
+ assert(STATION(aw,true,"aabbccddeeff"));assert(!STATION(aw,true,"wrong"));
+ const char *ambiguous="[{\"info\":{\"name\":\"X\"},\"lastData\":{}},{\"info\":{\"name\":\"X\"},\"lastData\":{}}]";assert(!STATION(ambiguous,true,"X"));
+ const char *fc="{\"daily\":{\"time\":[1779800000,1780000000,1780086400],\"temperature_2m_max\":[20,25,26],\"temperature_2m_min\":[10,null,12],\"weather_code\":[0,95,61],\"precipitation_probability_max\":[0,0,70]},\"hourly\":{\"time\":[1779900000,1780000000,1780003600],\"temperature_2m\":[10,20,null],\"precipitation_probability\":[0,0,50]}}";
+ assert(FORECAST(fc,false));assert(w.day_count==2 && w.days[0].icon==WX_STORM && isnan(w.days[0].low) && w.days[0].rain_chance==0);assert(w.hour_count==2 && isnan(w.hours[1].temp));
+ const char *twc="{\"validTimeUtc\":[1780000000],\"temperatureMax\":[null],\"temperatureMin\":[12],\"narrative\":[\"Evening rain\"],\"daypart\":[{\"iconCode\":[null,12],\"precipChance\":[null,80]}]}";
+ assert(FORECAST(twc,true));assert(w.day_count==1 && w.days[0].icon==WX_RAIN && w.days[0].rain_chance==80 && !strcmp(w.days[0].narrative,"Evening rain"));assert(!FORECAST("{}",true));
+ char b[80];weather_format(b,sizeof(b),0,"temp",false);assert(!strcmp(b,"32.0 °F"));weather_format(b,sizeof(b),NAN,"wind",true);assert(!strcmp(b,"--"));
+ assert(weather_encode(b,sizeof(b),"A B&x=/"));assert(!strcmp(b,"A%20B%26x%3D%2F"));assert(!weather_encode(b,3,"&"));
+ assert(weather_retry_seconds(0,500,0)==60 && weather_retry_seconds(20,500,0)==900 && weather_retry_seconds(0,403,0)==900 && weather_retry_seconds(0,429,7200)==3600);
  return 0;
 }
-'''.replace('FRAGMENT',fragment)
+'''
 with tempfile.TemporaryDirectory() as directory:
     tmp=Path(directory)
     source_dir=Path(os.environ.get('CJSON_DIR',str(Path.home()/'.platformio/packages/framework-espidf/components/json/cJSON')))
@@ -79,35 +41,56 @@ with tempfile.TemporaryDirectory() as directory:
             with urllib.request.urlopen('https://raw.githubusercontent.com/DaveGamble/cJSON/v1.7.19/'+name,timeout=30) as response:
                 (tmp/name).write_bytes(response.read())
     (tmp/'test.c').write_text(TEST)
-    subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-I'+str(ROOT/'tests/host/stubs'),'-I'+str(ROOT/'main'),'-I'+str(source_dir),str(tmp/'test.c'),str(source_dir/'cJSON.c'),'-lm','-o',str(tmp/'test')],check=True)
+    subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-I'+str(ROOT/'tests/host/stubs'),'-I'+str(ROOT/'main'),'-I'+str(source_dir),str(tmp/'test.c'),str(ROOT/'main/weather_parse.c'),str(source_dir/'cJSON.c'),'-lm','-o',str(tmp/'test')],check=True)
     subprocess.run([str(tmp/'test')],check=True)
-# Render the actual package's payload templates with representative HA objects.
-package=yaml.safe_load((ROOT/'home-assistant/esp-home-panel-weather.yaml').read_text())
-actions=package['automation'][0]['actions']
-station_template=actions[1]['data']['payload']
-forecast_template=actions[2]['then'][2]['data']['payload']
-env=NativeEnvironment()
-env.filters['to_json']=json.dumps
-env.tests['match']=lambda value,pattern: re.match(pattern,value) is not None
-now=datetime.datetime(2026,10,11,12,tzinfo=datetime.timezone.utc)
-class State:
-    last_reported=now-datetime.timedelta(seconds=90)
-env.globals.update(now=lambda:now,as_timestamp=lambda value,default=0: value.timestamp() if hasattr(value,'timestamp') else default,
-    as_datetime=lambda value,default=None: datetime.datetime.fromisoformat(value) if value else default,
-    as_local=lambda value:value,device_attr=lambda *args:'Evans Station',expand=lambda entity:[State()],
-    has_value=lambda entity:entity=='sensor.outdoor',
-    states=lambda entity:'0' if entity=='sensor.outdoor' else 'unavailable',
-    state_attr=lambda entity,key:{'friendly_name':entity,'unit_of_measurement':'°F','temperature_unit':'°F','precipitation_unit':'in'}.get(key))
-def render(template,**kwargs):
-    result=env.from_string(template).render(**kwargs)
-    return json.loads(result) if isinstance(result,str) else result
-station=render(station_template,station='sensor.outdoor',station_device='station1',station_entities=['sensor.outdoor','sensor.wind'])
-assert station['fields'][0]['value']=='0' and station['fields'][1]['value']=='Unavailable'
-assert station['fields'][1]['unit']=='' and station['age_seconds']==90
-forecast=render(forecast_template,forecast='weather.home',daily={'weather.home':{'forecast':[
-    {'datetime':'2026-10-10T12:00:00+00:00','temperature':70},
-    {'datetime':'2026-10-11T12:00:00+00:00','condition':'rainy','temperature':75,'templow':None,'precipitation_probability':0}]}})
-assert len(forecast['days'])==1 and forecast['days'][0]['low']=='--'
-assert forecast['days'][0]['rain']=='0% rain'
-assert not render(forecast_template,forecast='weather.home',daily={})['available']
-print('Weather schema, missing values, fragmentation, payload limits and HA templates passed')
+print('Direct weather provider parsing, units, missing values, station selection, forecasts and retry checks passed')
+# Exercise the actual transport collector with fragmented, oversized and failed responses.
+worker=(ROOT/'main/weather.c').read_text()
+transport=worker[worker.index('typedef struct {char *body;'):worker.index('static void error_text(')]
+HTTP=r'''
+#include <assert.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include "weather.h"
+typedef int esp_err_t;
+#define ESP_OK 0
+#define ESP_FAIL -1
+#define HTTP_EVENT_ON_HEADER 1
+#define HTTP_EVENT_ON_DATA 2
+typedef struct {void *user_data;int event_id;char *header_key,*header_value;int data_len;void *data;} esp_http_client_event_t;
+static int64_t clock_us;
+static int64_t esp_timer_get_time(void){return clock_us;}
+static int esp_crt_bundle_attach(void *p){(void)p;return 0;}
+typedef struct {const char *url;esp_err_t (*event_handler)(esp_http_client_event_t *);void *user_data;int (*crt_bundle_attach)(void *);int timeout_ms;bool disable_auto_redirect;int buffer_size,buffer_size_tx;const char *user_agent;bool keep_alive_enable;} esp_http_client_config_t;
+typedef void *esp_http_client_handle_t;
+static esp_http_client_config_t conf;
+static int mode,status_code=200;
+static bool complete=true;
+static esp_http_client_handle_t esp_http_client_init(const esp_http_client_config_t *c){conf=*c;assert(c->crt_bundle_attach==esp_crt_bundle_attach && c->disable_auto_redirect && c->timeout_ms<=12000);return &conf;}
+static int esp_http_client_set_header(void *c,const char *k,const char *v){(void)c;(void)k;(void)v;return 0;}
+static int esp_http_client_perform(void *c){
+ (void)c;esp_http_client_event_t e={.user_data=conf.user_data,.event_id=HTTP_EVENT_ON_HEADER,.header_key="Retry-After",.header_value="120"};conf.event_handler(&e);
+ e.event_id=HTTP_EVENT_ON_DATA;e.data="{}";e.data_len=1;conf.event_handler(&e);
+ e.data="}";e.data_len=mode==1?WEATHER_MAX_PAYLOAD:1;
+ if(mode==2)clock_us+=30000000;
+ conf.event_handler(&e);return mode==3?ESP_FAIL:ESP_OK;
+}
+static int esp_http_client_get_status_code(void *c){(void)c;return status_code;}
+static bool esp_http_client_is_complete_data_received(void *c){(void)c;return complete;}
+static void esp_http_client_cleanup(void *c){(void)c;}
+TRANSPORT
+int main(void){
+ response_t r={.body=malloc(WEATHER_MAX_PAYLOAD+1)};int status;
+ assert(get_json("https://example.test",&r,&status) && !strcmp(r.body,"{}") && r.retry_after==120);
+ for(mode=1;mode<=3;mode++)assert(!get_json("https://example.test",&r,&status));
+ mode=0;complete=false;assert(!get_json("https://example.test",&r,&status));complete=true;
+ status_code=403;assert(!get_json("https://example.test",&r,&status) && status==403);
+ free(r.body);return 0;
+}
+'''.replace('TRANSPORT',transport)
+with tempfile.TemporaryDirectory() as directory:
+    tmp=Path(directory);(tmp/'http.c').write_text(HTTP)
+    subprocess.run([os.environ.get('CC','cc'),'-std=c11','-Wall','-Wextra','-Werror','-I'+str(ROOT/'main'),str(tmp/'http.c'),'-o',str(tmp/'http')],check=True)
+    subprocess.run([str(tmp/'http')],check=True)
+print('HTTPS certificate/redirect configuration, chunk limits, timeout rejection and response failures passed')

@@ -97,6 +97,7 @@ static void load_defaults(panel_settings_t *cfg)
     cfg->brightness_min = 10;
     cfg->brightness_max = 100;
     cfg->weather_enabled = 0;
+    cfg->weather_poll_minutes = 1;
     cfg->theme = default_theme();
     cfg->backlight_percent = CONFIG_PANEL_BACKLIGHT;
 }
@@ -162,8 +163,10 @@ esp_err_t settings_init(void)
         }
     }
 
-    load_string(nvs, "ha_station", s_settings->ha_station_entity, sizeof(s_settings->ha_station_entity));
-    load_string(nvs, "ha_weather", s_settings->ha_weather_entity, sizeof(s_settings->ha_weather_entity));
+    load_string(nvs, "wx_station", s_settings->weather_station, sizeof(s_settings->weather_station));
+    load_string(nvs, "wx_api", s_settings->weather_api_key, sizeof(s_settings->weather_api_key));
+    load_string(nvs, "wx_app", s_settings->weather_app_key, sizeof(s_settings->weather_app_key));
+    load_string(nvs, "wx_fc_key", s_settings->weather_forecast_key, sizeof(s_settings->weather_forecast_key));
     uint8_t value = 0;
     if (nvs_get_u8(nvs, "sleep_on", &value) == ESP_OK && value <= 1) s_settings->sleep_enabled = value;
     if (nvs_get_u8(nvs, "sleep_delay", &value) == ESP_OK && value >= 5 && value <= 240) s_settings->sleep_delay_seconds = value;
@@ -198,6 +201,10 @@ esp_err_t settings_init(void)
         s_settings->backlight_percent = value;
     }
 
+    if (nvs_get_u8(nvs, "wx_provider", &value) == ESP_OK && value <= 1) s_settings->weather_provider = value;
+    if (nvs_get_u8(nvs, "wx_forecast", &value) == ESP_OK && value <= 2) s_settings->weather_forecast = value;
+    if (nvs_get_u8(nvs, "wx_units", &value) == ESP_OK && value <= 1) s_settings->weather_units = value;
+    if (nvs_get_u8(nvs, "wx_poll", &value) == ESP_OK && value <= 30 && value >= 1) s_settings->weather_poll_minutes = value;
     nvs_close(nvs);
     s_initialized = true;
     ESP_LOGI(TAG, "Loaded saved panel configuration");
@@ -266,9 +273,13 @@ esp_err_t settings_save(const panel_settings_t *settings)
     if (settings->brightness_max < 5 || settings->brightness_max > 100) return ESP_ERR_INVALID_ARG;
     if (settings->weather_enabled > 1) return ESP_ERR_INVALID_ARG;
     if (settings->brightness_min > settings->brightness_max) return ESP_ERR_INVALID_ARG;
+    if (settings->weather_provider > 1) return ESP_ERR_INVALID_ARG;
+    if (settings->weather_forecast > 2) return ESP_ERR_INVALID_ARG;
+    if (settings->weather_units > 1) return ESP_ERR_INVALID_ARG;
+    if (settings->weather_poll_minutes > 30 || settings->weather_poll_minutes < 1) return ESP_ERR_INVALID_ARG;
     panel_settings_t clean = *settings;
-    clean.ha_station_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
-    clean.ha_weather_entity[PANEL_HA_ENTITY_ID_MAX] = '\0';
+    clean.weather_station[127] = 0;
+    clean.weather_api_key[128] = clean.weather_app_key[128] = clean.weather_forecast_key[128] = 0;
     clean.wifi_ssid[PANEL_WIFI_SSID_MAX] = '\0';
     clean.admin_password[PANEL_ADMIN_PASSWORD_MAX] = '\0';
     clean.wifi_password[PANEL_WIFI_PASSWORD_MAX] = '\0';
@@ -319,8 +330,11 @@ esp_err_t settings_save(const panel_settings_t *settings)
     SAVE_STR("ha_fan", ha_fan_entity);
     SAVE_STR("ha_echo", ha_echo_entity);
     SAVE_STR("timezone", timezone);
-    SAVE_STR("ha_station", ha_station_entity);
-    SAVE_STR("ha_weather", ha_weather_entity);
+
+    SAVE_STR("wx_station", weather_station);
+    SAVE_STR("wx_api", weather_api_key);
+    SAVE_STR("wx_app", weather_app_key);
+    SAVE_STR("wx_fc_key", weather_forecast_key);
 
 #undef SAVE_STR
 
@@ -355,6 +369,14 @@ esp_err_t settings_save(const panel_settings_t *settings)
     err = nvs_set_u8(nvs, "bright_max", clean.brightness_max);
     if (err != ESP_OK) goto out;
     err = nvs_set_u8(nvs, "weather_on", clean.weather_enabled);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "wx_provider", clean.weather_provider);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "wx_forecast", clean.weather_forecast);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "wx_units", clean.weather_units);
+    if (err != ESP_OK) goto out;
+    err = nvs_set_u8(nvs, "wx_poll", clean.weather_poll_minutes);
     if (err != ESP_OK) goto out;
     err = nvs_set_u8(nvs, "theme", clean.theme);
     if (err != ESP_OK) goto out;

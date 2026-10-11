@@ -21,7 +21,7 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
  });
  const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));page.on('dialog',d=>d.accept());
  await page.goto('http://panel.test/');
- assert.equal(await page.getByRole('tab').count(),5);
+ assert.equal(await page.getByRole('tab').count(),6);
  assert.equal(await page.locator('[role=tabpanel]:visible').count(),1);
  assert(await page.locator('#save-settings').isDisabled());
  assert.equal(await page.locator('form form').count(),0);
@@ -31,10 +31,10 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
  await page.locator('[name=display_title]').fill('Living room');
  await page.locator('[name=sleep_enabled]').selectOption('1');
  await page.locator('[name=auto_brightness]').selectOption('1');
- await page.getByRole('tab',{name:'Home Assistant',exact:true}).click();
+ await page.getByRole('tab',{name:'Weather',exact:true}).click();
  await page.locator('[name=weather_enabled]').selectOption('1');
- await page.locator('[name=ha_station_entity]').fill('sensor.outdoor');
- await page.locator('[name=ha_weather_entity]').fill('weather.home');
+ await page.locator('[name=weather_station]').fill('KTEST1');
+ await page.locator('[name=weather_api_key]').fill('secret-key');
  await page.getByRole('tab',{name:'Sensors',exact:true}).click();
  await page.locator('[name=presence_enabled]').selectOption('1');
  await page.getByRole('tab',{name:'Network',exact:true}).click();
@@ -48,14 +48,14 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
  await page.locator('[name=display_title]').fill('Living room');
  failSave=true;await page.locator('#save-settings').click();await page.locator('#save-notice.error').waitFor();
  assert.equal(await page.locator('[name=display_title]').inputValue(),'Living room');assert(!(await page.locator('[name=display_title]').isDisabled()));
- assert.equal(sent.get('weather_enabled'),'1');assert.equal(sent.get('ha_weather_entity'),'weather.home');assert.equal(sent.get('sleep_enabled'),'1');assert.equal(sent.get('auto_brightness'),'1');
+ assert.equal(sent.get('weather_enabled'),'1');assert.equal(sent.get('weather_station'),'KTEST1');assert.equal(sent.get('sleep_enabled'),'1');assert.equal(sent.get('auto_brightness'),'1');
  assert.equal(sent.get('presence_enabled'),'1');assert.equal(sent.get('csrf'),'test-csrf');assert.equal(sent.get('hostname'),'panel-010101');assert.equal(sent.get('display_title'),'Living room');
  await page.locator('#discard-settings').click();assert.equal(await page.locator('[name=display_title]').inputValue(),'Home Control');assert(await page.locator('#save-settings').isDisabled());
  await page.getByRole('tab',{name:'Network',exact:true}).click();await page.locator('[name=wifi_password]').fill('secret123');await page.getByRole('button',{name:'Show Password',exact:true}).click();assert.equal(await page.locator('[name=wifi_password]').getAttribute('type'),'text');
  await page.locator('#discard-settings').click();
  for(const width of [1280,390]){
   await page.setViewportSize({width,height:950});
-  for(const id of ['network','display','home-assistant','sensors','system']){
+  for(const id of ['network','display','home-assistant','weather','sensors','system']){
    await page.locator('#tab-'+id).click();
    assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),`overflow: ${width}/${id}`);
    await page.screenshot({path:path.join(output,`${id}-${width}.png`),fullPage:true});

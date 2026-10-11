@@ -25,88 +25,95 @@ keep their existing display behavior. Save settings and allow the panel to resta
 - A tap can recover even a manually zeroed backlight. Place the lux sensor away
   from direct screen light to avoid feedback into automatic brightness.
 
-## Home Assistant setup
+## Direct weather setup
 
-1. Keep the existing `esp-home-panel-mqtt-bridge.yaml` package installed.
-2. Copy **`home-assistant/esp-home-panel-weather.yaml`** into your HA packages
-   directory alongside it. If using a custom MQTT base prefix, change the
-   wildcard trigger topic in the new package to match. Reload automations or
-   restart Home Assistant.
-3. Under the panel's **Home Assistant → Weather** settings, enable Weather page.
-4. Set **Station outdoor temperature entity** to your station's actual outdoor
-   temperature sensor, e.g. `sensor.backyard_temperature`. This reading becomes
-   the large temperature summary. The package includes this sensor first and
-   the other `sensor.*` entities belonging to the same Home Assistant device.
-   Entity names are not assumed or hardcoded. A standalone sensor without a
-   device supplies only itself. Sensors attached to other HA devices are not
-   implicitly combined.
-5. Set **Daily forecast entity** to a `weather.*` entity whose integration
-   supports daily `weather.get_forecasts`. Ambient station measurements and
-   forecast data are separate sources. HA keeps any provider credentials.
-6. Save and restart the panel. Swipe left/right anywhere across the title/time
-   header to switch pages, or tap that area. Controls below the header retain
-   their existing gestures. The current page remains selected after sleep.
+Weather works independently of Home Assistant and MQTT. Open **Settings → Weather**,
+choose a station provider, enter its credentials, enable the weather page, and save.
+Keys are stored on the panel. Saved keys are never filled back into the HTML form;
+leave a key blank to keep it or use its Clear checkbox to remove it.
 
-Station readings use their HA names and units, including temperature, humidity,
-wind, pressure, rain totals, UV, solar radiation, and any extra sensor entities
-that the station device exposes. The detail grid scrolls vertically. Long labels
-and values scroll within their cells. Unknown/unavailable values are explicitly
-labelled and are never converted to zero. Up to 48 station sensors are supported;
-a visible notice identifies truncation for larger devices.
-
-Five forecast cards show today and the following days when provided (at most five
-available daily entries), with high/low temperatures, condition icons, and rain
-probability or precipitation amount. Missing fields use `--`; a provider without
-daily forecasts shows an unavailable message. Dates follow Home Assistant's local
-timezone, while the panel clock uses its configured POSIX timezone.
-
-The weather page inherits Classic, Soccer, Kittens, and Magic theme colors,
-fonts, borders, existing background artwork, and decorative treatment.
-
-## MQTT contract and freshness
-
-Topics are relative to `<base>/<panel-id>`:
-
-| Topic | Direction | Content |
+| Provider | Station field | Credentials |
 | --- | --- | --- |
-| `request_weather` | Panel → HA | `station`, `forecast`, `refresh_forecast` |
-| `state/weather` | HA → Panel | Version 1 station snapshot |
-| `state/forecast` | HA → Panel | Version 1 daily forecast snapshot |
+| Weather Underground | PWS station ID, for example `KNYNEWYO123` | WU API key |
+| Ambient Weather | Exact station name (case insensitive), or station MAC address | Personal API key **and** application key |
 
-Station requests run every 30 seconds, forecasts every 15 minutes. Connection
-and HA birth trigger an immediate refresh of both. Replies are QoS 1 and **not
-retained**, avoiding an old forecast appearing fresh after a panel restart.
+For WU, use your account's **My Profile → My Devices** to find the station ID and
+**Member Settings → API Keys** to find your key. For Ambient Weather, open your
+[AmbientWeather.net account](https://ambientweather.net/account) to generate API
+and application keys; station names/MAC addresses are in your device settings.
+Duplicate Ambient station names require the MAC address so selection is unambiguous.
+A WU display name is not its station ID. Credentials for the two services are not interchangeable.
 
-A station snapshot includes `version: 1`, `available`, `name`, `age_seconds`,
-`truncated`, and `fields: [{label, value, unit}]`; all field text is sent as strings.
-The package derives observation age from the selected temperature entity's HA
-`last_reported` timestamp. The page marks station observations older than 15
-minutes or delivery gaps over 2 minutes as stale. This age relies on the HA
-integration reporting station updates accurately.
+### Forecast source
 
-A forecast snapshot includes `version: 1`, `available`, and
-`days: [{date, condition, high, low, rain}]`. Forecast delivery older than 30
-minutes is marked stale. Previously received readings remain visible with that
-status during a broker/HA outage. Failed forecast retrieval is shown as unavailable.
+- **Open-Meteo (default):** the same approach as Heat Index Display. Uses the
+  station's latitude/longitude for five daily forecasts and the next twelve hours.
+  No extra key is required. The free endpoint is for noncommercial use; see
+  [Open-Meteo terms](https://open-meteo.com/en/terms). Source attribution is on screen.
+- **Weather Underground:** daily five-day forecast using the WU key. Your key must
+  include the Weather Company v3 daily forecast service; observation access alone
+  does not guarantee this. You can supply a separate forecast key, required when
+  observations come from Ambient. The UI shows an explicit error if access is
+  denied. There is no silent provider fallback. This option has no hourly chart.
+- **Disabled:** station observations only.
 
-The receiver reassembles sequential MQTT fragments, caps payloads at 24 KiB,
-validates the version/schema, bounds every text field, and publishes coherent
-snapshots to the LVGL task. Oversize/malformed messages are discarded.
+Forecasts require valid coordinates in the station response. Missing coordinates
+are reported on screen. Forecast times, sunrise and sunset use the panel's
+configured POSIX timezone; set that to the station's timezone under Display.
+Select imperial or metric display units independently of the provider.
+
+### Navigation and information
+
+Swipe horizontally or tap the title/time header to switch between Home Control
+and Weather. Three weather tabs provide:
+
+- **Now:** outdoor temperature, calculated feels-like temperature, humidity,
+  dew point, wind speed/gusts and compass, rain total/rate, UV/solar radiation,
+  pressure, heat index, sunrise/sunset, and tomorrow's temperatures.
+- **Outlook:** twelve-hour temperature line and rain-probability bars with
+  time labels, plus five daily cards with high/low, illustrated conditions, and
+  rain chance. Tap a day for precipitation, wind, UV, sunrise/sunset, and the
+  provider's narrative when supplied. Daily icons describe the forecast,
+  not an observation of current sky conditions.
+- **Station:** a vertically scrolling grid of available readings, including
+  Ambient indoor, extra temperature/humidity, soil, air-quality, rain-period,
+  battery and lightning channels. Up to 48 fields; a notice identifies truncation.
+  Missing values show `--` and are never substituted with zero.
+
+All views inherit Classic, Soccer, Kittens, or Magic colors, typography, artwork,
+and card decorations. Weather icons, the compass and chart are drawn natively
+by LVGL. Touch controls below the header retain their gestures, and the selected
+page remains selected after sleep.
+
+### Refresh, outages and upgrades
+
+Observations refresh every 1–30 minutes (default one); forecasts every 15 minutes.
+HTTPS verifies provider certificates and waits for the network clock to sync.
+The separate worker keeps network requests off the touch/UI task. Responses are
+bounded to 96 KiB. Failed requests back off to 15 minutes; rate-limit Retry-After
+values are honored up to one hour. API keys are URL-encoded and HTTP client URL
+logging is suppressed.
+
+The last valid readings stay visible during outages with a **Cached** error
+notice. Actual station observation timestamps determine age; observations older
+than 15 minutes or delivery gaps beyond the configured interval plus two minutes
+are marked stale. Forecasts older than 30 minutes are marked stale. Caches are
+in RAM and reset on reboot. No live credentials are included in the repository.
+
+Upgrading from the previous `weather` branch requires configuring the new Weather
+tab. Old HA weather entity settings are ignored. Remove the obsolete HA weather
+package if installed; the control bridge package is still needed for lights,
+fan and media controls. Sensor MQTT discovery is unchanged.
 
 ## Verification
 
-- `python tools/test_display_policy.py`: vacancy deadlines, touch override,
-  radar failure, brightness limits, invalid lux, and manual fallback.
-- `python tools/test_weather.py`: production parser and fragment assembly,
-  unavailable values, limits, and real HA payload templates (requires Jinja2
-  and PyYAML; cJSON is taken from the installed SDK or pinned upstream v1.7.19).
-- `python tools/test_color_settings.py`: saved settings, migration, validation,
-  reset, and legacy forms.
-- `node tools/test_settings_ui.js`: desktop/mobile settings and submitted values.
-- Host LVGL renderer: all four themes, real pointer gestures, wake-only first
-  touch, subsequent control interaction, weather layout, and stale indicators.
-- GitHub Actions on `weather`: firmware build and downloadable firmware plus
-  settings/physical-display preview artifacts.
+- `python tools/test_weather.py`: actual provider parsers, station matching,
+  missing/null/zero values, units, forecast schemas, URL encoding and backoff.
+- `python tools/test_display_policy.py`: sleep, touch override and lux fallback.
+- `python tools/test_color_settings.py`: validation, persistence and blank-key semantics.
+- `node tools/test_settings_ui.js`: desktop/mobile weather tab and form submission.
+- Host LVGL renderer: all four themes and weather views, control gestures and
+  wake-only first touch. GitHub Actions retains firmware and UI preview artifacts.
 
-Physical C4001/VEML7700/backlight behavior and a live HA station still require
-on-device verification after installing the firmware and package.
+Live provider credentials and physical sensor/backlight behavior still need
+on-device verification after installing the firmware.

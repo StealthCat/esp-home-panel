@@ -52,22 +52,22 @@ static uint32_t stored[6];
 static bool present[6];
 static int commits;
 static uint8_t als_enabled, sensor_interval;
-static uint8_t prs_values[13];
-static bool prs_present[13];
-static const char *prs_keys[]={"prs_enabled","prs_address","prs_max_m","prs_trig_sens","prs_keep_sens","prs_hold_s","sleep_on","sleep_delay","wake_minutes","auto_bright","bright_min","bright_max","weather_on"};
-static int prs_index(const char *key){for(int i=0;i<13;i++)if(!strcmp(key,prs_keys[i]))return i;return -1;}
-static char saved_hostname[33], saved_admin_password[65], saved_station[128], saved_forecast[128];
+static uint8_t prs_values[17];
+static bool prs_present[17];
+static const char *prs_keys[]={"prs_enabled","prs_address","prs_max_m","prs_trig_sens","prs_keep_sens","prs_hold_s","sleep_on","sleep_delay","wake_minutes","auto_bright","bright_min","bright_max","weather_on","wx_provider","wx_forecast","wx_units","wx_poll"};
+static int prs_index(const char *key){for(int i=0;i<17;i++)if(!strcmp(key,prs_keys[i]))return i;return -1;}
+static char saved_hostname[33], saved_admin_password[65], saved_station[128], saved_forecast[129], saved_app[129], saved_fc_key[129];
 static int nvs_open(const char *s,int m,nvs_handle_t *h) {(void)s;(void)m;*h=1;return 0;}
 static void nvs_close(nvs_handle_t h) {(void)h;}
-static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;if(!strcmp(k,"ha_station")){strlcpy(v,saved_station,*s);return 0;}if(!strcmp(k,"ha_weather")){strlcpy(v,saved_forecast,*s);return 0;}if(!strcmp(k,"hostname") && saved_hostname[0]) {strlcpy(v,saved_hostname,*s);return 0;}if(!strcmp(k,"admin_pass") && saved_admin_password[0]){strlcpy(v,saved_admin_password,*s);return 0;}return ESP_ERR_NVS_NOT_FOUND;}
-static int nvs_set_str(int h,const char *k,const char *v) {(void)h;if(!strcmp(k,"ha_station"))strlcpy(saved_station,v,sizeof(saved_station));if(!strcmp(k,"ha_weather"))strlcpy(saved_forecast,v,sizeof(saved_forecast));if(!strcmp(k,"hostname"))strlcpy(saved_hostname,v,sizeof(saved_hostname));if(!strcmp(k,"admin_pass"))strlcpy(saved_admin_password,v,sizeof(saved_admin_password));return 0;}
+static int nvs_get_str(int h,const char *k,char *v,size_t *s) {(void)h;if(!strcmp(k,"wx_station")){strlcpy(v,saved_station,*s);return 0;}if(!strcmp(k,"wx_api")){strlcpy(v,saved_forecast,*s);return 0;}if(!strcmp(k,"wx_app")){strlcpy(v,saved_app,*s);return 0;}if(!strcmp(k,"wx_fc_key")){strlcpy(v,saved_fc_key,*s);return 0;}if(!strcmp(k,"hostname") && saved_hostname[0]) {strlcpy(v,saved_hostname,*s);return 0;}if(!strcmp(k,"admin_pass") && saved_admin_password[0]){strlcpy(v,saved_admin_password,*s);return 0;}return ESP_ERR_NVS_NOT_FOUND;}
+static int nvs_set_str(int h,const char *k,const char *v) {(void)h;if(!strcmp(k,"wx_station"))strlcpy(saved_station,v,sizeof(saved_station));if(!strcmp(k,"wx_api"))strlcpy(saved_forecast,v,sizeof(saved_forecast));if(!strcmp(k,"wx_app"))strlcpy(saved_app,v,sizeof(saved_app));if(!strcmp(k,"wx_fc_key"))strlcpy(saved_fc_key,v,sizeof(saved_fc_key));if(!strcmp(k,"hostname"))strlcpy(saved_hostname,v,sizeof(saved_hostname));if(!strcmp(k,"admin_pass"))strlcpy(saved_admin_password,v,sizeof(saved_admin_password));return 0;}
 static int nvs_get_u8(int h,const char *k,uint8_t *v) {(void)h;int i=prs_index(k);if(i>=0){if(!prs_present[i])return ESP_ERR_NVS_NOT_FOUND;*v=prs_values[i];return 0;}if(!strcmp(k,"als_enabled")){*v=als_enabled;return 0;}if(!strcmp(k,"sensor_interval") && sensor_interval){*v=sensor_interval;return 0;}return ESP_ERR_NVS_NOT_FOUND;}
 static int nvs_set_u8(int h,const char *k,uint8_t v) {(void)h;int i=prs_index(k);if(i>=0){prs_present[i]=true;prs_values[i]=v;return 0;}if(!strcmp(k,"als_enabled"))als_enabled=v;if(!strcmp(k,"sensor_interval"))sensor_interval=v;return 0;}
 static int color_index(const char *k) {assert(strlen(k)==7 && !strncmp(k,"color_",6));int i=k[6]-'0';assert(i>=0&&i<6);return i;}
 static int nvs_get_u32(int h,const char *k,uint32_t *v) {(void)h;int i=color_index(k);if(!present[i])return ESP_ERR_NVS_NOT_FOUND;*v=stored[i];return 0;}
 static int nvs_set_u32(int h,const char *k,uint32_t v) {(void)h;int i=color_index(k);stored[i]=v;present[i]=true;return 0;}
 static int nvs_commit(int h) {(void)h;commits++;return 0;}
-static int nvs_erase_all(int h) {(void)h;saved_station[0]=saved_forecast[0]=0;memset(present,0,sizeof(present));memset(prs_present,0,sizeof(prs_present));als_enabled=0;sensor_interval=0;saved_hostname[0]=0;saved_admin_password[0]=0;return 0;}
+static int nvs_erase_all(int h) {(void)h;saved_station[0]=saved_forecast[0]=saved_app[0]=saved_fc_key[0]=0;memset(present,0,sizeof(present));memset(prs_present,0,sizeof(prs_present));als_enabled=0;sensor_interval=0;saved_hostname[0]=0;saved_admin_password[0]=0;return 0;}
 typedef void *httpd_handle_t;
 typedef struct {size_t content_len;const char *body;} httpd_req_t;
 typedef struct {int max_uri_handlers,stack_size;bool lru_purge_enable;} httpd_config_t;
@@ -196,12 +196,18 @@ int main(void) {
     prs_values[1]=255;assert(settings_init()==ESP_OK && settings_get()->presence_address==42);
     assert(settings_reset()==ESP_OK && settings_init()==ESP_OK && !settings_get()->presence_enabled);
     assert(!settings_get()->sleep_enabled && !settings_get()->weather_enabled && !settings_get()->auto_brightness);
-    post("sleep_enabled=1&sleep_delay_seconds=90&touch_wake_minutes=5&auto_brightness=1&brightness_min=15&brightness_max=85&weather_enabled=1&ha_station_entity=sensor.outdoor&ha_weather_entity=weather.home");
+    post("sleep_enabled=1&sleep_delay_seconds=90&touch_wake_minutes=5&auto_brightness=1&brightness_min=15&brightness_max=85&weather_enabled=1&weather_station=KTEST1&weather_api_key=secret-key");
     assert(status==200 && settings_init()==ESP_OK);
     assert(settings_get()->sleep_enabled && settings_get()->sleep_delay_seconds==90 && settings_get()->touch_wake_minutes==5);
     assert(settings_get()->auto_brightness && settings_get()->brightness_min==15 && settings_get()->brightness_max==85);
-    assert(settings_get()->weather_enabled && !strcmp(settings_get()->ha_station_entity,"sensor.outdoor") && !strcmp(settings_get()->ha_weather_entity,"weather.home"));
-    const char *bad_weather[]={"sleep_enabled=2","sleep_delay_seconds=0","touch_wake_minutes=31","brightness_min=90&brightness_max=80","ha_station_entity=light.room","ha_weather_entity=sensor.temp","ha_weather_entity=weather.bad%3C"};
+    assert(settings_get()->weather_enabled && !strcmp(settings_get()->weather_station,"KTEST1") && !strcmp(settings_get()->weather_api_key,"secret-key"));
+    post("weather_api_key=&weather_app_key=app-secret&weather_forecast_key=forecast-secret");
+    assert(status==200 && !strcmp(settings_get()->weather_api_key,"secret-key"));
+    assert(settings_init()==ESP_OK && !strcmp(settings_get()->weather_app_key,"app-secret") && !strcmp(settings_get()->weather_forecast_key,"forecast-secret"));
+    post("weather_provider=1&weather_forecast=1");assert(status==200);
+    post("weather_provider=0&weather_forecast=0&clear_weather_app_key=1&clear_weather_forecast_key=1");assert(status==200);
+    assert(!settings_get()->weather_app_key[0] && !settings_get()->weather_forecast_key[0]);
+    const char *bad_weather[]={"sleep_enabled=2","sleep_delay_seconds=0","touch_wake_minutes=31","brightness_min=90&brightness_max=80","weather_provider=2","weather_forecast=3","weather_poll_minutes=0","weather_station=bad%0Aname","weather_provider=1"};
     for(unsigned i=0;i<sizeof(bad_weather)/sizeof(bad_weather[0]);i++){int before=commits;post(bad_weather[i]);assert(status==400 && commits==before);}
     post("theme=1");assert(status==200 && settings_get()->weather_enabled && settings_get()->sleep_enabled);
     assert(settings_reset()==ESP_OK && settings_init()==ESP_OK && !settings_get()->weather_enabled && !settings_get()->sleep_enabled);

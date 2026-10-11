@@ -269,7 +269,7 @@ An optional **Gravity C4001 SEN0610** also adds an **Occupancy** binary sensor t
 
 ## Optional weather page
 
-Install [the weather package](esp-home-panel-weather.yaml) alongside the control
-bridge, then configure the station temperature and daily forecast entities in
-the panel settings. See [weather and display setup](../docs/weather-display.md)
-for presence wake, automatic brightness, navigation, units, and freshness.
+Weather now connects directly to Ambient Weather or Weather Underground, with
+Open-Meteo or WU forecasts. No weather entities, MQTT topics, or HA weather package
+are needed. The control bridge above still handles lights, fan, and media.
+See [weather and display setup](../docs/weather-display.md).

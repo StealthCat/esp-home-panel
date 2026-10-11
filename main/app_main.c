@@ -6,6 +6,7 @@
 #include "ui.h"
 #include "web_config.h"
 #include "ota_update.h"
+#include "weather.h"
 
 #include "esp_err.h"
 #include "esp_log.h"
@@ -53,6 +54,7 @@ void app_main(void)
         }
     }
 
+    weather_start();
     bool mqtt_started = false;
 
     while (true) {

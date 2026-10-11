@@ -75,8 +75,14 @@ typedef struct {
     uint8_t brightness_min;
     uint8_t brightness_max;
     uint8_t weather_enabled;
-    char ha_station_entity[PANEL_HA_ENTITY_ID_MAX + 1];
-    char ha_weather_entity[PANEL_HA_ENTITY_ID_MAX + 1];
+    uint8_t weather_provider; /* 0 Weather Underground, 1 Ambient Weather */
+    uint8_t weather_forecast; /* 0 Open-Meteo, 1 Weather Underground, 2 disabled */
+    uint8_t weather_units; /* 0 imperial, 1 metric */
+    uint8_t weather_poll_minutes;
+    char weather_station[128];
+    char weather_api_key[129];
+    char weather_app_key[129];
+    char weather_forecast_key[129];
     uint8_t theme;
     uint8_t backlight_percent;
 } panel_settings_t;
