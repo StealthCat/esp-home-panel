@@ -521,9 +521,11 @@ static esp_err_t root_handler(httpd_req_t *req)
         "<p class='muted'>Install a new firmware version from your browser. Your saved settings stay in place.</p>"
         "<a class='button-link secondary' href='/firmware'>Open firmware updater &rarr;</a>"
         "<p class='hint'>Set an administrator password before your first upload.</p></section>"
-        "<section class='card full danger-card' data-tab='system'><h2>Reset configuration</h2>"
-        "<p class='hint'>Restore firmware defaults for Wi-Fi, MQTT, display, sensors, and administrator access. The panel will restart.</p>"
-        "<button class='danger' type='submit' form='reset-form'>Reset configuration</button></section>"
+        "<section class='card full danger-card' data-tab='system'><h2>Restart or reset</h2>"
+        "<p class='hint'>Reboot keeps your saved settings. Unsaved edits will be discarded.</p>"
+        "<p class='hint'>Reset configuration restores firmware defaults for Wi-Fi, MQTT, display, sensors, and administrator access. The panel will restart.</p>"
+        "<div class='actions'><button class='secondary' type='submit' form='reboot-form'>Reboot</button>"
+        "<button class='danger' type='submit' form='reset-form'>Reset configuration</button></div></section>"
         "</div><div class='savebar'><div><strong id='change-status'>Settings ready</strong>"
         "<small>Saving applies all tabs and restarts the panel.</small></div><div class='actions'>"
         "<button class='secondary' id='discard-settings' type='reset'>Discard changes</button>"
@@ -532,6 +534,8 @@ static esp_err_t root_handler(httpd_req_t *req)
     snprintf(buf, sizeof(buf), "<form id='reset-form' method='post' action='/reset'><input type='hidden' name='csrf' value='%s'></form>", web_security_token());
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
 
+    snprintf(buf, sizeof(buf), "<form id='reboot-form' method='post' action='/reboot'><input type='hidden' name='csrf' value='%s'></form>", web_security_token());
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, PAGE_FOOT));
     return httpd_resp_send_chunk(req, NULL, 0);
 }
@@ -822,6 +826,30 @@ static esp_err_t save_handler(httpd_req_t *req)
     return ESP_OK;
 }
 
+static esp_err_t reboot_handler(httpd_req_t *req)
+{
+    if (!web_security_authorize(req, false)) return ESP_OK;
+    char *body = NULL, csrf[34];
+    esp_err_t err = read_request_body(req, &body);
+    bool valid = err == ESP_OK && form_get(body, "csrf", csrf, sizeof(csrf)) && web_security_check_token(csrf);
+    free(body);
+    if (!valid) {
+        httpd_resp_set_status(req, "403 Forbidden");
+        httpd_resp_sendstr(req, "Session expired. Reload settings and try again.");
+        return ESP_OK;
+    }
+    ESP_LOGI(TAG, "Reboot requested from web configuration");
+    httpd_resp_set_type(req, "text/html; charset=utf-8");
+    httpd_resp_sendstr(req,
+        "<!doctype html><html><head><meta name='viewport' content='width=device-width,initial-scale=1'>"
+        "<title>Panel rebooting</title></head><body style='background:#07111c;color:#fff;font-family:system-ui;padding:30px'>"
+        "<h2>Panel rebooting</h2><p>Your saved settings have been kept. Wait a few seconds for the panel to reconnect.</p>"
+        "<a style='color:#79cfff' href='/#system'>Reconnect to panel</a></body></html>");
+    vTaskDelay(pdMS_TO_TICKS(700));
+    esp_restart();
+    return ESP_OK;
+}
+
 static esp_err_t reset_handler(httpd_req_t *req)
 {
     if (!web_security_authorize(req, false)) return ESP_OK;
@@ -883,6 +911,13 @@ esp_err_t web_config_start(void)
         .handler = reset_handler,
     };
 
+    const httpd_uri_t reboot = {
+        .uri = "/reboot",
+        .method = HTTP_POST,
+        .handler = reboot_handler,
+    };
+
+    ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &reboot));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &root));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &save));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &reset));

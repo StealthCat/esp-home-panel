@@ -7,7 +7,7 @@ Open the panel's network address in a browser. Settings are grouped into six tab
 - **Home Assistant:** MQTT connection, discovery, and entity mappings.
 - **Weather:** direct Ambient/WU station, API keys, forecast source, units and polling.
 - **Sensors:** VEML7700 ambient light and Gravity C4001 presence settings.
-- **System:** administrator password, firmware updater, and configuration reset.
+- **System:** administrator password, firmware updater, reboot, and configuration reset.
 
 Edits remain in the form when switching tabs. **Save & restart** saves all tabs together and restarts the panel. The save bar indicates unsaved changes; **Discard changes** restores the values loaded when the page opened. Leaving the page with unsaved edits triggers the browser's warning. Password fields remain blank on load; leaving them blank keeps the existing passwords.
 
@@ -15,7 +15,7 @@ If a field fails browser validation, its tab opens and the field receives focus.
 
 The tabs support arrow keys, Home, and End. On phones, all tabs remain visible in two rows. Styling and scripts are served by the panel with no external fonts or internet dependencies. Without JavaScript, settings remain available as one complete form.
 
-Firmware uploads use the dedicated updater linked from **System**. Configuration reset has a separate confirmation and restores firmware defaults, including administrator access and network settings.
+Firmware uploads use the dedicated updater linked from **System**. **Reboot**, beside **Reset configuration**, restarts the panel without changing saved settings and asks for confirmation, warning when unsaved edits will be discarded. Configuration reset has a separate confirmation and restores firmware defaults, including administrator access and network settings.
 
 ## Development checks
 

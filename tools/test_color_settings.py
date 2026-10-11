@@ -101,7 +101,8 @@ HARNESS = r'''
 #undef TAG
 #include "web_config.c"
 void web_security_init(void) {}
-bool web_security_authorize(httpd_req_t *r,bool required) {(void)r;(void)required;return true;}
+static bool authorized=true;
+bool web_security_authorize(httpd_req_t *r,bool required) {(void)r;(void)required;return authorized;}
 const char *web_security_token(void) {return "test-csrf";}
 bool web_security_check_token(const char *t) {return !strcmp(t,"test-csrf");}
 esp_err_t ota_update_register(httpd_handle_t server) {(void)server;return ESP_OK;}
@@ -212,6 +213,22 @@ int main(void) {
     for(unsigned i=0;i<sizeof(bad_weather)/sizeof(bad_weather[0]);i++){int before=commits;post(bad_weather[i]);assert(status==400 && commits==before);}
     post("theme=1");assert(status==200 && settings_get()->weather_enabled && settings_get()->sleep_enabled);
     assert(settings_reset()==ESP_OK && settings_init()==ESP_OK && !settings_get()->weather_enabled && !settings_get()->sleep_enabled);
+    panel_settings_t before_reboot=*settings_get();
+    saved_commits=commits; saved_reboots=reboots;
+    const char *bad_reboot[]={"", "theme=1", "csrf=wrong"};
+    for(unsigned i=0;i<sizeof(bad_reboot)/sizeof(bad_reboot[0]);i++) {
+        httpd_req_t request={.content_len=strlen(bad_reboot[i]),.body=bad_reboot[i]};
+        status=200;assert(reboot_handler(&request)==ESP_OK && status==403);
+        assert(reboots==saved_reboots);
+    }
+    const char *reboot_body="csrf=test-csrf";
+    httpd_req_t reboot_request={.content_len=strlen(reboot_body),.body=reboot_body};
+    authorized=false;
+    assert(reboot_handler(&reboot_request)==ESP_OK && reboots==saved_reboots);
+    authorized=true;status=200;
+    assert(reboot_handler(&reboot_request)==ESP_OK && status==200 && reboots==saved_reboots+1);
+    assert(commits==saved_commits && !memcmp(settings_get(),&before_reboot,sizeof(before_reboot)));
+    puts("Reboot authorization, CSRF and settings preservation checks passed");
     puts("Display/weather defaults, persistence, legacy forms, validation and reset passed");
     puts("C4001 settings persistence, legacy forms, invalid NVS and validation checks passed");
     puts("Sensor settings persistence, validation and reset checks passed");

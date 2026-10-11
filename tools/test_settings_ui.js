@@ -12,9 +12,10 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
 (async()=>{
  const browser=await chromium.launch({headless:true});
  const context=await browser.newContext({viewport:{width:1280,height:950}});
- let sent=null,failSave=false;const errors=[];
+ let sent=null,failSave=false,rebootRequest=null;const errors=[];
  await context.route('http://panel.test/**',route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/reboot'){rebootRequest={method:request.method(),body:request.postData()};return route.fulfill({contentType:'text/html',body:'<h2>Panel rebooting</h2>'});}
   if(url.pathname==='/save'){sent=new URLSearchParams(request.postData());return route.fulfill({status:failSave?400:200,contentType:'text/html',body:failSave?'Invalid configuration':'<h2>Configuration saved</h2>'});}
   if(url.pathname==='/firmware/status')return route.fulfill({json:{version:'test',build:'aabbccdd',pending:false,max_size:7340032,token:'test'}});
   return route.fulfill({contentType:'text/html',body:url.pathname==='/firmware'?firmware:html});
@@ -101,6 +102,21 @@ const output=process.env.PANEL_UI_OUTPUT||'/tmp/panel-settings-check';fs.mkdirSy
  assert(!(await page.locator('#weather-ambient-key').isVisible()));
  await page.goto('http://panel.test/#sensors');assert.equal(await page.locator('#tab-sensors').getAttribute('aria-selected'),'true');
  await page.locator('[name=presence_enabled]').selectOption('1');failSave=false;await page.locator('#save-settings').click();await page.getByRole('link',{name:'Reconnect to panel'}).waitFor();assert.equal(await page.locator('#change-status').textContent(),'Settings saved');assert(await page.locator('#save-settings').isDisabled());
+ // Reboot bypasses settings validation, confirms unsaved edits, and posts only its token.
+ await page.goto('http://panel.test/?reboot-test#display');
+ await page.locator('[name=display_title]').fill('');
+ await page.locator('#tab-system').click();
+ page.removeAllListeners('dialog');
+ let rebootPrompt='';
+ page.on('dialog',d=>{rebootPrompt=d.message();return d.dismiss();});
+ await page.getByRole('button',{name:'Reboot',exact:true}).click();
+ assert.equal(rebootRequest,null);
+ assert(rebootPrompt.includes('Unsaved changes will be discarded'));
+ assert.equal(await page.locator('#change-status').textContent(),'Unsaved changes');
+ page.removeAllListeners('dialog');page.on('dialog',d=>d.accept());
+ await page.getByRole('button',{name:'Reboot',exact:true}).click();
+ await page.getByRole('heading',{name:'Panel rebooting'}).waitFor();
+ assert.deepEqual(rebootRequest,{method:'POST',body:'csrf=test-csrf'});
  await page.goto('http://panel.test/firmware');await page.screenshot({path:path.join(output,'firmware-390.png'),fullPage:true});
  assert.deepEqual(errors,[]);
  const plain=await browser.newContext({javaScriptEnabled:false});await plain.route('**/*',r=>r.fulfill({contentType:'text/html',body:html}));const fallback=await plain.newPage();await fallback.goto('http://panel.test/');assert(await fallback.locator('[name=hostname]').isVisible());assert(await fallback.locator('[name=presence_address]').isVisible());assert(await fallback.locator('#save-settings').isEnabled());
