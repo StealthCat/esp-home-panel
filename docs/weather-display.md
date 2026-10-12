@@ -124,3 +124,5 @@ fan and media controls. Sensor MQTT discovery is unchanged.
 
 Live provider credentials and physical sensor/backlight behavior still need
 on-device verification after installing the firmware.
+
+The Now page uses HeatIndexDisplay warning pills for heat index and wind chill, including its risk labels and colors. Wind chill replaces heat index when outdoor temperature is at most 50 °F (10 °C) and wind exceeds 3 mph. Missing readings show Unavailable. On Outlook, each hourly temperature point is labeled in the selected °F/°C units; missing readings leave a gap.

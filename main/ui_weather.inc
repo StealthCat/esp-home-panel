@@ -6,6 +6,7 @@ static lv_obj_t *s_weather_sections[3], *s_weather_tabs[3], *s_weather_modal;
 static lv_obj_t *s_feels, *s_dew, *s_humidity, *s_wind, *s_gust, *s_wind_dir;
 static lv_obj_t *s_pressure, *s_rain_day, *s_rain_rate, *s_uv, *s_solar, *s_sun, *s_risk, *s_tomorrow;
 static lv_obj_t *s_chart_caption, *s_chart_times[4];
+static lv_obj_t *s_risk_card, *s_risk_title, *s_risk_pill, *s_risk_label;
 static lv_obj_t *s_hero_icon, *s_compass, *s_hour_chart, *s_forecast_cards[WEATHER_DAYS];
 static weather_snapshot_t *s_weather_view;
 static uint32_t s_weather_revision=UINT32_MAX;
@@ -143,6 +144,50 @@ static void compass_draw(lv_event_t *e)
         wx_line(layer,cx+(int)(dx*26),cy+(int)(dy*26),cx+(int)(dx*8+dy*10),cy+(int)(dy*8-dx*10),2,T->text,130);
     }
 }
+/* Match HeatIndexDisplay's 7C warning palette and risk labels. Its cold
+ * palette bands and warning-label bands are intentionally independent. */
+typedef struct {
+    const char *label;
+    uint32_t top,bottom,border,status,accent;
+} weather_risk_style_t;
+static weather_risk_style_t weather_risk_style(float fahrenheit,bool cold)
+{
+    if(!isfinite(fahrenheit))return (weather_risk_style_t){"UNAVAILABLE",T->card_bg_2,T->card_bg,T->card_border,T->card_bg,T->muted};
+    if(cold){
+        const char *label=fahrenheit<=-35?"EXTREME DANGER":fahrenheit<=-20?"DANGER":fahrenheit<=0?"VERY COLD":fahrenheit<=20?"COLD":"CHILLY";
+        if(fahrenheit<=-48)return (weather_risk_style_t){label,0x6c3aa8,0x1f0f43,0xbe84f2,0x27124f,0xdbacff};
+        if(fahrenheit<=-32)return (weather_risk_style_t){label,0x2569b8,0x0a224e,0x63abff,0x091e43,0x8bc6ff};
+        if(fahrenheit<=-18)return (weather_risk_style_t){label,0x4ea6da,0x0d3d60,0x9edfff,0x0b304c,0xc2ebff};
+        return (weather_risk_style_t){label,0x124f86,0x06192c,0x58b7ff,0x081c31,0x7bc9ff};
+    }
+    if(fahrenheit>=125)return (weather_risk_style_t){"EXTREME DANGER",0xb21585,0x37082f,0xf457cc,0x4c0a40,0xff8be4};
+    if(fahrenheit>=103)return (weather_risk_style_t){"DANGER",0xd83b35,0x46110f,0xff7168,0x52120e,0xff8c82};
+    if(fahrenheit>=90)return (weather_risk_style_t){"EXTREME CAUTION",0xdd751d,0x471e08,0xffad4b,0x582307,0xffc06e};
+    if(fahrenheit>=80)return (weather_risk_style_t){"CAUTION",0xc59b17,0x423207,0xffe45e,0x5b4407,0xffeb80};
+    return (weather_risk_style_t){"NORMAL",0x287a45,0x0a2314,0x61d889,0x123a20,0x8fe8aa};
+}
+static bool weather_wind_chill_applies(const weather_current_t *current)
+{
+    return isfinite(current->temp)&&isfinite(current->wind)&&current->temp<=10&&current->wind>3.0f*1.609344f;
+}
+static void update_weather_risk(const weather_current_t *current)
+{
+    bool cold=weather_wind_chill_applies(current);
+    float value=cold?current->wind_chill:current->heat_index;
+    weather_risk_style_t risk=weather_risk_style(value*1.8f+32,cold);
+    weather_set_text(s_risk_title,cold?"WIND CHILL":"HEAT INDEX");
+    char text[48];weather_format(text,sizeof(text),value,"temp",settings_get()->weather_units);
+    weather_set_text(s_risk,text);weather_set_text(s_risk_label,risk.label);
+    /* Avoid style invalidation on otherwise identical station refreshes. */
+    if(lv_color_to_u32(lv_obj_get_style_bg_color(s_risk_card,0))!=lv_color_to_u32(c(risk.top))){
+        lv_obj_set_style_bg_color(s_risk_card,c(risk.top),0);
+        lv_obj_set_style_bg_grad_color(s_risk_card,c(risk.bottom),0);
+        lv_obj_set_style_border_color(s_risk_card,c(risk.border),0);
+        lv_obj_set_style_bg_color(s_risk_pill,c(risk.status),0);
+        lv_obj_set_style_border_color(s_risk_pill,c(risk.accent),0);
+        lv_obj_set_style_text_color(s_risk_label,c(risk.accent),0);
+    }
+}
 static void chart_draw(lv_event_t *e)
 {
     lv_obj_t *o=lv_event_get_target(e);lv_area_t a;lv_obj_get_coords(o,&a);lv_layer_t *layer=lv_event_get_layer(e);
@@ -154,14 +199,24 @@ static void chart_draw(lv_event_t *e)
     if(high-low<2){high+=1;low-=1;}
     bool previous=false;int px=0,py=0;
     for(unsigned i=0;i<w->hour_count;i++){
-        int x=a.x1+8+(int)i*(width-16)/(w->hour_count-1);float chance=w->hours[i].rain_chance;
+        int x=a.x1+26+(int)i*(width-52)/(w->hour_count-1);float chance=w->hours[i].rain_chance;
         if(isfinite(chance)){int bar=(int)(chance*(height-12)/100);wx_disc(layer,x-6,a.y2-bar,12,bar+1,T->accent_2,95);}
         float temp=w->hours[i].temp;
         if(isfinite(temp)){
-            int y=a.y2-6-(int)((temp-low)/(high-low)*(height-12));
+            int y=a.y2-6-(int)((temp-low)/(high-low)*(height-28));
             if(previous){wx_line(layer,px,py,x,y,7,T->accent,30);wx_line(layer,px,py,x,y,3,T->accent,255);}
             wx_disc(layer,x-3,y-3,6,6,T->text,255);px=x;py=y;previous=true;
         }else previous=false;
+    }
+    for(unsigned i=0;i<w->hour_count;i++){
+        float temp=w->hours[i].temp;if(!isfinite(temp))continue;
+        int x=a.x1+26+(int)i*(width-52)/(w->hour_count-1);
+        int y=a.y2-6-(int)((temp-low)/(high-low)*(height-28));
+        char text[16];snprintf(text,sizeof(text),"%.0f°",settings_get()->weather_units?temp:temp*1.8f+32);
+        lv_draw_label_dsc_t label;lv_draw_label_dsc_init(&label);
+        label.text=text;label.text_local=1;label.font=&lv_font_montserrat_14;label.color=c(T->text);
+        label.align=LV_TEXT_ALIGN_CENTER;
+        lv_area_t area={x-26,y-21,x+25,y-5};lv_draw_label(layer,&label,&area);
     }
 }
 static void weather_section(unsigned section)
@@ -242,7 +297,7 @@ static void update_weather_view(void)
     }
     formatted(s_pressure,w->current.pressure,"pressure");formatted(s_rain_day,w->current.rain_day,"rain");formatted(s_rain_rate,w->current.rain_rate,"rate");
     weather_format(value,sizeof(value),w->current.uv,"",true);snprintf(status,sizeof(status),"UV %s",value);weather_set_text(s_uv,status);
-    formatted(s_solar,w->current.solar,"W/m2");formatted(s_risk,w->current.heat_index,"temp");
+    formatted(s_solar,w->current.solar,"W/m2");update_weather_risk(&w->current);
     weather_icon_t today=w->day_count?w->days[0].icon:WX_UNKNOWN;
     weather_set_icon(s_hero_icon,today);
     char rise[20]="--",set[20]="--";struct tm tm;
@@ -352,6 +407,20 @@ static void create_weather_page(lv_obj_t *root)
     lv_obj_t **values[]={&s_pressure,&s_risk,&s_sun,&s_tomorrow};
     for(unsigned i=0;i<4;i++){
         lv_obj_t *tile=make_card(now,14+i*195,349,187,98);
+        if(i==1){
+            s_risk_card=tile;
+            lv_obj_set_style_bg_opa(tile,LV_OPA_COVER,0);
+            lv_obj_set_style_bg_grad_dir(tile,LV_GRAD_DIR_VER,0);
+            s_risk_title=weather_text(tile,titles[i],14,9,159,&lv_font_montserrat_14,0xffffff);
+            s_risk=weather_text(tile,"--",14,29,159,&lv_font_montserrat_22,0xffffff);
+            s_risk_pill=weather_container(tile,10,63,167,26);
+            lv_obj_set_style_radius(s_risk_pill,13,0);
+            lv_obj_set_style_bg_opa(s_risk_pill,LV_OPA_COVER,0);
+            lv_obj_set_style_border_width(s_risk_pill,1,0);
+            s_risk_label=weather_text(s_risk_pill,"UNAVAILABLE",0,0,161,&lv_font_montserrat_14,T->muted);
+            lv_obj_set_style_text_align(s_risk_label,LV_TEXT_ALIGN_CENTER,0);lv_obj_center(s_risk_label);
+            continue;
+        }
         weather_text(tile,titles[i],14,13,159,&lv_font_montserrat_14,T->muted);
         *values[i]=weather_text(tile,"--",14,42,160,i==3?&lv_font_montserrat_16:&lv_font_montserrat_20,i==1?T->warm:T->text);
         if(i>=2){lv_label_set_long_mode(*values[i],LV_LABEL_LONG_MODE_WRAP);lv_obj_set_height(*values[i],50);}

@@ -181,6 +181,38 @@ int main(int argc,char **argv) {
     for(int i=0;i<12;i++)demo_weather.hours[i]=(weather_hour_t){.time=time(NULL)+i*3600,.temp=24+4*sinf(i*0.4),.rain_chance=i*7,.rain=i*0.2};
     update_weather_view();
     assert(strstr(lv_label_get_text(s_weather_summary),"76.5"));
+    /* Warning labels/palette match HeatIndexDisplay, including exact boundaries. */
+    const float heat_levels[]={79.9f,80,89.9f,90,102.9f,103,124.9f,125};
+    const char *heat_labels[]={"NORMAL","CAUTION","CAUTION","EXTREME CAUTION","EXTREME CAUTION","DANGER","DANGER","EXTREME DANGER"};
+    const float cold_levels[]={21,20,0,-20,-35};
+    const char *cold_labels[]={"CHILLY","COLD","VERY COLD","DANGER","EXTREME DANGER"};
+    for(unsigned i=0;i<8;i++)assert(!strcmp(weather_risk_style(heat_levels[i],false).label,heat_labels[i]));
+    for(unsigned i=0;i<5;i++)assert(!strcmp(weather_risk_style(cold_levels[i],true).label,cold_labels[i]));
+    assert(weather_risk_style(-48,true).accent==0xdbacff);
+    assert(weather_risk_style(-32,true).accent==0x8bc6ff);
+    assert(weather_risk_style(-18,true).accent==0xc2ebff);
+    assert(!strcmp(weather_risk_style(NAN,false).label,"UNAVAILABLE"));
+    weather_current_t normal=demo_weather.current;
+    demo_weather.current.temp=10;demo_weather.current.wind=3*1.609344f;
+    assert(!weather_wind_chill_applies(&demo_weather.current));
+    demo_weather.current.wind=5;demo_weather.current.wind_chill=-30;
+    demo_weather.revision++;update_weather_view();
+    assert(!strcmp(lv_label_get_text(s_risk_title),"WIND CHILL"));
+    assert(!strcmp(lv_label_get_text(s_risk_label),"DANGER"));
+    demo_weather.current.wind=NAN;
+    assert(!weather_wind_chill_applies(&demo_weather.current));
+    demo_weather.current=normal;demo_weather.current.heat_index=NAN;
+    demo_weather.revision++;update_weather_view();
+    assert(!strcmp(lv_label_get_text(s_risk_label),"UNAVAILABLE"));
+    assert(!strcmp(lv_label_get_text(s_risk),"--"));
+    demo_weather.current=normal;demo_weather.current.heat_index=35;
+    demo_weather.revision++;update_weather_view();lv_obj_update_layout(lv_screen_active());
+    assert(!strcmp(lv_label_get_text(s_risk_title),"HEAT INDEX"));
+    assert(!strcmp(lv_label_get_text(s_risk_label),"EXTREME CAUTION"));
+    lv_point_t pill_size;
+    lv_text_get_size(&pill_size,lv_label_get_text(s_risk_label),&lv_font_montserrat_14,0,0,LV_COORD_MAX,LV_TEXT_FLAG_NONE);
+    assert(pill_size.x<=lv_obj_get_width(s_risk_label));
+    demo_weather.current=normal;demo_weather.revision++;update_weather_view();
     config.weather_poll_minutes=30;
     fake_now+=600000000;update_weather_view();
     assert(!strstr(lv_label_get_text(s_weather_status),"Stale"));
@@ -209,9 +241,24 @@ int main(int argc,char **argv) {
     weather_section(0);clock_timer_cb(NULL);lv_refr_now(NULL);before_flush=flush_count;
     clock_timer_cb(NULL);ui_set_network_online(true);pending_state_timer_cb(NULL);lv_refr_now(NULL);
     assert(flush_count==before_flush);
+    demo_weather.revision++;update_weather_view();lv_refr_now(NULL);
+    assert(flush_count==before_flush);
     lv_label_set_text(s_clock,"10:24");lv_label_set_text(s_clock_period,"am");lv_label_set_text(s_date,"Sat, Apr 26");align_clock_labels();
     set_page(argc==4);
     if(argc==4 && !strcmp(argv[3],"forecast"))weather_section(1);
+    if(argc==4 && !strcmp(argv[3],"heat")){
+        demo_weather.current.temp=35;demo_weather.current.heat_index=41;demo_weather.current.feels=41;demo_weather.revision++;update_weather_view();
+    }
+    if(argc==4 && !strcmp(argv[3],"cold")){
+        demo_weather.current.temp=-25;demo_weather.current.wind=25;demo_weather.current.wind_chill=-39;demo_weather.current.feels=-39;
+        demo_weather.revision++;update_weather_view();
+    }
+    if(argc==4 && !strcmp(argv[3],"forecast-metric")){
+        config.weather_units=1;
+        for(unsigned i=0;i<WEATHER_HOURS;i++)demo_weather.hours[i].temp=-12+(int)i;
+        demo_weather.hours[5].temp=NAN;
+        demo_weather.revision++;update_weather_view();weather_section(1);
+    }
     if(argc==4 && !strcmp(argv[3],"station"))weather_section(2);
     if(argc==4 && !strcmp(argv[3],"day")){weather_section(1);lv_obj_send_event(s_forecast_cards[0],LV_EVENT_CLICKED,NULL);}
     lv_obj_update_layout(lv_screen_active());

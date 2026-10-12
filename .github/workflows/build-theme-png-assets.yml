@@ -36,7 +36,7 @@ jobs:
           mkdir -p build/previews
           for theme in 0 1 2 3; do
             build/host/panel_render "$theme" "build/previews/theme-$theme.ppm"
-            for view in weather forecast station day; do
+            for view in weather forecast station day heat cold forecast-metric; do
               build/host/panel_render "$theme" "build/previews/$view-$theme.ppm" "$view"
             done
           done
