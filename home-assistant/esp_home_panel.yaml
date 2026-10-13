@@ -146,11 +146,6 @@ automation:
           - conditions: "{{ trigger.id == 'command' and control == 'tapo' and entity | length > 0 }}"
             sequence:
               - choose:
-                  - conditions: "{{ 'on' in trigger.payload_json }}"
-                    sequence:
-                      - action: "{{ 'light.turn_on' if trigger.payload_json.on else 'light.turn_off' }}"
-                        target:
-                          entity_id: "{{ entity }}"
                   - conditions: "{{ 'brightness' in trigger.payload_json }}"
                     sequence:
                       - action: light.turn_on
@@ -158,6 +153,11 @@ automation:
                           entity_id: "{{ entity }}"
                         data:
                           brightness_pct: "{{ trigger.payload_json.brightness | int }}"
+                  - conditions: "{{ 'on' in trigger.payload_json }}"
+                    sequence:
+                      - action: "{{ 'light.turn_on' if trigger.payload_json.on else 'light.turn_off' }}"
+                        target:
+                          entity_id: "{{ entity }}"
                   - conditions: >-
                       {{ 'r' in trigger.payload_json and
                          'g' in trigger.payload_json and
@@ -182,11 +182,6 @@ automation:
           - conditions: "{{ trigger.id == 'command' and control == 'overhead' and entity | length > 0 }}"
             sequence:
               - choose:
-                  - conditions: "{{ 'on' in trigger.payload_json }}"
-                    sequence:
-                      - action: "{{ 'light.turn_on' if trigger.payload_json.on else 'light.turn_off' }}"
-                        target:
-                          entity_id: "{{ entity }}"
                   - conditions: "{{ 'brightness' in trigger.payload_json }}"
                     sequence:
                       - action: light.turn_on
@@ -194,6 +189,11 @@ automation:
                           entity_id: "{{ entity }}"
                         data:
                           brightness_pct: "{{ trigger.payload_json.brightness | int }}"
+                  - conditions: "{{ 'on' in trigger.payload_json }}"
+                    sequence:
+                      - action: "{{ 'light.turn_on' if trigger.payload_json.on else 'light.turn_off' }}"
+                        target:
+                          entity_id: "{{ entity }}"
               - delay:
                   milliseconds: 150
               - action: script.esp_home_panel_publish_state

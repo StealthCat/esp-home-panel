@@ -276,3 +276,5 @@ Weather now connects directly to Ambient Weather or Weather Underground, with
 Open-Meteo or WU forecasts. No weather entities, MQTT topics, or HA weather package
 are needed. The control bridge above still handles lights, fan, and media.
 See [weather and display setup](../docs/weather-display.md).
+
+Brightness changes and Main Lights percentage presets turn on an off light. The panel sends power and brightness in one command and immediately updates its switch; the bridge applies both in one `light.turn_on` action. Update the installed package when updating firmware so combined commands retain their brightness value. A 0% brightness setting remains off.

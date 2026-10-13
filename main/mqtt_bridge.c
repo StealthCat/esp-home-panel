@@ -916,8 +916,8 @@ void mqtt_bridge_tapo_brightness(uint8_t percent)
     note_local_command(CONTROL_TAPO);
     char payload[72];
     snprintf(payload, sizeof(payload),
-             "{\"event_type\":\"brightness\",\"brightness\":%u}",
-             clamp_pct(percent));
+             "{\"event_type\":\"brightness\",\"on\":%s,\"brightness\":%u}",
+             percent ? "true" : "false", clamp_pct(percent));
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_tapo,
                           settings ? settings->ha_tapo_entity : NULL,
@@ -952,8 +952,8 @@ void mqtt_bridge_overhead_brightness(uint8_t percent)
     note_local_command(CONTROL_OVERHEAD);
     char payload[72];
     snprintf(payload, sizeof(payload),
-             "{\"event_type\":\"brightness\",\"brightness\":%u}",
-             clamp_pct(percent));
+             "{\"event_type\":\"brightness\",\"on\":%s,\"brightness\":%u}",
+             percent ? "true" : "false", clamp_pct(percent));
     const panel_settings_t *settings = settings_get();
     publish_targeted_json(s_topic_cmd_overhead,
                           settings ? settings->ha_overhead_entity : NULL,

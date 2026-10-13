@@ -411,6 +411,17 @@ static void switch_fan_cb(lv_event_t *e)
     mqtt_bridge_fan_power(on);
 }
 
+/* Keep the power switch in step with the combined power/brightness command. */
+static void apply_light_brightness(bool strip,uint8_t percent)
+{
+    lv_obj_t *power=strip?s_tapo_switch:s_overhead_switch;
+    s_syncing=true;
+    set_switch(power,percent>0);
+    s_syncing=false;
+    if(strip)mqtt_bridge_tapo_brightness(percent);
+    else mqtt_bridge_overhead_brightness(percent);
+}
+
 static void tapo_brightness_cb(lv_event_t *e)
 {
     if (s_syncing) return;
@@ -418,7 +429,7 @@ static void tapo_brightness_cb(lv_event_t *e)
     int value = lv_slider_get_value(lv_event_get_target(e));
     set_percent_label(s_tapo_pct, value);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        mqtt_bridge_tapo_brightness((uint8_t)value);
+        apply_light_brightness(true,(uint8_t)value);
     }
 }
 
@@ -429,7 +440,7 @@ static void overhead_brightness_cb(lv_event_t *e)
     int value = lv_slider_get_value(lv_event_get_target(e));
     set_percent_label(s_overhead_pct, value);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
-        mqtt_bridge_overhead_brightness((uint8_t)value);
+        apply_light_brightness(false,(uint8_t)value);
     }
 }
 
@@ -532,7 +543,7 @@ static void overhead_preset_cb(lv_event_t *e)
         set_percent_label(s_overhead_pct, (int)pct);
         s_syncing = false;
     }
-    mqtt_bridge_overhead_brightness((uint8_t)pct);
+    apply_light_brightness(false,(uint8_t)pct);
 }
 
 static void hsv_to_rgb(uint16_t hue, uint8_t sat, uint8_t val, uint8_t *r, uint8_t *g, uint8_t *b)

@@ -31,12 +31,16 @@ static unsigned flush_count;
 static int tapo_commands, fan_commands, echo_commands;
 static bool last_playing, last_next;
 static uint32_t last_rgb;
+static char light_events[32];
+static unsigned light_event_count;
+static uint8_t light_level;
+static void light_event(char event){assert(light_event_count<sizeof(light_events));light_events[light_event_count++]=event;}
 const panel_settings_t *settings_get(void) { return &config; }
-void mqtt_bridge_tapo_power(bool on) {(void)on;tapo_commands++;}
-void mqtt_bridge_tapo_brightness(uint8_t p) {(void)p;tapo_commands++;}
+void mqtt_bridge_tapo_power(bool on) {light_event(on?'T':'t');tapo_commands++;}
+void mqtt_bridge_tapo_brightness(uint8_t p) {light_event('B');light_level=p;tapo_commands++;}
 void mqtt_bridge_tapo_rgb(uint8_t r,uint8_t g,uint8_t b) {last_rgb=((uint32_t)r<<16)|((uint32_t)g<<8)|b;tapo_commands++;}
-void mqtt_bridge_overhead_power(bool on) {(void)on;}
-void mqtt_bridge_overhead_brightness(uint8_t p) {(void)p;}
+void mqtt_bridge_overhead_power(bool on) {light_event(on?'O':'o');}
+void mqtt_bridge_overhead_brightness(uint8_t p) {light_event('b');light_level=p;}
 void mqtt_bridge_fan_power(bool on) {(void)on;fan_commands++;}
 void mqtt_bridge_echo_volume(uint8_t p) {(void)p;echo_commands++;}
 void mqtt_bridge_echo_mute(bool m,uint8_t p) {(void)m;(void)p;echo_commands++;}
@@ -156,6 +160,34 @@ int main(int argc,char **argv) {
     touch_at(550,30,true);touch_at(300,30,true);touch_at(200,30,false);
     assert(!s_show_weather);assert(!strcmp(lv_label_get_text(s_page_indicator),"Controls"));
     char clock_text[24];struct tm clock_tm={.tm_year=126,.tm_mon=9,.tm_mday=11,.tm_hour=0,.tm_min=5,.tm_isdst=-1};
+    /* Off lights switch on with their brightness command; drag previews do
+     * not publish, and already-on lights do not get duplicate power commands. */
+    for(unsigned strip=0;strip<2;strip++){
+        lv_obj_t *slider=strip?s_tapo_slider:s_overhead_slider;
+        lv_obj_t *power=strip?s_tapo_switch:s_overhead_switch;
+        set_switch(power,false);light_event_count=0;
+        lv_slider_set_value(slider,60,LV_ANIM_OFF);
+        lv_obj_send_event(slider,LV_EVENT_VALUE_CHANGED,NULL);
+        assert(light_event_count==0 && !lv_obj_has_state(power,LV_STATE_CHECKED));
+        lv_obj_send_event(slider,LV_EVENT_RELEASED,NULL);
+        assert(light_event_count==1 && light_events[0]==(strip?'B':'b') && light_level==60);
+        assert(lv_obj_has_state(power,LV_STATE_CHECKED));
+        light_event_count=0;lv_obj_send_event(slider,LV_EVENT_RELEASED,NULL);
+        assert(light_event_count==1 && light_events[0]==(strip?'B':'b'));
+        light_event_count=0;lv_slider_set_value(slider,0,LV_ANIM_OFF);
+        lv_obj_send_event(slider,LV_EVENT_RELEASED,NULL);
+        assert(light_event_count==1 && light_level==0 && !lv_obj_has_state(power,LV_STATE_CHECKED));
+    }
+    lv_obj_t *light_card=lv_obj_get_parent(s_overhead_slider);
+    for(unsigned i=0;i<lv_obj_get_child_count(light_card);i++){
+        lv_obj_t *button=lv_obj_get_child(light_card,i);
+        if(!lv_obj_check_type(button,&lv_button_class))continue;
+        set_switch(s_overhead_switch,false);light_event_count=0;
+        lv_obj_send_event(button,LV_EVENT_CLICKED,NULL);
+        assert(light_event_count==1 && light_events[0]=='b');
+        assert(light_level>0 && lv_obj_has_state(s_overhead_switch,LV_STATE_CHECKED));
+    }
+    light_event_count=0;
     weather_clock(clock_text,sizeof(clock_text),mktime(&clock_tm));assert(!strcmp(clock_text,"12:05 am"));
     clock_tm.tm_hour=12;weather_clock(clock_text,sizeof(clock_text),mktime(&clock_tm));assert(!strcmp(clock_text,"12:05 pm"));
     clock_tm.tm_hour=19;weather_clock(clock_text,sizeof(clock_text),mktime(&clock_tm));assert(!strcmp(clock_text,"7:05 pm"));
