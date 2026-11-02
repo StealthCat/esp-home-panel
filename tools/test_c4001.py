@@ -26,6 +26,10 @@ static bool failed, no_bus, corrupt_config;
 static int adds, saves, toggles, writes, expected_address=42;
 static uint8_t registers[256];
 static int64_t esp_timer_get_time(void) {return now;}
+static int i2c_master_probe(void *b,uint8_t address,int timeout) {
+ assert(b && timeout==20);
+ return !failed && address==expected_address ? ESP_OK : -1;
+}
 static int i2c_master_bus_add_device(void *b,const i2c_device_config_t *c,void **d) {
  assert(b && c->device_address==expected_address && c->scl_speed_hz==100000);
  *d=(void*)2;adds++;return 0;
@@ -80,6 +84,17 @@ int main(void){
  /* Other selectable address works on a fresh boot. */
  s_device=NULL;s_stage=CHECK_MODE;s_due_us=0;store_reading(false,false,now);
  cfg.presence_address=expected_address=43;cfg.presence_enabled=1;until_ready();assert(adds==2);
+ /* Wrong selected address must be distinguished from disconnected radar. */
+ s_device=NULL;s_stage=CHECK_MODE;s_due_us=0;store_reading(false,false,now);
+ cfg.presence_address=42;expected_address=43;
+ tick(1000000);
+ assert(!c4001_reading().available);
+ assert(c4001_diagnostic().alternate_address && c4001_diagnostic().responding);
+ assert(strstr(c4001_diagnostic().reason,"other I2C address"));
+ /* Missing device at both addresses must show no I2C response. */
+ expected_address=44;tick(6000000);
+ assert(!c4001_diagnostic().responding && !c4001_diagnostic().alternate_address);
+ assert(strstr(c4001_diagnostic().reason,"No I2C response"));
  return 0;
 }
 '''

@@ -96,6 +96,34 @@ Discovery and sensor availability are retained. Occupancy state is not retained 
 
 No Home Assistant YAML bridge change is required. This addition does not change screen behavior automatically, and does not expose distance or speed from the mutually exclusive ranging mode.
 
+### Troubleshooting detection in the web panel
+
+If **Live sensor readings** reports the SEN0610 as unavailable, open
+**Sensors** and read the diagnostic text under **Room occupancy**. The
+diagnostic is also present in the read-only `GET /api/sensors` response
+under `presence.diagnostic`, with `detected`, `other_address`,
+`address`, and optionally `raw_status`.
+
+- **No I2C response**: verify the SEN0610's mode switch is on I2C,
+  the +/− power and ground, the C/R-to-SCL and D/T-to-SDA wiring, and
+  that the cable pin ordering matches on both ends. Powered LEDs do not
+  prove the data lines are communicating. The ESP32 bus is 3.3 V only.
+- **Radar responds at the other I2C address**: change the configured
+  address between 0x2A and 0x2B, save, and reboot.
+- **Radar is responding but not initialized**: wait briefly for sensor
+  startup, then power-cycle the panel and radar if persistent.
+- **Configuration readback differs / cannot start**: the radar is detected
+  but cannot complete the presence-mode setup; check the selected I2C
+  mode, cable reliability, and available power. Note the raw status value.
+- **Radar connected**: the firmware has read a valid occupancy status.
+  Any `available=false` after that may indicate stale readings or
+  a new communications failure.
+
+The firmware retries after failures. It probes both *supported radar
+addresses* only while initially opening the device; it does not scan arbitrary
+bus addresses or interfere with unrelated devices. Existing sensors are
+not toggled into a new mode for diagnostic purposes.
+
 ### Protocol and verification
 
 The driver follows DFRobot's [official C4001 register definitions and I2C implementation](https://github.com/DFRobot/DFRobot_C4001/tree/master/src). Hardware specifications and mounting guidance: [SEN0610 documentation](https://wiki.dfrobot.com/sen0610/).

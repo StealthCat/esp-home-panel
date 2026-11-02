@@ -25,6 +25,26 @@ static i2c_master_dev_handle_t s_device;
 static int64_t s_due_us = 2000000; /* let the radar boot before configuration */
 static presence_reading_t s_reading;
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
+static presence_diagnostic_t s_diagnostic = {.reason = "Waiting for first radar poll"};
+
+presence_diagnostic_t c4001_diagnostic(void)
+{
+    portENTER_CRITICAL(&s_lock);
+    presence_diagnostic_t result = s_diagnostic;
+    portEXIT_CRITICAL(&s_lock);
+    return result;
+}
+
+static void store_diagnostic(const char *reason, bool responding, bool alternate,
+                             bool status_valid, uint8_t status)
+{
+    portENTER_CRITICAL(&s_lock);
+    s_diagnostic = (presence_diagnostic_t){
+        .responding = responding, .alternate_address = alternate,
+        .status_valid = status_valid, .raw_status = status, .reason = reason
+    };
+    portEXIT_CRITICAL(&s_lock);
+}
 
 presence_reading_t c4001_reading(void)
 {
@@ -75,60 +95,139 @@ void c4001_poll(void)
     if (now < s_due_us) return;
     s_due_us = now + 500000;
     i2c_master_bus_handle_t bus = board_7c_i2c_bus();
-    if (!bus) return;
+    if (!bus) {
+        store_diagnostic("I2C bus unavailable", false, false, false, 0);
+        return;
+    }
+    const char *reason = "Radar I2C communication error";
+    bool responding = true, alternate = false, status_valid = false;
+    uint8_t status = 0;
     if (!s_device) {
+        /* Probe before creating the device: detect wiring and address mismatches.
+         * Only probe while initializing, never in the HTTP server task. */
+        if (i2c_master_probe(bus, cfg->presence_address, 20) != ESP_OK) {
+            uint8_t other = cfg->presence_address == 0x2A ? 0x2B : 0x2A;
+            alternate = i2c_master_probe(bus, other, 20) == ESP_OK;
+            responding = alternate;
+            reason = alternate ? "Radar responds at the other I2C address" :
+                "No I2C response: check wiring and I2C mode switch";
+            goto failed;
+        }
+        store_diagnostic("Radar detected; initializing", true, false, false, 0);
         i2c_device_config_t device = {
             .dev_addr_length = I2C_ADDR_BIT_LEN_7,
             .device_address = cfg->presence_address,
             .scl_speed_hz = 100000,
         };
-        if (i2c_master_bus_add_device(bus, &device, &s_device) != ESP_OK) goto failed;
+        if (i2c_master_bus_add_device(bus, &device, &s_device) != ESP_OK) {
+            reason = "Unable to register radar on I2C bus";
+            goto failed;
+        }
     }
 
-    uint8_t status, result, actual[11], desired[11];
+    uint8_t result, actual[11], desired[11];
     desired_config(cfg, desired);
     switch (s_stage) {
     case CHECK_MODE:
-        if (read_register(REG_STATUS, &status, 1) != ESP_OK || !(status & 0x80)) goto failed;
+        if (read_register(REG_STATUS, &status, 1) != ESP_OK) {
+            reason = "Cannot read radar status register";
+            responding = false;
+            goto failed;
+        }
+        status_valid = true;
+        if (!(status & 0x80)) {
+            reason = "Radar is responding but not initialized";
+            goto failed;
+        }
         if (status & 0x02) {
             /* This command toggles modes. Always read status before issuing it. */
-            if (command(REG_COMMAND, CMD_CHANGE_MODE) != ESP_OK) goto failed;
+            if (command(REG_COMMAND, CMD_CHANGE_MODE) != ESP_OK) {
+                reason = "Radar mode change command failed";
+                goto failed;
+            }
+            store_diagnostic("Switching radar to presence mode", true, false, true, status);
             s_due_us = now + 1500000;
             return;
         }
-        if (command(REG_CONTROL, CMD_STOP) != ESP_OK) goto failed;
+        if (command(REG_CONTROL, CMD_STOP) != ESP_OK) {
+            reason = "Radar stop command failed";
+            goto failed;
+        }
+        store_diagnostic("Radar detected; configuring", true, false, true, status);
         s_stage = STOPPED;
         s_due_us = now + 200000;
         return;
     case STOPPED:
-        if (read_register(REG_STATUS, &status, 1) != ESP_OK || (status & 0x83) != 0x80) goto failed;
-        if (read_register(REG_CONFIG, actual, sizeof(actual)) != ESP_OK) goto failed;
+        if (read_register(REG_STATUS, &status, 1) != ESP_OK) {
+            reason = "Cannot read radar status after stop";
+            responding = false;
+            goto failed;
+        }
+        status_valid = true;
+        if ((status & 0x83) != 0x80) {
+            reason = "Radar did not stop in presence mode";
+            goto failed;
+        }
+        if (read_register(REG_CONFIG, actual, sizeof(actual)) != ESP_OK) {
+            reason = "Cannot read radar configuration";
+            goto failed;
+        }
         if (memcmp(actual, desired, sizeof(actual)) != 0) {
             uint8_t bytes[12] = {REG_CONFIG};
             memcpy(bytes + 1, desired, sizeof(desired));
-            if (i2c_master_transmit(s_device, bytes, sizeof(bytes), 20) != ESP_OK ||
-                command(REG_COMMAND, CMD_SAVE) != ESP_OK) goto failed;
+            if (i2c_master_transmit(s_device, bytes, sizeof(bytes), 20) != ESP_OK) {
+                reason = "Cannot write radar configuration";
+                goto failed;
+            }
+            if (command(REG_COMMAND, CMD_SAVE) != ESP_OK) {
+                reason = "Cannot save radar configuration";
+                goto failed;
+            }
         }
         s_stage = VERIFY_CONFIG;
         s_due_us = now + 500000;
         return;
     case VERIFY_CONFIG:
-        if (read_register(REG_CONFIG, actual, sizeof(actual)) != ESP_OK ||
-            memcmp(actual, desired, sizeof(actual)) != 0) goto failed;
-        if (command(REG_CONTROL, CMD_START) != ESP_OK) goto failed;
+        if (read_register(REG_CONFIG, actual, sizeof(actual)) != ESP_OK) {
+            reason = "Cannot verify radar configuration";
+            goto failed;
+        }
+        if (memcmp(actual, desired, sizeof(actual)) != 0) {
+            reason = "Radar configuration readback differs";
+            goto failed;
+        }
+        if (command(REG_CONTROL, CMD_START) != ESP_OK) {
+            reason = "Radar start command failed";
+            goto failed;
+        }
+        store_diagnostic("Radar configured; starting", true, false, false, 0);
         s_stage = STARTED;
         s_due_us = now + 200000;
         return;
     case STARTED:
     case RUNNING:
-        if (read_register(REG_STATUS, &status, 1) != ESP_OK || (status & 0x83) != 0x81 ||
-            read_register(REG_RESULT, &result, 1) != ESP_OK) goto failed;
+        if (read_register(REG_STATUS, &status, 1) != ESP_OK) {
+            reason = "Cannot read radar running status";
+            responding = false;
+            goto failed;
+        }
+        status_valid = true;
+        if ((status & 0x83) != 0x81) {
+            reason = "Radar not running in presence mode";
+            goto failed;
+        }
+        if (read_register(REG_RESULT, &result, 1) != ESP_OK) {
+            reason = "Cannot read occupancy result";
+            goto failed;
+        }
+        store_diagnostic("Radar connected", true, false, true, status);
         store_reading(true, (result & 1) != 0, now);
         s_stage = RUNNING;
         return;
     }
 failed:
     /* A missing/stopped/rebooting radar is unavailable, never a vacant room. */
+    store_diagnostic(reason, responding, alternate, status_valid, status);
     store_reading(false, false, now);
     s_stage = CHECK_MODE;
     s_due_us = now + 5000000;
