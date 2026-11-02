@@ -103,6 +103,9 @@ HARNESS = r'''
 #include "web_config.c"
 ambient_light_reading_t sensors_ambient_light(void) {return (ambient_light_reading_t){0};}
 presence_reading_t c4001_reading(void) {return (presence_reading_t){0};}
+presence_diagnostic_t c4001_diagnostic(void) {
+    return (presence_diagnostic_t){.reason = "Waiting for first radar poll"};
+}
 void web_security_init(void) {}
 static bool authorized=true;
 bool web_security_authorize(httpd_req_t *r,bool required) {(void)r;(void)required;return authorized;}
