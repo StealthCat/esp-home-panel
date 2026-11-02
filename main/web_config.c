@@ -13,6 +13,9 @@
 #include "network.h"
 #include "network_identity.h"
 #include "settings.h"
+#include "sensors.h"
+#include "c4001.h"
+#include "esp_timer.h"
 #include "web_security.h"
 #include "ota_update.h"
 
@@ -247,6 +250,38 @@ static esp_err_t send_chunk(httpd_req_t *req, const char *text)
     return httpd_resp_send_chunk(req, text, HTTPD_RESP_USE_STRLEN);
 }
 
+/* Read only: no bus activity in the HTTP server task. Sensor snapshots are
+ * produced in the application polling loop, independently of MQTT. */
+static esp_err_t sensor_status_handler(httpd_req_t *req)
+{
+    if (!web_security_authorize(req, false)) return ESP_OK;
+    const panel_settings_t *cfg = settings_get();
+    ambient_light_reading_t light = sensors_ambient_light();
+    presence_reading_t presence = c4001_reading();
+    int64_t now = esp_timer_get_time();
+    int64_t light_age = light.sampled_us > 0 && now >= light.sampled_us
+        ? (now - light.sampled_us) / 1000 : -1;
+    int64_t presence_age = presence.sampled_us > 0 && now >= presence.sampled_us
+        ? (now - presence.sampled_us) / 1000 : -1;
+    /* Treat old samples as unavailable, never as fresh lux or vacancy. */
+    bool light_ok = cfg->ambient_light_enabled && light.available &&
+        light_age >= 0 && light_age <= (int64_t)(cfg->sensor_interval_seconds * 3 + 5) * 1000;
+    bool presence_ok = cfg->presence_enabled && presence.available &&
+        presence_age >= 0 && presence_age <= 5000;
+
+    char response[360];
+    snprintf(response, sizeof(response),
+        "{\"light\":{\"enabled\":%s,\"available\":%s,\"lux\":%.2f,\"age_ms\":%lld},"
+        "\"presence\":{\"enabled\":%s,\"available\":%s,\"occupied\":%s,\"age_ms\":%lld}}",
+        cfg->ambient_light_enabled ? "true" : "false", light_ok ? "true" : "false",
+        light_ok ? (double)light.lux : 0.0, (long long)light_age,
+        cfg->presence_enabled ? "true" : "false", presence_ok ? "true" : "false",
+        presence_ok && presence.occupied ? "true" : "false", (long long)presence_age);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-store");
+    return httpd_resp_sendstr(req, response);
+}
+
 static esp_err_t root_handler(httpd_req_t *req)
 {
     if (!web_security_authorize(req, false)) return ESP_OK;
@@ -410,6 +445,21 @@ static esp_err_t root_handler(httpd_req_t *req)
     snprintf(buf, sizeof(buf), "<label>Observation refresh (minutes)</label><input name='weather_poll_minutes' type='number' min='1' max='30' required value='%u'>", cfg->weather_poll_minutes);
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, buf));
     ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req, "</div></div></fieldset></section>"));
+
+    ESP_ERROR_CHECK_WITHOUT_ABORT(send_chunk(req,
+        "<section class='card full' data-tab='sensors'><h2>Live sensor readings</h2>"
+        "<div class='hint'>Live measurements from the panel (no MQTT required). Updates every 2 seconds while this tab is open.</div>"
+        "<div class='row' style='margin-top:14px'>"
+        "<div style='padding:16px;border:1px solid var(--line);border-radius:12px'>"
+        "<div class='eyebrow'>VEML7700 &middot; Ambient light</div>"
+        "<div id='live-lux' style='font-size:28px;font-weight:700;margin:8px 0'>-- lx</div>"
+        "<div id='live-light-status' class='hint' role='status'>Connecting...</div></div>"
+        "<div style='padding:16px;border:1px solid var(--line);border-radius:12px'>"
+        "<div class='eyebrow'>SEN0610 &middot; Room occupancy</div>"
+        "<div id='live-occupancy' style='font-size:28px;font-weight:700;margin:8px 0'>--</div>"
+        "<div id='live-presence-status' class='hint' role='status'>Connecting...</div></div></div>"
+        "<div id='live-connection' class='hint' aria-live='polite'>Connecting to the panel...</div>"
+        "</section>"));
 
     snprintf(buf, sizeof(buf),
              "<section class='card' data-tab='sensors'><h2>Ambient light</h2>"
@@ -917,6 +967,12 @@ esp_err_t web_config_start(void)
         .handler = reboot_handler,
     };
 
+    const httpd_uri_t sensor_status = {
+        .uri = "/api/sensors",
+        .method = HTTP_GET,
+        .handler = sensor_status_handler,
+    };
+    ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &sensor_status));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &reboot));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &root));
     ESP_ERROR_CHECK(httpd_register_uri_handler(s_server, &save));
