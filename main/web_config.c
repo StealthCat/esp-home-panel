@@ -258,6 +258,7 @@ static esp_err_t sensor_status_handler(httpd_req_t *req)
     const panel_settings_t *cfg = settings_get();
     ambient_light_reading_t light = sensors_ambient_light();
     presence_reading_t presence = c4001_reading();
+    presence_diagnostic_t radar = c4001_diagnostic();
     int64_t now = esp_timer_get_time();
     int64_t light_age = light.sampled_us > 0 && now >= light.sampled_us
         ? (now - light.sampled_us) / 1000 : -1;
@@ -269,14 +270,19 @@ static esp_err_t sensor_status_handler(httpd_req_t *req)
     bool presence_ok = cfg->presence_enabled && presence.available &&
         presence_age >= 0 && presence_age <= 5000;
 
-    char response[360];
+    char response[512];
     snprintf(response, sizeof(response),
         "{\"light\":{\"enabled\":%s,\"available\":%s,\"lux\":%.2f,\"age_ms\":%lld},"
-        "\"presence\":{\"enabled\":%s,\"available\":%s,\"occupied\":%s,\"age_ms\":%lld}}",
+        "\"presence\":{\"enabled\":%s,\"available\":%s,\"occupied\":%s,\"age_ms\":%lld,"
+        "\"detected\":%s,\"other_address\":%s,\"address\":\"0x%02X\","
+        "\"raw_status\":%u,\"status_valid\":%s,\"diagnostic\":\"%s\"}}",
         cfg->ambient_light_enabled ? "true" : "false", light_ok ? "true" : "false",
         light_ok ? (double)light.lux : 0.0, (long long)light_age,
         cfg->presence_enabled ? "true" : "false", presence_ok ? "true" : "false",
-        presence_ok && presence.occupied ? "true" : "false", (long long)presence_age);
+        presence_ok && presence.occupied ? "true" : "false", (long long)presence_age,
+        radar.responding ? "true" : "false", radar.alternate_address ? "true" : "false",
+        cfg->presence_address, radar.raw_status, radar.status_valid ? "true" : "false",
+        radar.reason);
     httpd_resp_set_type(req, "application/json");
     httpd_resp_set_hdr(req, "Cache-Control", "no-store");
     return httpd_resp_sendstr(req, response);
