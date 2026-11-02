@@ -92,8 +92,6 @@ static int httpd_start(httpd_handle_t *h,const httpd_config_t *c) {(void)c;*h=(v
 static int httpd_register_uri_handler(httpd_handle_t h,const httpd_uri_t *u) {(void)h;(void)u;return 0;}
 static void esp_restart(void) {reboots++;}
 static int64_t esp_timer_get_time(void) {return 10000000;}
-ambient_light_reading_t sensors_ambient_light(void) {return (ambient_light_reading_t){0};}
-presence_reading_t c4001_reading(void) {return (presence_reading_t){0};}
 #define pdMS_TO_TICKS(x) (x)
 static void vTaskDelay(int t) {(void)t;}
 '''
@@ -103,6 +101,8 @@ HARNESS = r'''
 #include "settings.c"
 #undef TAG
 #include "web_config.c"
+ambient_light_reading_t sensors_ambient_light(void) {return (ambient_light_reading_t){0};}
+presence_reading_t c4001_reading(void) {return (presence_reading_t){0};}
 void web_security_init(void) {}
 static bool authorized=true;
 bool web_security_authorize(httpd_req_t *r,bool required) {(void)r;(void)required;return authorized;}
