@@ -26,6 +26,10 @@ static bool failed, no_bus, corrupt_config;
 static int adds, saves, toggles, writes, expected_address=42;
 static uint8_t registers[256];
 static int64_t esp_timer_get_time(void) {return now;}
+static int i2c_master_probe(void *b,uint8_t address,int timeout) {
+ assert(b && timeout==20);
+ return !failed && address==expected_address ? ESP_OK : -1;
+}
 static int i2c_master_bus_add_device(void *b,const i2c_device_config_t *c,void **d) {
  assert(b && c->device_address==expected_address && c->scl_speed_hz==100000);
  *d=(void*)2;adds++;return 0;
