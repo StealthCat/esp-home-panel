@@ -9,7 +9,7 @@ import test_color_settings as fixture
 with tempfile.TemporaryDirectory() as directory:
     tmp=Path(directory)
     (tmp/'stubs.h').write_text(fixture.STUBS)
-    for name in ('esp_err.h','esp_heap_caps.h','esp_log.h','esp_mac.h','nvs.h','sdkconfig.h','esp_http_server.h','esp_system.h','freertos/FreeRTOS.h','freertos/task.h'):
+    for name in ('esp_err.h','esp_heap_caps.h','esp_log.h','esp_mac.h','nvs.h','sdkconfig.h','esp_http_server.h','esp_system.h','freertos/FreeRTOS.h','freertos/task.h','esp_timer.h'):
         p=tmp/name;p.parent.mkdir(parents=True,exist_ok=True);p.write_text('#include "stubs.h"\n')
     source=fixture.HARNESS.split('int main(void)')[0]+'''int main(void) {
         assert(settings_init()==ESP_OK);
