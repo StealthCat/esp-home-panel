@@ -34,6 +34,25 @@ Conversion uses gain 1/8 and 100 ms integration, with a nominal 0.5376 lx/count 
 
 This feature reports ambient light; it does not automatically change screen brightness. The original LCD-7 has switch-only backlight control. Future sensor drivers can use the same polling/snapshot structure without changing touch initialization.
 
+## Live readings in the web panel
+
+Open the panel's web interface and select **Sensors → Live sensor readings**. The
+VEML7700 lux measurement and C4001 occupied/vacant state refresh every two seconds
+while this tab is visible. These readings come directly from the firmware snapshots:
+no MQTT broker or Home Assistant connection is required.
+
+The read-only `GET /api/sensors` endpoint returns JSON objects named `light`
+and `presence`, with `enabled`, `available`, `age_ms`, and sensor-specific
+`lux` or `occupied` fields. The endpoint uses the same administrator Basic
+authentication policy as the settings page and disables response caching. Sensor
+values are zeroed when unavailable; clients **must** inspect `available` before
+displaying them. Stale lux samples (three configured intervals plus five seconds)
+and presence samples (five seconds) are marked unavailable.
+
+The dashboard distinguishes disabled and unavailable sensors, shows sample age,
+and clears the values if the browser loses communication with the panel. This is
+a near-real-time monitor based on polling, not a high-frequency streaming feed.
+
 ## Verification
 
 `python tools/test_sensors.py` exercises the production polling code with simulated startup, missing hardware, conversion timing, dark readings, saturation, disconnection and recovery. Settings tests cover persistence and invalid input. CI builds the ESP32 firmware. Physical wiring and end-to-end discovery should also be checked on a real panel and Home Assistant installation.
