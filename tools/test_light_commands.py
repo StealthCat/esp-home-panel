@@ -68,4 +68,17 @@ for control in ('tapo', 'overhead'):
     for on in (False, True):
         action = selected(control, {'on':on})
         assert render(action['action'], {'on':on}) == ('light.turn_on' if on else 'light.turn_off')
-print('Combined light power/brightness, presets, zero, clamping and legacy HA commands passed')
+# Auto mode is handled by HA, independently for each light; it must not
+# accidentally fall through to brightness/power on the original command.
+assert 'esp_home_panel_lux_hold' in package['script']
+for control in ('tapo', 'overhead'):
+    branch = next(b for b in branches if "control == '"+control+"'" in b['conditions'])
+    auto = branch['sequence'][0]['choose'][0]
+    for state in (False, True):
+        payload = {'event_type':'auto','auto':state,'target_lux':125.0}
+        assert render(auto['conditions'], payload) == 'True'
+        assert auto['sequence'][0]['if'][0]['value_template']  # Guard target validity
+    assert "target_lux" in str(auto)
+assert 'sensor/illuminance/state' in str(package['script']['esp_home_panel_lux_hold'])
+assert "light.turn_on" in str(package['script']['esp_home_panel_lux_hold'])
+print('Combined light power/brightness, auto lux-hold wiring and legacy HA commands passed')

@@ -1,6 +1,7 @@
 #include "mqtt_bridge.h"
 
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -899,6 +900,23 @@ void mqtt_bridge_poll(void)
         now - s_last_state_request_us >= 10LL * 1000LL * 1000LL) {
         publish_state_request();
     }
+}
+
+bool mqtt_bridge_light_auto(bool strip, bool enabled, float lux_target)
+{
+    if (!s_connected || !s_client) return false;
+    if (enabled && (!isfinite(lux_target) || lux_target < 0)) return false;
+    const panel_settings_t *cfg = settings_get();
+    if (!cfg) return false;
+    const char *entity = strip ? cfg->ha_tapo_entity : cfg->ha_overhead_entity;
+    const char *topic = strip ? s_topic_cmd_tapo : s_topic_cmd_overhead;
+    if (!entity || !entity[0] || !topic) return false;
+    char json[120];
+    snprintf(json, sizeof(json),
+             "{\"event_type\":\"auto\",\"auto\":%s,\"target_lux\":%.2f}",
+             enabled ? "true" : "false", enabled ? (double)lux_target : 0.0);
+    publish_targeted_json(topic, entity, json);
+    return true;
 }
 
 void mqtt_bridge_tapo_power(bool on)

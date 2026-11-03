@@ -16,6 +16,78 @@
 # refresh changes made elsewhere in Home Assistant.
 
 script:
+  esp_home_panel_lux_hold:
+    alias: ESP Home Panel - hold ambient illumination
+    mode: parallel
+    max: 32
+    description: Adjust one light to maintain the ambient lux captured by Auto.
+    fields:
+      entity:
+        description: Home Assistant light entity
+      base_topic:
+        description: Per-panel MQTT topic root
+      control:
+        description: tapo or overhead
+      target_lux:
+        description: Ambient lux when Auto was selected
+    sequence:
+      # Each enabled light has its own run. Runs end on manual control,
+      # toggling Auto again, or missing lux messages for 90 seconds.
+      - repeat:
+          while:
+            - condition: template
+              value_template: "{{ true }}"
+          sequence:
+            - wait_for_trigger:
+                - trigger: mqtt
+                  topic: "home/7c-panel/+/sensor/illuminance/state"
+                  id: lux
+                - trigger: mqtt
+                  topic: "home/7c-panel/+/cmd/+"
+                  id: command
+              timeout: "00:01:30"
+              continue_on_timeout: false
+            - choose:
+                - conditions: >-
+                    {{ wait.trigger.id == 'command' and
+                       wait.trigger.topic == base_topic ~ '/cmd/' ~ control }}
+                  sequence:
+                    - stop: "Light Auto changed or manual control selected"
+                - conditions: >-
+                    {{ wait.trigger.id == 'lux' and
+                       wait.trigger.topic == base_topic ~ '/sensor/illuminance/state' and
+                       (wait.trigger.payload | float(-1)) >= 0 and
+                       is_state(entity, 'on') }}
+                  sequence:
+                    - variables:
+                        measured_lux: "{{ wait.trigger.payload | float(-1) }}"
+                        current_pct: >-
+                          {{ ((state_attr(entity, 'brightness') | int(0)) * 100 / 255)
+                             | round(0) | int }}
+                        error_lux: "{{ (target_lux | float(0)) - (measured_lux | float(0)) }}"
+                    - if:
+                        - condition: template
+                          value_template: >-
+                            {{ (error_lux | float | abs) >
+                               [2, (target_lux | float(0)) * 0.08] | max and
+                               (current_pct | int) > 0 }}
+                      then:
+                        - variables:
+                            change_pct: >-
+                              {% set magnitude = [10, [1, ((error_lux | float | abs) * 0.3) | round(0) | int] | max] | min %}
+                              {{ magnitude if (error_lux | float) > 0 else -magnitude }}
+                            desired_pct: >-
+                              {{ [100, [1, (current_pct | int) + (change_pct | int)] | max] | min }}
+                        - if:
+                            - condition: template
+                              value_template: "{{ (desired_pct | int) != (current_pct | int) }}"
+                          then:
+                            - action: light.turn_on
+                              target:
+                                entity_id: "{{ entity }}"
+                              data:
+                                brightness_pct: "{{ desired_pct | int }}"
+
   esp_home_panel_publish_state:
     alias: ESP Home Panel - publish entity state
     description: Publish normalized Home Assistant state back to the ESP panel.
@@ -146,6 +218,24 @@ automation:
           - conditions: "{{ trigger.id == 'command' and control == 'tapo' and entity | length > 0 }}"
             sequence:
               - choose:
+                  - conditions: >-
+                      {{ trigger.payload_json.event_type | default('') == 'auto' }}
+                    sequence:
+                      - if:
+                          - condition: template
+                            value_template: >-
+                              {{ trigger.payload_json.auto | default(false) | bool and
+                                 (trigger.payload_json.target_lux | float(-1)) >= 0 }}
+                        then:
+                          - action: script.turn_on
+                            target:
+                              entity_id: script.esp_home_panel_lux_hold
+                            data:
+                              variables:
+                                entity: "{{ entity }}"
+                                control: "{{ control }}"
+                                base_topic: "{{ base_topic }}"
+                                target_lux: "{{ trigger.payload_json.target_lux | float(0) }}"
                   - conditions: "{{ 'brightness' in trigger.payload_json }}"
                     sequence:
                       - action: light.turn_on
@@ -182,6 +272,24 @@ automation:
           - conditions: "{{ trigger.id == 'command' and control == 'overhead' and entity | length > 0 }}"
             sequence:
               - choose:
+                  - conditions: >-
+                      {{ trigger.payload_json.event_type | default('') == 'auto' }}
+                    sequence:
+                      - if:
+                          - condition: template
+                            value_template: >-
+                              {{ trigger.payload_json.auto | default(false) | bool and
+                                 (trigger.payload_json.target_lux | float(-1)) >= 0 }}
+                        then:
+                          - action: script.turn_on
+                            target:
+                              entity_id: script.esp_home_panel_lux_hold
+                            data:
+                              variables:
+                                entity: "{{ entity }}"
+                                control: "{{ control }}"
+                                base_topic: "{{ base_topic }}"
+                                target_lux: "{{ trigger.payload_json.target_lux | float(0) }}"
                   - conditions: "{{ 'brightness' in trigger.payload_json }}"
                     sequence:
                       - action: light.turn_on

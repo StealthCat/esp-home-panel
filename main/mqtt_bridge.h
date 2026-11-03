@@ -11,6 +11,9 @@ extern "C" {
 esp_err_t mqtt_bridge_start(void);
 void mqtt_bridge_poll(void);
 
+/* Start/stop HA ambient-lux feedback for one light; false if offline. */
+bool mqtt_bridge_light_auto(bool strip, bool enabled, float lux_target);
+
 void mqtt_bridge_tapo_power(bool on);
 void mqtt_bridge_tapo_brightness(uint8_t percent);
 void mqtt_bridge_tapo_rgb(uint8_t r, uint8_t g, uint8_t b);
