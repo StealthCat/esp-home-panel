@@ -32,7 +32,7 @@ script:
         description: Ambient lux when Auto was selected
     sequence:
       # Each enabled light has its own run. Runs end on manual control,
-      # toggling Auto again, or missing lux messages for 35 seconds.
+      # toggling Auto again, or missing lux messages for 90 seconds.
       - repeat:
           while:
             - condition: template
@@ -45,7 +45,7 @@ script:
                 - trigger: mqtt
                   topic: "home/7c-panel/+/cmd/+"
                   id: command
-              timeout: "00:00:35"
+              timeout: "00:01:30"
               continue_on_timeout: false
             - choose:
                 - conditions: >-
