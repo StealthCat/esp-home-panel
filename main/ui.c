@@ -1,4 +1,5 @@
 #include "ui.h"
+#include "esp_timer.h"
 
 #include <limits.h>
 #include <math.h>
@@ -1145,6 +1146,31 @@ static void clock_timer_cb(lv_timer_t *timer)
 
 #include "ui_weather.inc"
 
+static int64_t s_last_touch_us;
+static portMUX_TYPE s_touch_mux = portMUX_INITIALIZER_UNLOCKED;
+
+int64_t ui_last_touch_us(void)
+{
+    portENTER_CRITICAL(&s_touch_mux);
+    int64_t stamp = s_last_touch_us;
+    portEXIT_CRITICAL(&s_touch_mux);
+    return stamp;
+}
+
+static void record_touch_timer_cb(lv_timer_t *timer)
+{
+    (void)timer;
+    for (lv_indev_t *dev = lv_indev_get_next(NULL); dev; dev = lv_indev_get_next(dev)) {
+        if (lv_indev_get_type(dev) == LV_INDEV_TYPE_POINTER &&
+            lv_indev_get_state(dev) == LV_INDEV_STATE_PRESSED) {
+            portENTER_CRITICAL(&s_touch_mux);
+            s_last_touch_us = esp_timer_get_time();
+            portEXIT_CRITICAL(&s_touch_mux);
+            break;
+        }
+    }
+}
+
 esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
 {
     if (settings_get()->weather_enabled) {
@@ -1243,6 +1269,7 @@ esp_err_t ui_start(esp_lcd_panel_handle_t panel, esp_lcd_touch_handle_t touch)
     create_weather_page(root);
     create_display_behavior();
 
+    lv_timer_create(record_touch_timer_cb, 50, NULL);
     lv_timer_create(pending_state_timer_cb, 20, NULL);
     lv_timer_create(clock_timer_cb, 1000, NULL);
     clock_timer_cb(NULL);
