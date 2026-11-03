@@ -3,6 +3,9 @@
 #include "network.h"
 #include "settings.h"
 #include "sensors.h"
+#include "c4001.h"
+#include "display_policy.h"
+#include "esp_timer.h"
 #include "ui.h"
 #include "web_config.h"
 #include "ota_update.h"
@@ -56,10 +59,39 @@ void app_main(void)
 
     weather_start();
     bool mqtt_started = false;
+    display_policy_t display = {.brightness = settings_get()->backlight_percent};
+    int64_t last_touch = 0, next_display_us = 0;
+    int applied_backlight = settings_get()->backlight_percent;
 
     while (true) {
         ota_update_boot_poll(web_ready);
         sensors_poll();
+        int64_t now_us = esp_timer_get_time();
+        int64_t touch_us = ui_last_touch_us();
+        if (touch_us > last_touch) {
+            last_touch = touch_us;
+            display_policy_touch(&display, settings_get(), touch_us);
+        }
+        if (now_us >= next_display_us) {
+            next_display_us = now_us + 250000;
+            const panel_settings_t *cfg = settings_get();
+            ambient_light_reading_t light = sensors_ambient_light();
+            presence_reading_t presence = c4001_reading();
+            bool light_valid = cfg->ambient_light_enabled && light.available &&
+                light.sampled_us > 0 && now_us >= light.sampled_us &&
+                now_us - light.sampled_us <= (int64_t)(cfg->sensor_interval_seconds * 3 + 5) * 1000000;
+            bool presence_valid = cfg->presence_enabled && presence.available &&
+                presence.sampled_us > 0 && now_us >= presence.sampled_us &&
+                now_us - presence.sampled_us <= 5000000;
+            uint8_t brightness = display_policy_step(&display, cfg, now_us,
+                presence_valid, presence.occupied, light_valid, light.lux,
+                board_7c_has_pwm_backlight());
+            if (brightness != applied_backlight) {
+                esp_err_t err = board_7c_set_backlight(brightness);
+                if (err == ESP_OK) applied_backlight = brightness;
+                else ESP_LOGW(TAG, "Backlight adjustment failed: %s", esp_err_to_name(err));
+            }
+        }
         bool online = network_is_connected();
         ui_set_network_online(online);
 
