@@ -42,6 +42,7 @@ static lv_obj_t *s_clock_period;
 static lv_obj_t *s_date;
 
 static lv_obj_t *s_tapo_switch;
+static lv_obj_t *s_tapo_auto;
 static lv_obj_t *s_tapo_slider;
 static lv_obj_t *s_tapo_pct;
 static lv_obj_t *s_tapo_status;
@@ -51,6 +52,7 @@ static lv_obj_t *s_color_presets[PANEL_COLOR_PRESET_COUNT];
 static void *s_colorwheel_buf;
 
 static lv_obj_t *s_overhead_switch;
+static lv_obj_t *s_overhead_auto;
 static lv_obj_t *s_overhead_slider;
 static lv_obj_t *s_overhead_pct;
 static lv_obj_t *s_overhead_status;
@@ -71,6 +73,8 @@ static lv_obj_t *s_alexa_now_playing;
 static lv_obj_t *s_alexa_artist;
 
 static bool s_syncing;
+static bool s_tapo_auto_enabled;
+static bool s_overhead_auto_enabled;
 static bool s_fan_on;
 static bool s_echo_muted;
 static uint8_t s_echo_unmuted_volume = 50;
@@ -381,11 +385,51 @@ static void add_theme_decor(lv_obj_t *screen)
     else add_classic_decor(screen);
 }
 
+/* The controller runs in Home Assistant; the panel only captures a fresh
+ * lux target and sends explicit enable/disable commands for each light. */
+static void disable_light_auto(bool strip)
+{
+    bool *enabled = strip ? &s_tapo_auto_enabled : &s_overhead_auto_enabled;
+    lv_obj_t *button = strip ? s_tapo_auto : s_overhead_auto;
+    if (!*enabled) return;
+    *enabled = false;
+    if (button) lv_obj_remove_state(button, LV_STATE_CHECKED);
+    mqtt_bridge_light_auto(strip, false, 0);
+}
+
+static void light_auto_cb(lv_event_t *e)
+{
+    bool strip = (uintptr_t)lv_event_get_user_data(e) != 0;
+    bool *enabled = strip ? &s_tapo_auto_enabled : &s_overhead_auto_enabled;
+    lv_obj_t *button = lv_event_get_target(e);
+    bool turn_on = lv_obj_has_state(button, LV_STATE_CHECKED);
+    if (!turn_on) {
+        disable_light_auto(strip);
+        return;
+    }
+    ambient_light_reading_t lux = sensors_ambient_light();
+    const panel_settings_t *cfg = settings_get();
+    int64_t now = esp_timer_get_time();
+    bool fresh = cfg->ambient_light_enabled && lux.available &&
+        lux.sampled_us > 0 && now >= lux.sampled_us &&
+        now - lux.sampled_us <= (int64_t)(cfg->sensor_interval_seconds * 3 + 5) * 1000000 &&
+        isfinite(lux.lux) && lux.lux >= 0;
+    if (!fresh || !mqtt_bridge_light_auto(strip, true, lux.lux)) {
+        lv_obj_remove_state(button, LV_STATE_CHECKED);
+        ESP_LOGW(TAG, "Lux hold needs a fresh VEML7700 measurement and MQTT connection");
+        return;
+    }
+    *enabled = true;
+    ESP_LOGI(TAG, "Lux hold enabled for %s at %.1f lx",
+             strip ? "Light Strips" : "Main Lights", (double)lux.lux);
+}
+
 static void switch_tapo_cb(lv_event_t *e)
 {
     if (s_syncing) return;
     discard_pending_ui(UI_PENDING_TAPO);
     bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    disable_light_auto(true);
     ESP_LOGI(TAG, "UI CMD tapo power=%d", on);
     mqtt_bridge_tapo_power(on);
 }
@@ -395,6 +439,7 @@ static void switch_overhead_cb(lv_event_t *e)
     if (s_syncing) return;
     discard_pending_ui(UI_PENDING_OVERHEAD);
     bool on = lv_obj_has_state(lv_event_get_target(e), LV_STATE_CHECKED);
+    disable_light_auto(false);
     ESP_LOGI(TAG, "UI CMD overhead power=%d", on);
     mqtt_bridge_overhead_power(on);
 }
@@ -419,6 +464,7 @@ static void apply_light_brightness(bool strip,uint8_t percent)
     s_syncing=true;
     set_switch(power,percent>0);
     s_syncing=false;
+    disable_light_auto(strip);
     if(strip)mqtt_bridge_tapo_brightness(percent);
     else mqtt_bridge_overhead_brightness(percent);
 }
@@ -746,6 +792,10 @@ static void create_tapo_card(lv_obj_t *root)
         make_status_dot(card, &s_tapo_status, 72, 48);
     }
 
+    s_tapo_auto = make_button(card, "Auto", 241, 10, 62, 36);
+    lv_obj_add_flag(s_tapo_auto, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_set_style_bg_color(s_tapo_auto, c(T->accent), LV_STATE_CHECKED);
+    lv_obj_add_event_cb(s_tapo_auto, light_auto_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)1);
     s_tapo_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_tapo_switch, switch_tapo_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
@@ -808,6 +858,10 @@ static void create_overhead_card(lv_obj_t *root)
         make_status_dot(card, &s_overhead_status, 72, 48);
     }
 
+    s_overhead_auto = make_button(card, "Auto", 241, 10, 62, 36);
+    lv_obj_add_flag(s_overhead_auto, LV_OBJ_FLAG_CHECKABLE);
+    lv_obj_set_style_bg_color(s_overhead_auto, c(T->accent), LV_STATE_CHECKED);
+    lv_obj_add_event_cb(s_overhead_auto, light_auto_cb, LV_EVENT_CLICKED, NULL);
     s_overhead_switch = make_switch(card, 309, 13);
     lv_obj_add_event_cb(s_overhead_switch, switch_overhead_cb, LV_EVENT_VALUE_CHANGED, NULL);
 
