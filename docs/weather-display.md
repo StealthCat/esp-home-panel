@@ -126,3 +126,9 @@ Live provider credentials and physical sensor/backlight behavior still need
 on-device verification after installing the firmware.
 
 The Now page uses HeatIndexDisplay warning pills for heat index and wind chill, including its risk labels and colors. Wind chill replaces heat index when outdoor temperature is at most 50 °F (10 °C) and wind exceeds 3 mph. Missing readings show Unavailable. On Outlook, each hourly temperature point is labeled in the selected °F/°C units; missing readings leave a gap.
+
+## Restored runtime display control
+
+The main firmware loop now applies the existing display policy every 250 ms, using fresh VEML7700 lux and C4001 occupancy snapshots. Touch interactions extend the configured wake hold, including when the finger remains down. Invalid/stale readings cannot force a sleep decision; invalid lux falls back to manual brightness. The 7C-BOX uses PWM for gradual brightness, and the original LCD-7 remains on/off only. This fixes an earlier disconnect where the policy and settings existed but were never driven by the application loop.
+
+Verify on physical hardware after flashing: enable automatic brightness and observe changing VEML7700 lux, then check that the backlight ramps with light; enable occupancy sleep and verify vacancy delay, wake-on-touch, occupied stay-awake, and sensor-disconnect fallback. Host policy regression test: `python tools/test_display_policy.py`.
