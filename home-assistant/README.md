@@ -278,3 +278,33 @@ are needed. The control bridge above still handles lights, fan, and media.
 See [weather and display setup](../docs/weather-display.md).
 
 Brightness changes and Main Lights percentage presets turn on an off light. The panel sends power and brightness in one command and immediately updates its switch; the bridge applies both in one `light.turn_on` action. Update the installed package when updating firmware so combined commands retain their brightness value. A 0% brightness setting remains off.
+
+## Main Lights and Light Strips: Auto lux hold
+
+Each light card has its own **Auto** button alongside its power switch. This
+is separate from the Display tab's automatic *screen backlight* setting.
+
+When Auto is enabled, the panel captures a fresh VEML7700 ambient-light lux
+reading and sends an MQTT command to Home Assistant with that target. The
+Home Assistant package starts an independent feedback session for the selected
+`light.*` entity. Each new panel lux reading causes a bounded adjustment
+(up to ten brightness percentage points) toward the captured ambient level,
+with an 8% / 2 lux deadband to limit oscillation. Selecting Auto again, or
+using the power or brightness control manually, stops that light's session.
+
+The sensor must be enabled, working, and publishing. The panel must be
+connected to MQTT; if no fresh lux reading is available, the Auto button
+does not engage. The feedback session terminates after 90 seconds without
+a matching MQTT message, rather than continuing to drive the light with
+stale data. Enabled Auto state is not restored after device restart.
+
+**Update the installed `home-assistant/esp_home_panel.yaml` package** together
+with firmware, then reload Home Assistant automations and scripts (or restart
+Home Assistant). This feature is implemented in the backend package; it is not
+the panel's local display brightness policy. Adapt the two lux-hold MQTT
+wait trigger topic patterns if you use a non-default MQTT prefix.
+
+Since the VEML7700 also sees daylight, stable lux regulation depends on sensor
+placement and lighting conditions. Avoid pointing it directly at the panel
+screen; tune placement if the regulation oscillates. This is a simple
+feedback controller, not precision calibrated illuminance control.
