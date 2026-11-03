@@ -915,7 +915,8 @@ bool mqtt_bridge_light_auto(bool strip, bool enabled, float lux_target)
     snprintf(json, sizeof(json),
              "{\"event_type\":\"auto\",\"auto\":%s,\"target_lux\":%.2f}",
              enabled ? "true" : "false", enabled ? (double)lux_target : 0.0);
-    return publish_targeted_json(topic, entity, json) >= 0;
+    publish_targeted_json(topic, entity, json);
+    return true;
 }
 
 void mqtt_bridge_tapo_power(bool on)
