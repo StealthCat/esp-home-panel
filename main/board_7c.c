@@ -22,6 +22,8 @@ esp_err_t board_7c_set_backlight(uint8_t percent)
     return ESP_OK;
 }
 
+void board_7c_service(void) {}
+
 esp_err_t board_7c_init(board_7c_handles_t *handles)
 {
     ESP_RETURN_ON_FALSE(handles, ESP_ERR_INVALID_ARG, TAG, "handles is NULL");
@@ -42,6 +44,8 @@ esp_err_t board_7c_init(board_7c_handles_t *handles)
 #include "esp_lcd_panel_rgb.h"
 #include "esp_lcd_touch_gt911.h"
 #include "esp_log.h"
+#include "esp_timer.h"
+#include "iox_monitor.h"
 #include "touch_guard.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -60,6 +64,7 @@ static const char *TAG = "board_7c";
 #define BOX_IOX_ADDR        0x24
 #define BOX_IOX_REG_MODE    0x02
 #define BOX_IOX_REG_OUTPUT  0x03
+#define BOX_IOX_REG_INPUT   0x04
 #define BOX_IOX_REG_PWM     0x05
 #define BOX_LCD_RST         0
 #define BOX_TOUCH_RST       1
@@ -95,6 +100,8 @@ static i2c_master_dev_handle_t s_box_iox;
 static i2c_master_dev_handle_t s_ch422g_wr_set;
 static i2c_master_dev_handle_t s_ch422g_wr_io;
 static uint16_t s_box_output = 0xFFFF;
+static uint8_t s_box_pwm;
+static iox_monitor_t s_box_monitor;
 static uint8_t s_ch422g_output = 0xFF;
 static gpio_num_t s_i2c_sda = GPIO_NUM_NC;
 static gpio_num_t s_i2c_scl = GPIO_NUM_NC;
@@ -297,7 +304,69 @@ esp_err_t board_7c_set_backlight(uint8_t percent)
     uint8_t buf[2] = { BOX_IOX_REG_PWM, pwm };
     ESP_RETURN_ON_ERROR(i2c_master_transmit(s_box_iox, buf, sizeof(buf), 100), TAG,
                         "Backlight PWM write failed");
+    s_box_pwm = pwm;
     return iox_set_pin(BOX_BACKLIGHT, true);
+}
+
+/*
+ * GT911 address selection for a controller that is already registered with
+ * LVGL: hold INT low across the reset release (0x5D) without reconfiguring
+ * the pin's interrupt, which esp_lcd_touch owns.
+ */
+static esp_err_t box_touch_rearm(void)
+{
+    gpio_intr_disable(TOUCH_INT);
+    esp_err_t err = gpio_set_direction(TOUCH_INT, GPIO_MODE_OUTPUT);
+    if (err == ESP_OK) err = gpio_set_level(TOUCH_INT, 0);
+    if (err == ESP_OK) err = iox_set_pin(BOX_TOUCH_RST, false);
+    if (err == ESP_OK) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+        err = iox_set_pin(BOX_TOUCH_RST, true);
+    }
+    vTaskDelay(pdMS_TO_TICKS(60));
+    esp_err_t input_err = gpio_set_direction(TOUCH_INT, GPIO_MODE_INPUT);
+    gpio_intr_enable(TOUCH_INT);
+    return err != ESP_OK ? err : input_err;
+}
+
+/* Re-apply everything the expander forgets when it resets: pin directions,
+ * output levels (LCD power/reset, touch reset, backlight enable) and PWM. */
+static esp_err_t box_restore_iox(void)
+{
+    ESP_RETURN_ON_ERROR(box_write3(BOX_IOX_REG_MODE, 0xFFFF), TAG, "IO expander mode restore failed");
+    ESP_RETURN_ON_ERROR(box_write3(BOX_IOX_REG_OUTPUT, s_box_output), TAG,
+                        "IO expander output restore failed");
+    if (s_box_output & (1U << BOX_BACKLIGHT)) {
+        uint8_t buf[2] = { BOX_IOX_REG_PWM, s_box_pwm };
+        ESP_RETURN_ON_ERROR(i2c_master_transmit(s_box_iox, buf, sizeof(buf), 100), TAG,
+                            "Backlight PWM restore failed");
+    }
+    /* The touch reset line was released too; GT911 may have re-latched the
+     * wrong I2C address with INT floating. */
+    return box_touch_rearm();
+}
+
+void board_7c_service(void)
+{
+    if (s_hw_profile != HW_PROFILE_7C_BOX || !s_box_iox) return;
+    int64_t now = esp_timer_get_time();
+    if (!iox_monitor_due(&s_box_monitor, now)) return;
+
+    uint8_t reg = BOX_IOX_REG_INPUT, raw[2] = { 0 };
+    bool ok = i2c_master_transmit_receive(s_box_iox, &reg, 1, raw, sizeof(raw), 50) == ESP_OK;
+    uint16_t levels = (uint16_t)raw[0] | ((uint16_t)raw[1] << 8);
+    bool was_calibrated = s_box_monitor.calibrated;
+    bool repair = iox_monitor_update(&s_box_monitor, now, s_box_output, ok, levels);
+    if (!was_calibrated && s_box_monitor.calibrated) {
+        ESP_LOGI(TAG, "IO expander readback check covers pins 0x%04X", s_box_monitor.verified);
+    }
+    if (!repair) return;
+
+    ESP_LOGW(TAG, "IO expander lost its output state (driving 0x%04X, reads 0x%04X), "
+             "likely a supply dip on the shared 3.3 V rail; restoring display and touch",
+             s_box_output, levels);
+    esp_err_t err = box_restore_iox();
+    if (err != ESP_OK) ESP_LOGW(TAG, "IO expander restore incomplete: %s", esp_err_to_name(err));
 }
 
 static esp_err_t touch_reset_sequence(void)

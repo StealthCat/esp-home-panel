@@ -65,6 +65,7 @@ void app_main(void)
 
     while (true) {
         ota_update_boot_poll(web_ready);
+        board_7c_service();
         sensors_poll();
         int64_t now_us = esp_timer_get_time();
         int64_t touch_us = ui_last_touch_us();
