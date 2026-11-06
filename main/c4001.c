@@ -1,6 +1,7 @@
 #include "c4001.h"
 #include "board_i2c.h"
 #include "settings.h"
+#include "esp_log.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include <string.h>
@@ -26,6 +27,8 @@ static int64_t s_due_us = 2000000; /* let the radar boot before configuration */
 static presence_reading_t s_reading;
 static portMUX_TYPE s_lock = portMUX_INITIALIZER_UNLOCKED;
 static presence_diagnostic_t s_diagnostic = {.reason = "Waiting for first radar poll"};
+static const char *TAG = "c4001";
+static const char *s_logged_reason; /* reasons are static strings */
 
 presence_diagnostic_t c4001_diagnostic(void)
 {
@@ -35,9 +38,27 @@ presence_diagnostic_t c4001_diagnostic(void)
     return result;
 }
 
-static void store_diagnostic(const char *reason, bool responding, bool alternate,
+/* Mirror the web diagnostic on the serial console, once per change, so a
+ * radar that stays unavailable explains itself without the web UI. */
+static void log_diagnostic(const char *reason, bool fault, bool status_valid, uint8_t status)
+{
+    if (reason == s_logged_reason) return;
+    s_logged_reason = reason;
+    const panel_settings_t *cfg = settings_get();
+    unsigned address = cfg ? cfg->presence_address : 0;
+    if (fault && status_valid) {
+        ESP_LOGW(TAG, "Radar 0x%02X: %s (status 0x%02X)", address, reason, status);
+    } else if (fault) {
+        ESP_LOGW(TAG, "Radar 0x%02X: %s", address, reason);
+    } else {
+        ESP_LOGI(TAG, "Radar 0x%02X: %s", address, reason);
+    }
+}
+
+static void store_diagnostic(const char *reason, bool fault, bool responding, bool alternate,
                              bool status_valid, uint8_t status)
 {
+    log_diagnostic(reason, fault, status_valid, status);
     portENTER_CRITICAL(&s_lock);
     s_diagnostic = (presence_diagnostic_t){
         .responding = responding, .alternate_address = alternate,
@@ -96,7 +117,7 @@ void c4001_poll(void)
     s_due_us = now + 500000;
     i2c_master_bus_handle_t bus = board_7c_i2c_bus();
     if (!bus) {
-        store_diagnostic("I2C bus unavailable", false, false, false, 0);
+        store_diagnostic("I2C bus unavailable", true, false, false, false, 0);
         return;
     }
     const char *reason = "Radar I2C communication error";
@@ -113,7 +134,7 @@ void c4001_poll(void)
                 "No I2C response: check wiring and I2C mode switch";
             goto failed;
         }
-        store_diagnostic("Radar detected; initializing", true, false, false, 0);
+        store_diagnostic("Radar detected; initializing", false, true, false, false, 0);
         i2c_device_config_t device = {
             .dev_addr_length = I2C_ADDR_BIT_LEN_7,
             .device_address = cfg->presence_address,
@@ -145,7 +166,7 @@ void c4001_poll(void)
                 reason = "Radar mode change command failed";
                 goto failed;
             }
-            store_diagnostic("Switching radar to presence mode", true, false, true, status);
+            store_diagnostic("Switching radar to presence mode", false, true, false, true, status);
             s_due_us = now + 1500000;
             return;
         }
@@ -153,7 +174,7 @@ void c4001_poll(void)
             reason = "Radar stop command failed";
             goto failed;
         }
-        store_diagnostic("Radar detected; configuring", true, false, true, status);
+        store_diagnostic("Radar detected; configuring", false, true, false, true, status);
         s_stage = STOPPED;
         s_due_us = now + 200000;
         return;
@@ -200,7 +221,7 @@ void c4001_poll(void)
             reason = "Radar start command failed";
             goto failed;
         }
-        store_diagnostic("Radar configured; starting", true, false, false, 0);
+        store_diagnostic("Radar configured; starting", false, true, false, false, 0);
         s_stage = STARTED;
         s_due_us = now + 200000;
         return;
@@ -220,14 +241,14 @@ void c4001_poll(void)
             reason = "Cannot read occupancy result";
             goto failed;
         }
-        store_diagnostic("Radar connected", true, false, true, status);
+        store_diagnostic("Radar connected", false, true, false, true, status);
         store_reading(true, (result & 1) != 0, now);
         s_stage = RUNNING;
         return;
     }
 failed:
     /* A missing/stopped/rebooting radar is unavailable, never a vacant room. */
-    store_diagnostic(reason, responding, alternate, status_valid, status);
+    store_diagnostic(reason, true, responding, alternate, status_valid, status);
     store_reading(false, false, now);
     s_stage = CHECK_MODE;
     s_due_us = now + 5000000;

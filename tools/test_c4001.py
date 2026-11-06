@@ -11,6 +11,8 @@ STUB = r'''
 #include <stdbool.h>
 #include <assert.h>
 #include <string.h>
+#include <stdarg.h>
+#include <stdio.h>
 typedef int esp_err_t;
 #define ESP_OK 0
 #define I2C_ADDR_BIT_LEN_7 0
@@ -26,6 +28,15 @@ static bool failed, no_bus, corrupt_config;
 static int adds, saves, toggles, writes, expected_address=42;
 static uint8_t registers[256];
 static int64_t esp_timer_get_time(void) {return now;}
+static int log_warnings, log_infos;
+static char last_log[160];
+static void stub_log(int *counter,const char *tag,const char *format,...) {
+ assert(tag && strcmp(tag,"c4001")==0);
+ va_list args;va_start(args,format);vsnprintf(last_log,sizeof(last_log),format,args);va_end(args);
+ (*counter)++;
+}
+#define ESP_LOGW(tag,format,...) stub_log(&log_warnings,tag,format,__VA_ARGS__)
+#define ESP_LOGI(tag,format,...) stub_log(&log_infos,tag,format,__VA_ARGS__)
 static int i2c_master_probe(void *b,uint8_t address,int timeout) {
  assert(b && timeout==20);
  return !failed && address==expected_address ? ESP_OK : -1;
@@ -66,8 +77,12 @@ int main(void){
  cfg.presence_enabled=1;no_bus=true;tick(1000000);assert(adds==0);
  no_bus=false;failed=true;tick(1000000);assert(!c4001_reading().available);
  int before=writes;tick(1000000);assert(writes==before); /* retry backoff */
+ assert(log_warnings==2 && strstr(last_log,"Radar 0x2A: No I2C response")); /* after "I2C bus unavailable" */
+ int warnings_before=log_warnings;tick(6000000);
+ assert(log_warnings==warnings_before); /* unchanged failure is not repeated */
  failed=false;registers[0]=0x83;registers[0x10]=1;until_ready();
  assert(toggles==1 && saves==1 && adds==1 && c4001_reading().occupied);
+ assert(log_infos>0 && strcmp(last_log,"Radar 0x2A: Radar connected")==0);
  assert(registers[0x20]==5 && registers[0x21]==7 && registers[0x22]==0);
  assert(registers[0x23]==60 && registers[0x24]==0 && registers[0x25]==30 && registers[0x26]==0);
  assert(registers[0x27]==0x58 && registers[0x28]==2 && registers[0x29]==0x58 && registers[0x2a]==2);
@@ -95,13 +110,15 @@ int main(void){
  expected_address=44;tick(6000000);
  assert(!c4001_diagnostic().responding && !c4001_diagnostic().alternate_address);
  assert(strstr(c4001_diagnostic().reason,"No I2C response"));
+ assert(strstr(last_log,"No I2C response"));
+ warnings_before=log_warnings;tick(6000000);assert(log_warnings==warnings_before);
  return 0;
 }
 '''
 with tempfile.TemporaryDirectory() as directory:
     d=Path(directory)
     (d/'stub.h').write_text(STUB)
-    for header in ['esp_err.h','esp_timer.h','driver/i2c_master.h','freertos/FreeRTOS.h']:
+    for header in ['esp_err.h','esp_log.h','esp_timer.h','driver/i2c_master.h','freertos/FreeRTOS.h']:
         path=d/header;path.parent.mkdir(parents=True,exist_ok=True);path.write_text('#include "stub.h"\n')
     (d/'test.c').write_text(TEST)
     subprocess.run(['cc','-std=c11','-Wall','-Wextra','-Werror','-I'+str(d),'-I'+str(ROOT/'main'),str(d/'test.c'),'-o',str(d/'test')],check=True)

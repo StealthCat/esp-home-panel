@@ -32,6 +32,10 @@ On Waveshare's 7C schematic the external bus is on the board's 16-pin header **P
 
 Matching blue to blue swaps SDA and SCL. Matching connectors pin-for-pin with a generic adapter can put power on a data line or short the 3.3 V rail.
 
+The Adafruit hub's breakout pads use a **different order from its JST connectors**. The pads are labelled `VIN GND SCL SDA`, and the two rows run in opposite directions; the JST connectors are GND, V+, SDA, SCL. Wire the pads by their labels, not by position.
+
+**Check the hub before connecting the sensor.** With only the hub attached and the panel on, the hub's green **on** LED must light and VIN-to-GND must read about **+3.3 V**. SDA and SCL to GND should also read about +3.3 V (the panel's pull-ups). If the LED stays dark or the reading is negative or 0 V, the panel-to-hub wiring is reversed or misrouted. Plugging the sensor into it reverse-powers the sensor and shorts the panel's supply. The screen goes black and USB serial drops with no log, because the panel loses power, not because firmware crashed.
+
 - A **passive hub** such as the Adafruit 5625 simply wires its ports in parallel (it has no pull-ups). Its cables and each module's on-board pull-ups add to the bus load, so keep the total cable length short. Power the hub from the header's **3.3 V** pin: Gravity modules pull SDA/SCL up to the supply they receive, and 5 V on these lines exceeds the 3.3 V touch controller and IO expander.
 - **Multiplexer hubs** (TCA9548A/PCA9548A, usually at `0x70`) are not supported. The firmware never selects a channel, so a radar behind one reports **No I2C response**.
 
@@ -128,7 +132,10 @@ If **Live sensor readings** reports the SEN0610 as unavailable, open
 **Sensors** and read the diagnostic text under **Room occupancy**. The
 diagnostic is also present in the read-only `GET /api/sensors` response
 under `presence.diagnostic`, with `detected`, `other_address`,
-`address`, and optionally `raw_status`.
+`address`, and optionally `raw_status`. The serial console logs each change
+once, for example `W (12345) c4001: Radar 0x2A: No I2C response: check wiring and I2C mode switch`.
+While the radar is unavailable, MQTT publishes `offline` on the occupancy
+availability topic; that message alone does not say why.
 
 - **No I2C response**: verify the SEN0610's mode switch is on I2C,
   the +/− power and ground, the C/R-to-SCL and D/T-to-SDA wiring, and
