@@ -13,6 +13,18 @@ Power off before connecting a 3.3 V compatible breakout. Connect ground, 3.3 V, 
 
 The driver borrows the board's initialized 100 kHz bus, shared with touch and the IO expander. Use short wiring and avoid excessive parallel pull-ups. Place the sensor at a case opening, away from the display's own light and shadows cast by the bezel. Only one VEML7700 is supported on this bus because its address is fixed.
 
+### Hubs, hot-plugging and panel restarts
+
+Every sensor, cable and hub joins the same bus as the touch controller and the expander that powers the LCD. A bus fault can therefore affect the whole panel, not only the sensor.
+
+- **Power off the panel before connecting or disconnecting a sensor or hub.** Hot-plugging glitches SDA/SCL and can pull the 3.3 V supply low.
+- A **passive hub** (for example a Gravity I2C hub) simply wires its ports in parallel. Its cables and each module's on-board pull-ups add to the bus load, so keep the total cable length short. Power the hub and modules from **3.3 V**: Gravity modules pull SDA/SCL up to the supply they receive, and 5 V on these lines can damage the ESP32-S3.
+- **Multiplexer hubs** (TCA9548A/PCA9548A, usually at `0x70`) are not supported. The firmware never selects a channel, so a radar behind one reports **No I2C response**.
+
+Firmware treats a failed touch-controller read as "no touch" instead of restarting. (Previously, esp_lvgl_port aborted on any such error.) The serial log reports these failures, rate-limited, as `touch_guard: Ignored N touch read failure(s)`. Occasional messages are harmless. A continuous stream means the bus is unhealthy: touch may stop responding while the display, MQTT and web settings keep working, so you can disable the sensor under **Sensors** and power off to check the wiring.
+
+If the panel still restarts after connecting a sensor, check the serial monitor. `Brownout detector was triggered` means the supply cannot carry the extra load: power the sensor from a separate 3.3 V supply with a common ground. Report any other panic backtrace along with your hub model.
+
 ## Setup and Home Assistant
 
 1. Install this firmware, then open the panel's web settings.
