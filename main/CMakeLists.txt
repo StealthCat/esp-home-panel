@@ -46,6 +46,7 @@ idf_component_register(
     SRCS
         "app_main.c"
         "board_7c.c"
+        "touch_guard.c"
         "network.c"
         "network_identity.c"
         "settings.c"

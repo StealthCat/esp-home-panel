@@ -42,6 +42,7 @@ esp_err_t board_7c_init(board_7c_handles_t *handles)
 #include "esp_lcd_panel_rgb.h"
 #include "esp_lcd_touch_gt911.h"
 #include "esp_log.h"
+#include "touch_guard.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -361,6 +362,9 @@ static esp_err_t touch_init(esp_lcd_touch_handle_t *out_touch)
 
     ESP_RETURN_ON_ERROR(esp_lcd_touch_new_i2c_gt911(touch_io, &touch_cfg, out_touch), TAG,
                         "GT911 init failed");
+    /* The bus is shared with optional sensors; a transient I2C error during a
+     * touch read must not abort the firmware from inside esp_lvgl_port. */
+    touch_guard_install(*out_touch);
     return ESP_OK;
 }
 
