@@ -15,15 +15,29 @@ The driver borrows the board's initialized 100 kHz bus, shared with touch and th
 
 ### Hubs, hot-plugging and panel restarts
 
-Every sensor, cable and hub joins the same bus as the touch controller and the expander that powers the LCD. A bus fault can therefore affect the whole panel, not only the sensor.
+Every sensor, cable and hub joins the same bus as the touch controller and the IO expander that controls the LCD. They also share the panel's 3.3 V rail. A fault on either can therefore affect the whole panel, not only the sensor.
 
-- **Power off the panel before connecting or disconnecting a sensor or hub.** Hot-plugging glitches SDA/SCL and can pull the 3.3 V supply low.
-- A **passive hub** (for example a Gravity I2C hub) simply wires its ports in parallel. Its cables and each module's on-board pull-ups add to the bus load, so keep the total cable length short. Power the hub and modules from **3.3 V**: Gravity modules pull SDA/SCL up to the supply they receive, and 5 V on these lines can damage the ESP32-S3.
+**Power off the panel before connecting or disconnecting a sensor or hub.** On the 7C-BOX the 3.3 V header pin is the panel's own logic rail, with only about 21 µF of capacitance at its regulator. A module plugged in live charges its own capacitors from that rail, and the dip can reset the IO expander. The backlight enable (DISP) has a pull-down, so a reset expander turns the screen **black while the panel keeps running**. The firmware now detects this and restores the expander within about two seconds (serial log: `IO expander lost its output state ... restoring display and touch`). Hot-plugging is still not supported: a deeper dip resets the ESP32-S3 too.
+
+On Waveshare's 7C schematic the external bus is on the board's 16-pin header **P1**: pin 4 or 6 = GND, pin 5 = **3V3**, pin 7 = SDA, pin 8 = SCL (pin 3 is 5 V; do not use it for sensors). These SDA/SCL lines are the 3.3 V side of a MOSFET level shifter (4.7 kΩ pull-ups to 3.3 V). The ESP32-S3's own GPIO47/GPIO48 run at 1.8 V behind it. Check the labels on your board.
+
+**Gravity sensor on a STEMMA QT / Qwiic hub** (for example Adafruit 5625 with the Gravity C4001): the two systems use different pin orders and **conflicting wire colours**, so wire by signal name, never by colour:
+
+| STEMMA QT / Qwiic (hub) | Gravity SEN0610 (sensor) |
+| --- | --- |
+| GND (black) | `-` (black) |
+| V+ (red) | `+` (red) |
+| SDA (blue) | `D/T` (green) |
+| SCL (yellow) | `C/R` (blue) |
+
+Matching blue to blue swaps SDA and SCL. Matching connectors pin-for-pin with a generic adapter can put power on a data line or short the 3.3 V rail.
+
+- A **passive hub** such as the Adafruit 5625 simply wires its ports in parallel (it has no pull-ups). Its cables and each module's on-board pull-ups add to the bus load, so keep the total cable length short. Power the hub from the header's **3.3 V** pin: Gravity modules pull SDA/SCL up to the supply they receive, and 5 V on these lines exceeds the 3.3 V touch controller and IO expander.
 - **Multiplexer hubs** (TCA9548A/PCA9548A, usually at `0x70`) are not supported. The firmware never selects a channel, so a radar behind one reports **No I2C response**.
 
 Firmware treats a failed touch-controller read as "no touch" instead of restarting. (Previously, esp_lvgl_port aborted on any such error.) The serial log reports these failures, rate-limited, as `touch_guard: Ignored N touch read failure(s)`. Occasional messages are harmless. A continuous stream means the bus is unhealthy: touch may stop responding while the display, MQTT and web settings keep working, so you can disable the sensor under **Sensors** and power off to check the wiring.
 
-If the panel still restarts after connecting a sensor, check the serial monitor. `Brownout detector was triggered` means the supply cannot carry the extra load: power the sensor from a separate 3.3 V supply with a common ground. Report any other panic backtrace along with your hub model.
+If the panel restarts or stays dark after connecting a sensor with the power off, check the serial monitor. `Brownout detector was triggered` means the 3.3 V rail cannot carry the extra load: power the sensor from a separate 3.3 V supply with a common ground. Report any other panic backtrace along with your hub model.
 
 ## Setup and Home Assistant
 

@@ -22,6 +22,11 @@ esp_err_t board_7c_init(board_7c_handles_t *handles);
 esp_err_t board_7c_set_backlight(uint8_t percent);
 bool board_7c_has_pwm_backlight(void);
 
+/* Call periodically from the task that sets the backlight. Detects a 7C-BOX IO
+ * expander that was reset (e.g. by an accessory hot-plug dipping 3.3 V), which
+ * leaves the backlight off, and restores its state. */
+void board_7c_service(void);
+
 #ifdef __cplusplus
 }
 #endif

@@ -47,6 +47,7 @@ idf_component_register(
         "app_main.c"
         "board_7c.c"
         "touch_guard.c"
+        "iox_monitor.c"
         "network.c"
         "network_identity.c"
         "settings.c"
